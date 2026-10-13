@@ -1,4 +1,5 @@
 import { scaledAmount } from '@money-tour/engine';
+import { readPrivateChoice, savePrivateChoice } from './privateStorage';
 import { useEffect, useRef, useState } from 'react';
 import {
   duelCommitment,
@@ -39,11 +40,7 @@ export function DuelView({
     ).join('');
     const secret = { choice, salt };
     secrets.current[actor.id] = secret;
-    try {
-      sessionStorage.setItem(key(actor.id), JSON.stringify(secret));
-    } catch {
-      /* The in-memory secret still supports this duel. */
-    }
+    savePrivateChoice(key(actor.id), secret, !!self);
     act({
       type: 'duel_commit',
       playerId: actor.id,
@@ -56,9 +53,7 @@ export function DuelView({
     if (revealSent.current === requestKey) return;
     let secret = secrets.current[actor.id];
     try {
-      secret ??= JSON.parse(
-        sessionStorage.getItem(`money-tour.duel.${d.id}.${actor.id}`) ?? 'null',
-      );
+      secret ??= readPrivateChoice(key(actor.id)) as typeof secret;
     } catch {
       /* Offer cancellation if the local secret was lost. */
     }

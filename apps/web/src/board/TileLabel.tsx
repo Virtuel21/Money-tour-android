@@ -45,7 +45,7 @@ export function TileLabel({
       viewBox={`0 0 240 ${height}`}
       style={{ height, transform: `matrix(${matrix.join(',')})` }}
     >
-      {backing && <rect width="240" height={height} rx="5" fill="#fff7df" fillOpacity="0.94" />}
+      {backing && <rect width="240" height={height} rx="5" fill="#fff7df" />}
       <svg
         x="8"
         y="2"
@@ -72,7 +72,7 @@ export function TileLabel({
       {frame(anchors.name, 60, 'name', name, 46, true)}
       {conditions.length > 0 &&
         frame(anchors.condition, 36, 'condition', conditions.join(' · '), 23, true)}
-      {rent && frame(insured ? anchors.insuredRent : anchors.rent, 120, 'rent', rent, 116, false)}
+      {rent && frame(insured ? anchors.insuredRent : anchors.rent, 120, 'rent', rent, 116, true)}
     </>
   );
 }

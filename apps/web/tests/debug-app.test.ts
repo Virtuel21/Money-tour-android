@@ -92,12 +92,14 @@ it('launches, edits, undoes and resumes a debug scenario without overwriting nor
   await act(() =>
     document.querySelector<HTMLButtonElement>('[aria-label="Money Tour, accueil"]')!.click(),
   );
+  await click('Accueil et sauvegarde');
   await click('Reprendre mon scénario debug');
   expect(loadDebug()!.state.players[0]!.cash).toBe(2500);
   await shortcut();
   await act(() =>
     document.querySelector<HTMLButtonElement>('[aria-label="Money Tour, accueil"]')!.click(),
   );
+  await click('Accueil et sauvegarde');
   await click('Reprendre ma partie');
   expect(scene.visible!.players[0]!.cash).toBe(1234);
   expect(document.querySelector('.debug-toolbar')).toBeNull();

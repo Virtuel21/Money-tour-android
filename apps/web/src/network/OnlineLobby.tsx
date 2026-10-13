@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { config } from '@money-tour/engine';
 import { identity, secret, type Identity } from './crypto';
-import { Session, type SavedSession, type SessionView } from './session';
+import { Session, type SessionView } from './session';
+import {
+  forgetOnlineResume,
+  loadOnlineIdentity,
+  loadOnlineSession,
+  rememberOnline,
+  type OnlineResume,
+} from './storage';
 import { TrysteroTransport } from './trystero';
 import { invitationCode } from './invitation';
 import { DurationPicker, validMinutes } from '../game/DurationPicker';
@@ -14,6 +20,7 @@ export default function OnlineLobby({
   onView,
   onLeave,
   autoCreate = false,
+  resume,
   defaults,
 }: {
   open: boolean;
@@ -22,6 +29,7 @@ export default function OnlineLobby({
   onView: (view: SessionView) => void;
   onLeave: () => void;
   autoCreate?: boolean;
+  resume?: OnlineResume;
   defaults?: {
     name: string;
     count: number;
@@ -34,7 +42,9 @@ export default function OnlineLobby({
   const [code, setCode] = useState(
     () => new URLSearchParams(location.hash.slice(1)).get('room') ?? '',
   );
-  const [name, setName] = useState(defaults?.name && defaults.name !== 'Vous' ? defaults.name : '');
+  const [name, setName] = useState(
+    resume?.name ?? (defaults?.name && defaults.name !== 'Vous' ? defaults.name : ''),
+  );
   const [view, setView] = useState<SessionView | null>(null);
   const [error, setError] = useState(''),
     [working, setWorking] = useState(false),
@@ -67,11 +77,11 @@ export default function OnlineLobby({
   );
   const created = useRef(false);
   useEffect(() => {
-    if (autoCreate && !created.current) {
+    if ((resume || autoCreate) && !created.current) {
       created.current = true;
-      void connect(true);
+      void connect(!resume);
     }
-  }, [autoCreate]);
+  }, [autoCreate, resume]);
   async function connect(create: boolean) {
     if (connecting.current) return;
     connecting.current = true;
@@ -81,7 +91,7 @@ export default function OnlineLobby({
     abort.current = controller;
     setWorking(true);
     setError('');
-    const roomCode = create ? secret().slice(0, 32) : invitationCode(code);
+    const roomCode = resume?.code ?? (create ? secret().slice(0, 32) : invitationCode(code));
     if (!roomCode) {
       setError('Le code doit contenir 32 caractères. Copiez le code complet de votre ami.');
       setWorking(false);
@@ -92,33 +102,9 @@ export default function OnlineLobby({
     session.current = null;
     setView(null);
     try {
-      let user: Identity | undefined;
-      try {
-        const stored = JSON.parse(
-          localStorage.getItem(`money-tour.identity.${roomCode}`) ?? 'null',
-        ) as { at: number; identity: Identity } | null;
-        if (stored && Date.now() - stored.at < config.network.reconnectTtlMs)
-          user = stored.identity;
-      } catch {
-        /* Storage may be disabled. */
-      }
+      let user: Identity | undefined = loadOnlineIdentity(roomCode);
       user ??= await identity();
-      try {
-        localStorage.setItem(
-          `money-tour.identity.${roomCode}`,
-          JSON.stringify({ at: Date.now(), identity: user }),
-        );
-      } catch {
-        setError('Stockage désactivé : votre siège ne pourra pas être repris après fermeture.');
-      }
-      let saved: SavedSession | undefined;
-      try {
-        saved =
-          JSON.parse(sessionStorage.getItem(`money-tour.session.${roomCode}`) ?? 'null') ??
-          undefined;
-      } catch {
-        /* Ignore malformed cache. */
-      }
+      const saved = loadOnlineSession(roomCode);
       let servers: RTCIceServer[] = [];
       if (turnUrl.trim()) {
         const urls = turnUrl
@@ -147,27 +133,34 @@ export default function OnlineLobby({
           ? `Voyageur ${user.id.slice(0, 4)}`
           : chosenName;
       setName(publicName);
-      const next = new Session(transport, user, publicName, create);
+      const creator = resume?.creator ?? create;
+      const recovery = { code: roomCode, name: publicName, creator };
+      if (!rememberOnline(recovery, user))
+        setError('Stockage désactivé : votre siège ne pourra pas être repris après fermeture.');
+      const next = new Session(transport, user, publicName, creator);
       next.onChange = (value) => {
         if (request !== attempt.current) return;
         setView(value);
         callbacks.current.onView(value);
       };
       next.onPersist = (value) => {
-        try {
-          sessionStorage.setItem(`money-tour.session.${roomCode}`, JSON.stringify(value));
-        } catch {
-          /* An active session remains playable without persistence. */
-        }
+        if (!rememberOnline({ ...recovery, name: next.name }, user, value))
+          setError(
+            'Sauvegarde indisponible : gardez cet onglet ouvert pour conserver votre siège.',
+          );
       };
       session.current = next;
+      setCode(roomCode);
+      history.replaceState(
+        history.state,
+        '',
+        `${location.pathname}${location.search}#room=${roomCode}`,
+      );
       await next.join(roomCode, saved);
       if (request !== attempt.current) {
         next.close();
         return;
       }
-      setCode(roomCode);
-      history.replaceState(null, '', `${location.pathname}${location.search}#room=${roomCode}`);
       callbacks.current.onSession(next);
     } catch (e) {
       if (request !== attempt.current) return;
@@ -189,6 +182,14 @@ export default function OnlineLobby({
     }
   }
   function leave() {
+    if (
+      view?.state &&
+      !view.state.winner &&
+      !window.confirm(
+        'Quitter le salon ? Votre siège sera conservé pendant 90 secondes avant de passer en bot.',
+      )
+    )
+      return;
     attempt.current++;
     abort.current?.abort();
     connecting.current = false;
@@ -196,7 +197,8 @@ export default function OnlineLobby({
     session.current?.close();
     session.current = null;
     setView(null);
-    history.replaceState(null, '', `${location.pathname}${location.search}`);
+    forgetOnlineResume(code);
+    history.replaceState(history.state, '', `${location.pathname}${location.search}`);
     callbacks.current.onLeave();
     onClose();
   }
@@ -474,8 +476,10 @@ export default function OnlineLobby({
         </p>
       )}
       <p className="setup-note">
-        Gardez l’onglet ouvert. Une coupure de l’hôte déclenche une relève après 15 secondes.
-        Certains réseaux nécessitent un TURN. Partagez le lien uniquement avec vos invités.
+        Vous pouvez reprendre votre siège sur cet appareil pendant 24 h. Après une coupure, la
+        partie attend jusqu’à 90 secondes avant de confier votre siège à un bot. Une coupure de
+        l’hôte déclenche une relève après 15 secondes. Certains réseaux nécessitent un TURN.
+        Partagez le lien uniquement avec vos invités.
       </p>
     </dialog>
   );

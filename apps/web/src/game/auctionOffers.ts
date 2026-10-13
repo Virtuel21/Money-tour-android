@@ -1,4 +1,5 @@
 import { auctionCommitment, type GameState } from '@money-tour/engine';
+import { readPrivateChoice, savePrivateChoice } from './privateStorage';
 
 type Offer = { amount: number; salt: string };
 const offers = new Map<string, Offer>();
@@ -8,11 +9,7 @@ export const auctionOfferKey = (id: string, player: string, gameKey?: string) =>
 export function saveAuctionOffer(id: string, player: string, offer: Offer, gameKey?: string) {
   const key = auctionOfferKey(id, player, gameKey);
   offers.set(key, offer);
-  try {
-    sessionStorage.setItem(key, JSON.stringify(offer));
-  } catch {
-    /* The mounted game can continue even when storage is unavailable. */
-  }
+  savePrivateChoice(key, offer, !!gameKey);
 }
 
 export function readAuctionOffer(state: GameState, player: string, gameKey?: string): Offer | null {
@@ -22,7 +19,7 @@ export function readAuctionOffer(state: GameState, player: string, gameKey?: str
   if (auction.stage === 'reveal') keys.push(auctionOfferKey(auction.id, player));
   for (const key of keys) {
     try {
-      const offer = offers.get(key) ?? JSON.parse(sessionStorage.getItem(key) ?? 'null');
+      const offer = (offers.get(key) ?? readPrivateChoice(key)) as Offer | null;
       if (
         offer &&
         Number.isSafeInteger(offer.amount) &&
