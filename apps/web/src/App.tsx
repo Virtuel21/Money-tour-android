@@ -184,6 +184,8 @@ for (const [id, ownerId, level] of [
 export default function App() {
   const mobile = useMobile();
   const [overview, setOverview] = useState(false);
+  const [boardPanned, setBoardPanned] = useState(false);
+  const [viewResetKey, setViewResetKey] = useState(0);
   const [strategicTiles, setStrategicTiles] = useState<number[]>([]);
   const [comfort, setComfort] = useState(loadComfort);
   const [journey, setJourney] = useState(0);
@@ -1157,6 +1159,8 @@ export default function App() {
                     taunt={visibleTaunt ?? undefined}
                     mobile={mobile}
                     onZoomChange={(boardZoom) => setComfort((old) => ({ ...old, boardZoom }))}
+                    onPanChange={setBoardPanned}
+                    viewResetKey={viewResetKey}
                     overview={
                       overview ||
                       paused ||
@@ -1244,16 +1248,22 @@ export default function App() {
                 {mobile ? (
                   <>
                     <button
-                      aria-pressed={overview}
-                      onClick={() =>
-                        inspectedOwner ? setInspectedOwner(null) : setOverview(!overview)
-                      }
+                      aria-pressed={overview || boardPanned}
+                      onClick={() => {
+                        if (inspectedOwner) setInspectedOwner(null);
+                        else if (boardPanned) {
+                          setOverview(false);
+                          setViewResetKey((key) => key + 1);
+                        } else setOverview(!overview);
+                      }}
                     >
                       {inspectedOwner
                         ? 'Tout afficher'
-                        : overview
-                          ? 'Suivre mon pion'
-                          : 'Vue globale'}
+                        : boardPanned
+                          ? 'Recentrer mon pion'
+                          : overview
+                            ? 'Suivre mon pion'
+                            : 'Vue globale'}
                     </button>
                     <button className="icon-label" onClick={() => setModal('pocket')}>
                       <GameIcon name="book" />
@@ -1769,7 +1779,8 @@ export default function App() {
                 <p id="board-zoom-help">
                   Réglage personnel, mémorisé sur cet appareil. Le zoom s’applique au plateau et au
                   suivi du pion. Une vue complète est conservée pour les enchères et le repérage des
-                  cases.
+                  cases. Sur mobile, pincez pour zoomer et glissez avec un doigt pour déplacer la
+                  vue agrandie. « Recentrer mon pion » rétablit le cadrage automatique.
                 </p>
               </section>
               <label className="field">
