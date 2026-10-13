@@ -4,6 +4,7 @@ import { tauntAsset, type Taunt } from '../game/taunts';
 import { scaledAmount } from '@money-tour/engine';
 import { cameraBounds, cameraZoom, followPlayer } from './camera';
 import { bindPinchZoom } from './pinchZoom';
+import { panFocus } from './cameraPan';
 import { useEffect, useId, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -99,6 +100,8 @@ export default function Board({
   overview = false,
   zoomPercent = 100,
   onZoomChange,
+  viewResetKey = 0,
+  onPanChange,
   self,
   inspectedOwner,
   onPlayer,
@@ -119,6 +122,8 @@ export default function Board({
   overview?: boolean;
   zoomPercent?: number;
   onZoomChange?: (value: number) => void;
+  viewResetKey?: number;
+  onPanChange?: (panned: boolean) => void;
   self?: string;
   inspectedOwner?: string | null;
   onPlayer?: (id: string) => void;
@@ -135,6 +140,23 @@ export default function Board({
   const shell = useRef<HTMLDivElement>(null);
   const zoomCallback = useRef(onZoomChange);
   zoomCallback.current = onZoomChange;
+  const panCallback = useRef(onPanChange);
+  panCallback.current = onPanChange;
+  const manualView = useRef<{ focus: THREE.Vector3; zoomBase: number } | null>(null);
+  const panEnabled = useRef(false);
+  const pan = useRef<(dx: number, dy: number) => void>(() => {});
+  const frameAll =
+    selecting ||
+    auctionTile !== undefined ||
+    state.phase === 'auction' ||
+    strategicTiles.length > 0 ||
+    Boolean(state.winner);
+  useEffect(() => {
+    if (manualView.current) {
+      manualView.current = null;
+      panCallback.current?.(false);
+    }
+  }, [viewResetKey, overview, mobile, frameAll, state.turn, state.currentPlayer]);
   const foregroundPawns = useRef<(HTMLSpanElement | null)[]>([]);
   const live = useRef({
     state,
@@ -169,6 +191,7 @@ export default function Board({
       shell.current,
       () => live.current.zoomPercent,
       (value) => zoomCallback.current?.(value),
+      { enabled: () => panEnabled.current, move: (dx, dy) => pan.current(dx, dy) },
     );
   }, [mobile, demo, Boolean(onZoomChange)]);
   const [error, setError] = useState(''),
@@ -808,6 +831,24 @@ export default function Board({
         draw();
         const focus = new THREE.Vector3();
         const cameraOffset = new THREE.Vector3(18, 22, 18);
+        pan.current = (dx, dy) => {
+          if (!panEnabled.current || (!dx && !dy)) return;
+          const previous = manualView.current;
+          const next = panFocus(
+            camera,
+            previous?.focus ?? focus,
+            dx,
+            dy,
+            element.clientWidth,
+            element.clientHeight,
+            { x: shape.x + shape.depth / 2, z: shape.z + shape.depth / 2 },
+          );
+          manualView.current = {
+            focus: next,
+            zoomBase: previous?.zoomBase ?? camera.zoom / (live.current.zoomPercent / 100),
+          };
+          if (!previous) panCallback.current?.(true);
+        };
         let previousTime = performance.now(),
           lastProjection = 0,
           projectionSignature = '';
@@ -907,23 +948,27 @@ export default function Board({
             active: currentPlayer.id,
             winner: Boolean(game.winner),
           });
-          const target = following
-            ? pawns[game.currentPlayer]!.position.clone().setY(0.6)
-            : new THREE.Vector3();
+          const target =
+            manualView.current?.focus ??
+            (following
+              ? pawns[game.currentPlayer]!.position.clone().setY(0.6)
+              : new THREE.Vector3());
           const factor = reduced ? 1 : 1 - Math.exp(-Math.min(100, now - previousTime) / 170);
           previousTime = now;
-          focus.lerp(target, factor);
-          const zoomTarget = cameraZoom(
-            camera.right,
-            following,
-            live.current.zoomPercent,
+          if (manualView.current) focus.copy(target);
+          else focus.lerp(target, factor);
+          const frameAll =
             live.current.selecting ||
-              live.current.auctionTile !== undefined ||
-              game.phase === 'auction' ||
-              live.current.strategicTiles.length > 0 ||
-              Boolean(game.winner),
-          );
+            live.current.auctionTile !== undefined ||
+            game.phase === 'auction' ||
+            live.current.strategicTiles.length > 0 ||
+            Boolean(game.winner);
+          const zoomTarget = manualView.current
+            ? (manualView.current.zoomBase * live.current.zoomPercent) / 100
+            : cameraZoom(camera.right, following, live.current.zoomPercent, frameAll);
           camera.zoom = THREE.MathUtils.lerp(camera.zoom, zoomTarget, factor);
+          panEnabled.current = live.current.mobile && !demo && !frameAll && camera.zoom > 1.01;
+          element.parentElement?.classList.toggle('board-can-pan', panEnabled.current);
           camera.position.copy(cameraOffset).add(focus);
           camera.lookAt(focus);
           camera.updateProjectionMatrix();
@@ -991,7 +1036,10 @@ export default function Board({
               '--camera-label-scale',
               String((camera.zoom * 18) / camera.right),
             );
-            element.parentElement?.setAttribute('data-camera', following ? 'follow' : 'overview');
+            element.parentElement?.setAttribute(
+              'data-camera',
+              manualView.current ? 'manual' : following ? 'follow' : 'overview',
+            );
             projectionSignature = signature;
             lastProjection = now;
           }
@@ -1124,6 +1172,12 @@ export default function Board({
     return () => {
       disposed = true;
       update.current = () => {};
+      pan.current = () => {};
+      panEnabled.current = false;
+      if (manualView.current) {
+        manualView.current = null;
+        panCallback.current?.(false);
+      }
       renderer?.setAnimationLoop(null);
       observer?.disconnect();
       cleanup();

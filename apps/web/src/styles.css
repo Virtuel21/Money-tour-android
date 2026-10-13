@@ -340,6 +340,9 @@ select {
 .board-pinch-zoom {
   touch-action: pan-x pan-y;
 }
+.board-pinch-zoom.board-can-pan {
+  touch-action: none;
+}
 .board-canvas canvas {
   display: block;
   width: 100% !important;
