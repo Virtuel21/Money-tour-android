@@ -12,6 +12,7 @@ import {
 import { MemoryNetwork, MemoryTransport } from '../src/network/transport';
 import { Session, type SavedSession } from '../src/network/session';
 import { getDecisionPlayerId, getLegalActions } from '@money-tour/engine';
+import { DISCONNECT_GRACE_MS } from '../src/network/policy';
 
 describe('shared randomness', () => {
   it('requires identical commitments before reveal and verifies every secret', async () => {
@@ -126,6 +127,7 @@ describe('network sessions', () => {
     expect(returned.host).toBe(next.user.id);
     expect(returned.epoch).toBe(1);
     expect(returned.head).toBe(next.head);
+    expect(returned.status).toBe('Partie synchronisée.');
     sessions.forEach((s) => s.close());
   });
   it('refuses incomplete rounds and retries without accepting the missing contribution', async () => {
@@ -231,7 +233,7 @@ describe('network sessions', () => {
     expect(client.head).toBe(host.head);
     sessions.forEach((s) => s.close());
   });
-  it('migrates after 15 seconds, preserves history and replaces the absent seat', async () => {
+  it('migrates after 15 seconds but waits 90 seconds before replacing the absent seat', async () => {
     const { sessions, flush, advance } = await setup(3);
     const host = sessions[0]!,
       next = sessions[1]!;
@@ -251,8 +253,95 @@ describe('network sessions', () => {
     expect(next.head).toBe(head);
     await next.pulse();
     await flush();
+    expect(next.state!.players[0]!.bot).toBe(false);
+    const elapsed = next.state!.decisionElapsedMs;
+    for (let seconds = 0; seconds < 70; seconds += 5) {
+      advance(5000);
+      await next.pulse();
+      await flush();
+      await sessions[2]!.pulse();
+      await flush();
+    }
+    advance(DISCONNECT_GRACE_MS - 85002);
+    await next.pulse();
+    await flush();
+    await sessions[2]!.pulse();
+    await flush();
+    await next.pulse();
+    await flush();
+    expect(next.state!.players[0]!.bot).toBe(false);
+    expect(next.state!.decisionElapsedMs).toBe(elapsed);
+    advance(1);
+    await next.pulse();
+    await flush();
     expect(next.state!.players[0]!.bot).toBe(true);
     expect(sessions[2]!.head).toBe(next.head);
+    sessions.forEach((s) => s.close());
+  });
+  it('reserves a disconnected guest seat and pauses the clock until it reconnects', async () => {
+    const { network, sessions, flush, advance } = await setup(2);
+    const host = sessions[0]!,
+      client = sessions[1]!;
+    let saved: SavedSession | undefined;
+    client.onPersist = (value) => {
+      saved = structuredClone(value);
+    };
+    await host.start(2, false, 1200000);
+    await host.idle();
+    await flush();
+    client.close();
+    const elapsed = host.state!.decisionElapsedMs;
+    for (let n = 0; n < 8; n++) {
+      advance(10000);
+      await host.pulse();
+      await flush();
+      expect(host.state!.players[1]!.bot).toBe(false);
+      expect(host.state!.decisionElapsedMs).toBe(elapsed);
+    }
+    const returned = new Session(
+      new MemoryTransport('guest-reopened', network),
+      client.user,
+      client.name,
+      false,
+    );
+    sessions.push(returned);
+    await returned.join('test-code', saved, false);
+    await flush();
+    advance(1000);
+    await host.pulse();
+    await flush();
+    expect(returned.head).toBe(host.head);
+    expect(host.state!.players[1]!.bot).toBe(false);
+    expect(host.state!.decisionElapsedMs).toBe(elapsed + 1000);
+    sessions.forEach((s) => s.close());
+  });
+  it('treats a failed draw as a temporary connection problem and allows a healthy retry', async () => {
+    const { network, sessions, flush, advance } = await setup(2);
+    const host = sessions[0]!,
+      client = sessions[1]!;
+    await host.start(2, false, 1200000);
+    await host.idle();
+    await flush();
+    network.drop = (from, _to, message) =>
+      from === 'peer-1' && (message as { body: { type: string } }).body.type === 'contribution';
+    await host.intent({ type: 'roll', playerId: host.user.id });
+    await flush();
+    advance(17000);
+    await host.pulse();
+    await flush();
+    await host.pulse();
+    await flush();
+    expect(host.state!.players[1]!.bot).toBe(false);
+    expect(host.state!.decisionElapsedMs).toBe(0);
+    network.drop = () => false;
+    await client.pulse();
+    await flush();
+    await host.intent({ type: 'roll', playerId: host.user.id });
+    await flush();
+    expect(host.state!.dice).toHaveLength(2);
+    expect(host.state!.players[1]!.bot).toBe(false);
+    expect(client.head).toBe(host.head);
+    expect(host.frames.at(-1)?.proof?.context.participants).toHaveLength(2);
     sessions.forEach((s) => s.close());
   });
   it('reconnects with the same key and replays the snapshot before reclaiming a seat', async () => {
@@ -267,9 +356,10 @@ describe('network sessions', () => {
     await host.idle();
     await flush();
     client.close();
-    advance(16000);
+    advance(DISCONNECT_GRACE_MS + 1);
     await host.pulse();
     await flush();
+    expect(host.state!.players[1]!.bot).toBe(true);
     const returned = new Session(
       new MemoryTransport('peer-returned', network),
       client.user,
@@ -280,8 +370,7 @@ describe('network sessions', () => {
     await returned.join('test-code', saved, false);
     await flush();
     expect(returned.head).toBe(host.head);
-    await returned.intent({ type: 'set_control', playerId: client.user.id, bot: false });
-    await flush();
+    // The authenticated snapshot restores human control automatically.
     expect(host.state!.players[1]!.bot).toBe(false);
     sessions.forEach((s) => s.close());
   });

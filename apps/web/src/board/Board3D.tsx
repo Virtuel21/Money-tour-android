@@ -3,6 +3,7 @@ import { architectureFamilies, architectureForCity } from '../game/architecture'
 import { tauntAsset, type Taunt } from '../game/taunts';
 import { scaledAmount } from '@money-tour/engine';
 import { cameraBounds, cameraZoom, followPlayer } from './camera';
+import { bindPinchZoom } from './pinchZoom';
 import { useEffect, useId, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -97,6 +98,7 @@ export default function Board({
   mobile = false,
   overview = false,
   zoomPercent = 100,
+  onZoomChange,
   self,
   inspectedOwner,
   onPlayer,
@@ -116,6 +118,7 @@ export default function Board({
   mobile?: boolean;
   overview?: boolean;
   zoomPercent?: number;
+  onZoomChange?: (value: number) => void;
   self?: string;
   inspectedOwner?: string | null;
   onPlayer?: (id: string) => void;
@@ -129,6 +132,9 @@ export default function Board({
       : 'outline'
     : 'outline';
   const host = useRef<HTMLDivElement>(null);
+  const shell = useRef<HTMLDivElement>(null);
+  const zoomCallback = useRef(onZoomChange);
+  zoomCallback.current = onZoomChange;
   const foregroundPawns = useRef<(HTMLSpanElement | null)[]>([]);
   const live = useRef({
     state,
@@ -157,6 +163,14 @@ export default function Board({
     auctionTile,
   };
   const update = useRef<() => void>(() => {});
+  useEffect(() => {
+    if (!mobile || demo || !onZoomChange || !shell.current) return;
+    return bindPinchZoom(
+      shell.current,
+      () => live.current.zoomPercent,
+      (value) => zoomCallback.current?.(value),
+    );
+  }, [mobile, demo, Boolean(onZoomChange)]);
   const [error, setError] = useState(''),
     [ready, setReady] = useState(false);
   const [pawnAnchors, setPawnAnchors] = useState<
@@ -603,7 +617,22 @@ export default function Board({
           celebration.rotation.y = p.angle;
           if (tile.type === 'city' || tile.type === 'resort') {
             const flag = festivalFlag(festivalFlags[0]?.texture);
-            flag.group.position.set(-0.72, 0, -0.62);
+            // A small pennant in the building lane, below the name strip in
+            // screen space on all four sides, rather than a full-height mast.
+            const regions = tileLabelRegions(tile.id, live.current.state.config.board.length);
+            const point = tileDecorationPoint(
+              tile.id,
+              live.current.state.config.board.length,
+              0.75,
+            );
+            const flagPoint = new THREE.Vector3(
+              point.x - regions.across.x * regions.width * 0.28,
+              0.29,
+              point.z - regions.across.z * regions.width * 0.28,
+            );
+            celebration.updateMatrixWorld();
+            flag.group.position.copy(celebration.worldToLocal(flagPoint));
+            flag.group.scale.setScalar(0.45);
             flag.group.rotation.y = -p.angle;
             celebration.add(flag.group);
             festivalFlags.push(flag);
@@ -1105,7 +1134,8 @@ export default function Board({
   }, [visualKey]);
   return (
     <div
-      className={`board-shell board-3d ${demo ? 'board-demo' : ''} ${cue?.reason === 'earthquake' && !reducedMotion ? 'board-earthquake' : ''}`}
+      ref={shell}
+      className={`board-shell board-3d ${mobile && !demo && onZoomChange ? 'board-pinch-zoom' : ''} ${demo ? 'board-demo' : ''} ${cue?.reason === 'earthquake' && !reducedMotion ? 'board-earthquake' : ''}`}
     >
       <div ref={host} className="board-canvas" aria-label="Plateau 3D Money Tour" />
       {!ready && !error && <div className="board-loading">Construction de votre archipel…</div>}

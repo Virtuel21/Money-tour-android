@@ -7,6 +7,9 @@ import { BuildingIllustration } from './game/BuildingIllustration';
 import { architectureForCity, architectureLabels } from './game/architecture';
 import { EventCelebration } from './game/EventCelebration';
 import { loadComfort, saveComfort } from './game/comfort';
+import { guardGameNavigation } from './game/navigationGuard';
+import { loadOnlineResume, type OnlineResume } from './network/storage';
+import { invitationCode } from './network/invitation';
 import { MIN_BOARD_ZOOM, MAX_BOARD_ZOOM, normalizeBoardZoom } from './board/camera';
 import { ContextTip } from './game/ContextTip';
 import { GameResults } from './game/GameResults';
@@ -222,6 +225,15 @@ export default function App() {
   const seenTaunt = useRef('');
   const [createSalon, setCreateSalon] = useState(false);
   const [online, setOnline] = useState<SessionView | null>(null);
+  const [onlineResume, setOnlineResume] = useState(() => loadOnlineResume());
+  const [resumeRequest, setResumeRequest] = useState<OnlineResume | undefined>(() => {
+    const code = invitationCode(location.hash);
+    return code ? (loadOnlineResume(code) ?? undefined) : undefined;
+  });
+  useEffect(() => {
+    if (screen !== 'game') return;
+    return guardGameNavigation(() => setModal('leave'));
+  }, [screen]);
   const onlineSession = useRef<Session | null>(null);
   const onlineSeq = useRef(-1);
   useEffect(() => {
@@ -694,13 +706,18 @@ export default function App() {
         onKeyDownCapture={() => void sound.current?.unlock()}
       >
         <header className="topbar">
-          <button className="brand-button" aria-label="Money Tour, accueil" onClick={goHome}>
+          <button
+            className="brand-button"
+            aria-label="Money Tour, accueil"
+            onClick={() => (screen === 'game' ? setModal('leave') : goHome())}
+          >
             <Logo />
           </button>
           <nav>
             <button
               onClick={() => {
                 setCreateSalon(false);
+                if (!online) setResumeRequest(undefined);
                 setModal('online');
               }}
             >
@@ -806,6 +823,7 @@ export default function App() {
                 <button
                   className="primary launch"
                   onClick={() => {
+                    setResumeRequest(undefined);
                     setCreateSalon(true);
                     setModal('online');
                   }}
@@ -820,6 +838,29 @@ export default function App() {
                 >
                   Jouer sur cet appareil · solo / local
                 </button>
+                {(online?.state || onlineResume) && (
+                  <>
+                    <button
+                      className="resume"
+                      onClick={() => {
+                        if (online?.state) {
+                          cinema.reset(online.state);
+                          setScreen('game');
+                          setPaused(false);
+                        } else if (onlineResume) {
+                          setResumeRequest(onlineResume);
+                          setCreateSalon(false);
+                          setModal('online');
+                        }
+                      }}
+                    >
+                      Reprendre ma partie en ligne
+                    </button>
+                    <p className="saved-progress">
+                      Votre siège est conservé sur cet appareil pendant 24 h.
+                    </p>
+                  </>
+                )}
                 {save && (
                   <>
                     <button
@@ -1115,6 +1156,7 @@ export default function App() {
                     }
                     taunt={visibleTaunt ?? undefined}
                     mobile={mobile}
+                    onZoomChange={(boardZoom) => setComfort((old) => ({ ...old, boardZoom }))}
                     overview={
                       overview ||
                       paused ||
@@ -1852,14 +1894,17 @@ export default function App() {
           </Modal>
         )}
         {modal === 'leave' && (
-          <Modal title="Faire une pause ou quitter ?" onClose={() => setModal(null)}>
+          <Modal title="Voulez-vous quitter la partie ?" onClose={() => setModal(null)}>
             <p>
               {online
                 ? 'La partie en ligne continue lorsque vous revenez à l’accueil. Abandonner élimine votre joueur.'
                 : 'Revenir à l’accueil conserve votre partie. Abandonner élimine le joueur actif de cette partie.'}
             </p>
+            <button className="primary" onClick={() => setModal(null)}>
+              Continuer la partie
+            </button>
             <button
-              className="primary"
+              className="secondary"
               onClick={() => {
                 goHome();
                 setModal(null);
@@ -2293,6 +2338,7 @@ export default function App() {
             <OnlineLobby
               open={modal === 'online'}
               autoCreate={createSalon}
+              resume={resumeRequest}
               defaults={{
                 name: names[0]!,
                 count,
@@ -2308,6 +2354,9 @@ export default function App() {
                 onlineSession.current = session;
               }}
               onLeave={() => {
+                setOnlineResume(null);
+                setResumeRequest(undefined);
+                setCreateSalon(false);
                 onlineSession.current = null;
                 setOnline(null);
                 onlineSeq.current = -1;

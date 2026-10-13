@@ -37,6 +37,7 @@ import {
 } from './schema';
 import type { Transport } from './transport';
 import { presentationMs } from '../game/presentation';
+import { DISCONNECT_GRACE_MS } from './policy';
 import { TAUNT_COOLDOWN, taunts, type Taunt, type TauntKind } from '../game/taunts';
 
 const ZERO = '0'.repeat(64);
@@ -149,6 +150,8 @@ export class Session {
   private presentationUntil = 0;
   private joinWarningShown = false;
   private exclusions = new Set<string>();
+  private unavailableSince = new Map<string, number>();
+  private reclaimOnSync = false;
   private failures = 0;
   private hostMissingSince: number | null = null;
   private recovering = false;
@@ -217,6 +220,7 @@ export class Session {
     this.identities.set(this.user.id, this.user.publicKey);
     if (saved && saved.room === this.room) {
       this.recovering = true;
+      this.reclaimOnSync = true;
       this.recoveryUntil = this.now() + config.network.hostTimeoutMs;
       this.members = saved.members;
       this.host = saved.host;
@@ -236,6 +240,7 @@ export class Session {
       if (id) {
         this.peers.delete(id);
         this.seen.delete(id);
+        if (!this.unavailableSince.has(id)) this.unavailableSince.set(id, this.now());
         if (id === this.host) this.hostMissingSince = this.now();
       }
       this.emit();
@@ -250,7 +255,13 @@ export class Session {
     if (this.stopped) return;
     this.lastTick = this.now();
     this.lastHello = this.now();
-    this.status = this.isHost ? 'Salon prêt : invitez vos amis.' : 'Recherche de l’hôte…';
+    this.status = this.state
+      ? this.recovering
+        ? 'Reconnexion à la partie…'
+        : 'Partie synchronisée.'
+      : this.isHost
+        ? 'Salon prêt : invitez vos amis.'
+        : 'Recherche de l’hôte…';
     if (this.host) this.persist();
     this.emit();
     if (automatic) this.timer = setInterval(() => this.enqueue(() => this.pulse()), 250);
@@ -346,6 +357,14 @@ export class Session {
       frames: this.frames,
     });
   }
+  private recovered(): void {
+    this.recovering = false;
+    if (!this.reclaimOnSync) return;
+    this.reclaimOnSync = false;
+    const player = this.state?.players.find((p) => p.id === this.user.id);
+    if (player?.bot && !player.eliminated && !this.state?.winner)
+      void this.intent({ type: 'set_control', playerId: this.user.id, bot: false });
+  }
   private async receive(raw: unknown, peer: string): Promise<void> {
     if (JSON.stringify(raw).length > 8_000_000) return;
     const parsed = envelopeSchema.safeParse(raw);
@@ -362,9 +381,14 @@ export class Session {
     if (this.dedup.size > 3000) this.dedup.delete(this.dedup.values().next().value!);
     this.peers.set(message.from, peer);
     this.seen.set(message.from, this.now());
+    if (!this.exclusions.has(message.from)) this.unavailableSince.delete(message.from);
     const body = bodySchema.parse(message.body),
       from = message.from;
     if (body.type === 'hello') {
+      if (body.head === this.head && body.index === this.frames.length && !this.round) {
+        this.exclusions.delete(from);
+        this.unavailableSince.delete(from);
+      }
       if (!this.host && body.creator) this.host = from;
       if (this.isHost) {
         const existing = this.members.find((m) => m.id === from);
@@ -422,6 +446,10 @@ export class Session {
         return;
       }
       if (body.index > this.frames.length) await this.send({ type: 'sync' }, peer);
+      if (body.index === this.frames.length && body.head === this.head) {
+        this.recovered();
+        if (this.state) this.status = 'Partie synchronisée.';
+      }
       if (!this.members.some((m) => m.id === this.user.id))
         this.status = 'Ce salon est complet ou la partie a déjà commencé.';
       else if (!this.state) this.status = 'Salon connecté. L’hôte peut lancer la partie.';
@@ -454,6 +482,7 @@ export class Session {
       for (const frame of body.frames.slice(this.frames.length))
         await this.acceptFrame(frame, false);
       this.status = 'Partie synchronisée.';
+      this.recovered();
       this.persist();
       this.emit();
       return;
@@ -488,7 +517,10 @@ export class Session {
       this.round?.ceremony.context.nonce === body.nonce
     ) {
       this.round = null;
-      for (const id of body.missing) this.exclusions.add(id);
+      for (const id of body.missing) {
+        this.exclusions.add(id);
+        if (!this.unavailableSince.has(id)) this.unavailableSince.set(id, this.now());
+      }
       this.incident('Tirage annulé : contribution manquante. Aucun résultat incomplet accepté.');
       return;
     }
@@ -877,6 +909,7 @@ export class Session {
       this.tauntTimes.clear();
       this.presentationUntil = 0;
       this.exclusions.clear();
+      this.unavailableSince.clear();
       this.lastTick = this.now();
     }
     this.state = result.state;
@@ -884,8 +917,10 @@ export class Session {
       frame.command.type === 'action' &&
       frame.command.action.type === 'set_control' &&
       !frame.command.action.bot
-    )
+    ) {
       this.exclusions.delete(frame.command.action.playerId);
+      this.unavailableSince.delete(frame.command.action.playerId);
+    }
     this.events = result.events;
     if (live && result.events.length) {
       this.presentationUntil =
@@ -906,7 +941,7 @@ export class Session {
   }
   async pulse(): Promise<void> {
     const now = this.now();
-    if (this.recovering && this.isHost && now < this.recoveryUntil) {
+    if (this.recovering && now < this.recoveryUntil) {
       await this.hello();
       return;
     }
@@ -961,10 +996,16 @@ export class Session {
           (id) => !c.secrets[id] || !this.round?.attestations[id],
         );
         await this.send({ type: 'abort', nonce: c.context.nonce, missing });
-        for (const id of missing) if (id !== this.user.id) this.exclusions.add(id);
+        for (const id of missing)
+          if (id !== this.user.id) {
+            this.exclusions.add(id);
+            if (!this.unavailableSince.has(id)) this.unavailableSince.set(id, now);
+          }
         this.round = null;
         this.failures++;
-        this.incident('Tirage annulé : contribution manquante. Le joueur absent passe en bot.');
+        this.incident(
+          'Tirage annulé : contribution manquante. Réessayez après la reconnexion ; le siège reste réservé pendant 90 secondes.',
+        );
         if (this.failures >= config.network.maxRandomRetries) {
           this.blocked = true;
           this.incident('Trop d’interruptions réseau : partie suspendue.');
@@ -979,15 +1020,33 @@ export class Session {
       this.lastTick = now;
       return;
     }
-    const absent = this.state.players.find(
+    const unavailable = this.state.players.filter(
       (p) =>
         !p.bot && !p.eliminated && (!this.connected().includes(p.id) || this.exclusions.has(p.id)),
+    );
+    for (const player of unavailable) {
+      if (!this.unavailableSince.has(player.id))
+        this.unavailableSince.set(player.id, this.seen.get(player.id) ?? now);
+    }
+    const absent = unavailable.find(
+      (p) => now - this.unavailableSince.get(p.id)! >= DISCONNECT_GRACE_MS,
     );
     if (absent) {
       await this.propose({
         type: 'action',
         action: { type: 'set_control', playerId: absent.id, bot: true },
       });
+      return;
+    }
+    if (unavailable.length) {
+      this.lastTick = now;
+      const remaining = Math.max(
+        ...unavailable.map((p) =>
+          Math.ceil((DISCONNECT_GRACE_MS - (now - this.unavailableSince.get(p.id)!)) / 1000),
+        ),
+      );
+      this.status = `Reconnexion de ${unavailable.map((p) => p.name).join(', ')}… Partie en attente · bot dans ${remaining} s.`;
+      this.emit();
       return;
     }
     const active = this.state.players.find((p) => p.id === getDecisionPlayerId(this.state!))!;
