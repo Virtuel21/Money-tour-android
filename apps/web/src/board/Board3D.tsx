@@ -182,8 +182,10 @@ export default function Board({
     const element = host.current!;
     let disposed = false;
     let renderer: THREE.WebGLRenderer | undefined;
+    let festivalRenderer: THREE.WebGLRenderer | undefined;
     let observer: ResizeObserver | undefined;
     const resources = new THREE.Group();
+    const festivalScene = new THREE.Scene();
     const disposePending = (root: THREE.Object3D) =>
       root.traverse((node) => {
         if (node instanceof THREE.Mesh) {
@@ -192,7 +194,10 @@ export default function Board({
             m.dispose();
         }
       });
-    let cleanup = () => disposePending(resources);
+    let cleanup = () => {
+      disposePending(resources);
+      disposePending(festivalScene);
+    };
     const initialize = async () => {
       try {
         renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -203,6 +208,16 @@ export default function Board({
         renderer.toneMapping = THREE.NeutralToneMapping;
         renderer.toneMappingExposure = 0.9;
         element.appendChild(renderer.domElement);
+        // DOM tile labels sit above the board canvas. Render full-size flags
+        // in their own transparent layer, using the very same board camera.
+        festivalRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        festivalRenderer.setPixelRatio(renderer.getPixelRatio());
+        festivalRenderer.outputColorSpace = renderer.outputColorSpace;
+        festivalRenderer.toneMapping = renderer.toneMapping;
+        festivalRenderer.toneMappingExposure = renderer.toneMappingExposure;
+        festivalRenderer.domElement.className = 'festival-foreground-layer';
+        festivalRenderer.domElement.setAttribute('aria-hidden', 'true');
+        element.parentElement!.appendChild(festivalRenderer.domElement);
         const scene = new THREE.Scene();
         scene.add(resources);
         const camera = new THREE.OrthographicCamera(-18, 18, 12.25, -12.25, 0.1, 80);
@@ -213,6 +228,7 @@ export default function Board({
           const width = element.clientWidth,
             height = element.clientHeight;
           renderer!.setSize(width, height, false);
+          festivalRenderer!.setSize(width, height, false);
           const bounds = cameraBounds(width, height, live.current.mobile);
           camera.left = -bounds.halfWidth;
           camera.right = bounds.halfWidth;
@@ -235,6 +251,10 @@ export default function Board({
         light.shadow.normalBias = 0.025;
         light.shadow.radius = 3;
         scene.add(light);
+        festivalScene.add(new THREE.HemisphereLight(0xf4fcff, 0xa8a388, 1.8));
+        const festivalLight = new THREE.DirectionalLight(0xfff4df, 2.4);
+        festivalLight.position.copy(light.position);
+        festivalScene.add(festivalLight);
         const ground = new THREE.Mesh(
           new THREE.PlaneGeometry(200, 200),
           new THREE.MeshStandardMaterial({ color: 0xd5edf2, roughness: 1 }),
@@ -617,27 +637,12 @@ export default function Board({
           celebration.rotation.y = p.angle;
           if (tile.type === 'city' || tile.type === 'resort') {
             const flag = festivalFlag(festivalFlags[0]?.texture);
-            // A small pennant in the building lane, below the name strip in
-            // screen space on all four sides, rather than a full-height mast.
-            const regions = tileLabelRegions(tile.id, live.current.state.config.board.length);
-            const point = tileDecorationPoint(
-              tile.id,
-              live.current.state.config.board.length,
-              0.75,
-            );
-            const flagPoint = new THREE.Vector3(
-              point.x - regions.across.x * regions.width * 0.28,
-              0.29,
-              point.z - regions.across.z * regions.width * 0.28,
-            );
-            celebration.updateMatrixWorld();
-            flag.group.position.copy(celebration.worldToLocal(flagPoint));
-            flag.group.scale.setScalar(0.45);
+            flag.group.position.set(-0.72, 0, -0.62);
             flag.group.rotation.y = -p.angle;
             celebration.add(flag.group);
             festivalFlags.push(flag);
           }
-          resources.add(celebration);
+          festivalScene.add(celebration);
           championships.push(celebration);
           const shower = new THREE.Group();
           shower.position.copy(celebration.position);
@@ -1061,6 +1066,7 @@ export default function Board({
           const fullSize = renderer!.getSize(new THREE.Vector2());
           renderer!.setViewport(0, 0, fullSize.x, fullSize.y);
           renderer!.render(scene, camera);
+          festivalRenderer!.render(festivalScene, camera);
           if (activeCue?.kind === 'dice') diceVisibleUntil = now + 450;
           element.parentElement?.classList.toggle('dice-overlay', now < diceVisibleUntil);
           if (now < diceVisibleUntil) {
@@ -1095,6 +1101,7 @@ export default function Board({
               }
             });
           gather(resources);
+          gather(festivalScene);
           gather(diceScene);
           gather(gltf.scene);
           gather(wealthGltf.scene);
@@ -1122,6 +1129,8 @@ export default function Board({
       cleanup();
       renderer?.dispose();
       renderer?.domElement.remove();
+      festivalRenderer?.dispose();
+      festivalRenderer?.domElement.remove();
     };
   }, []);
   useEffect(() => {
