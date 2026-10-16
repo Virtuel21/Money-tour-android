@@ -309,6 +309,11 @@ export function createGame(
     winner: null,
   };
   initAdventure(state, rng);
+  // Opt in for new games; historical signed starts must replay their original RNG stream.
+  if (options.randomFirstPlayer) {
+    state.firstPlayer = randomInt(rng, players.length);
+    state.currentPlayer = state.firstPlayer;
+  }
   return state;
 }
 
@@ -1021,7 +1026,9 @@ function nextTurn(state: GameState, events: GameEvent[], rng: Rng): void {
     }
   }
   state.turn += 1;
-  if (state.currentPlayer <= current) {
+  const first = state.firstPlayer ?? 0;
+  const order = (index: number) => (index - first + state.players.length) % state.players.length;
+  if (order(state.currentPlayer) <= order(current)) {
     if (state.adventure) state.adventure.round += 1;
     maybeCrisis(state, rng, events);
     maybeEarthquake(state, rng, events);
@@ -1712,6 +1719,11 @@ export function validateState(state: GameState): string[] {
     errors.push('Invalid presentation pace.');
   const safe = (value: number): boolean => Number.isSafeInteger(value) && value >= 0;
   if (!state.players[state.currentPlayer]) errors.push('Invalid active player index.');
+  if (
+    state.firstPlayer !== undefined &&
+    (!Number.isSafeInteger(state.firstPlayer) || !state.players[state.firstPlayer])
+  )
+    errors.push('Invalid first player index.');
   if (new Set(state.players.map((player) => player.id)).size !== state.players.length)
     errors.push('Duplicate player IDs.');
   for (const player of state.players) {

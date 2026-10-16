@@ -43,8 +43,9 @@ export function accumulateStats(
 }
 
 /** A fresh journey preserves the table, never the previous debts or possessions. */
-export function rematchOptions(state: GameState): GameOptions {
+export function rematchOptions(state: GameState, randomFirstPlayer = true): GameOptions {
   return {
+    ...(randomFirstPlayer ? { randomFirstPlayer: true } : {}),
     players: state.players.map(({ id, name, bot, team }) => ({
       id,
       name,

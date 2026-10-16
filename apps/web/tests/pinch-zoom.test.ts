@@ -96,7 +96,9 @@ it('zooms from the initial span, clamps the scale and suppresses tile taps after
   expect(touch('touchmove', [10, 160]).defaultPrevented).toBe(true);
   expect(zoom).toHaveBeenLastCalledWith(150);
   touch('touchmove', [10, 300]);
-  expect(zoom).toHaveBeenLastCalledWith(160);
+  expect(zoom).toHaveBeenLastCalledWith(290);
+  touch('touchmove', [10, 510]);
+  expect(zoom).toHaveBeenLastCalledWith(400);
   touch('touchmove', [10, 20]);
   expect(zoom).toHaveBeenLastCalledWith(70);
   touch('touchend', [10]);
@@ -110,4 +112,37 @@ it('zooms from the initial span, clamps the scale and suppresses tile taps after
   expect(tap).toHaveBeenCalledTimes(1);
   unbind();
   expect(touch('touchstart', [10, 110]).defaultPrevented).toBe(false);
+});
+
+it('continues zooming across successive pinches and zooms back out from the maximum', () => {
+  const board = document.createElement('div');
+  let zoom = 100;
+  const unbind = bindPinchZoom(
+    board,
+    () => zoom,
+    (value) => (zoom = value),
+  );
+  for (const expected of [200, 400]) {
+    touch(board, 'touchstart', [
+      [0, 100, 100],
+      [1, 200, 100],
+    ]);
+    touch(board, 'touchmove', [
+      [0, 50, 100],
+      [1, 250, 100],
+    ]);
+    touch(board, 'touchend', []);
+    expect(zoom).toBe(expected);
+  }
+  touch(board, 'touchstart', [
+    [0, 50, 100],
+    [1, 250, 100],
+  ]);
+  touch(board, 'touchmove', [
+    [0, 100, 100],
+    [1, 200, 100],
+  ]);
+  touch(board, 'touchend', []);
+  expect(zoom).toBe(200);
+  unbind();
 });

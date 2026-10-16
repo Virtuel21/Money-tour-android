@@ -180,6 +180,7 @@ export interface GameState {
   mode: 'free-for-all' | 'teams';
   players: Player[];
   currentPlayer: number;
+  firstPlayer?: number;
   phase: Phase;
   properties: Record<number, Property>;
   festivals: number[];
@@ -205,6 +206,7 @@ export interface GameState {
   winner: Winner | null;
 }
 export interface GameOptions {
+  randomFirstPlayer?: boolean;
   presentationPace?: 'normal' | 'fast';
   players: PlayerSetup[];
   mode?: 'free-for-all' | 'teams';

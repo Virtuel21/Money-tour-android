@@ -30,6 +30,8 @@ it('accepts the invited seat, keeps choices concealed in signed frames, and agre
     await host.idle();
     await flush();
     for (const s of sessions) {
+      // This fixture places the host on the duel tile independently of the opening draw.
+      s.state!.currentPlayer = 0;
       s.state!.phase = 'duel';
       s.state!.duel = {
         id: 'network-duel',

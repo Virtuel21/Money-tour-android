@@ -56,7 +56,7 @@ export function execute(
     if (command.type === 'start' && state) throw new Error('Already started');
     if (command.type === 'rematch') {
       if (!state?.winner) throw new Error('Game not finished');
-      const expected = rematchOptions(state);
+      const expected = rematchOptions(state, command.options.randomFirstPlayer === true);
       // Restoring a human seat from bot control is allowed; table and rules are fixed.
       expected.players = expected.players.map((p) => ({
         ...p,
@@ -627,6 +627,7 @@ export class Session {
         commandSchema.parse({
           type: 'start',
           options: {
+            randomFirstPlayer: true,
             players,
             mode: teams ? 'teams' : 'free-for-all',
             durationMs,
@@ -652,7 +653,7 @@ export class Session {
   private async permitted(command: Command): Promise<boolean> {
     if (command.type === 'rematch') {
       if (!this.state?.winner) return false;
-      const previous = rematchOptions(this.state);
+      const previous = rematchOptions(this.state, command.options.randomFirstPlayer === true);
       previous.players = previous.players.map((player) => ({
         ...player,
         bot: this.members.some((member) => member.id === player.id)

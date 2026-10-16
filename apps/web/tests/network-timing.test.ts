@@ -18,6 +18,8 @@ it('does not spend the human decision clock while presenting an online purchase'
     await session.start(2, false, 1200000);
     await session.idle();
     const state = session.state!;
+    // Exercise the host's purchase regardless of which seat won the opening draw.
+    state.currentPlayer = 0;
     state.phase = 'property';
     state.players[0]!.position = 5;
     state.properties[5]!.ownerId = null;

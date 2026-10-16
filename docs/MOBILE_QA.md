@@ -1,5 +1,13 @@
 # Recette mobile — 26 septembre 2026
 
+## Premier joueur aléatoire et zoom étendu — 16 octobre 2026
+
+- Les nouvelles parties et revanches choisissent leur premier siège au hasard. En ligne, le tirage utilise la preuve partagée du démarrage. Les sièges, couleurs et équipes restent stables ; le tour de table se termine après le passage de tous les sièges actifs, même si le premier joueur est éliminé.
+- Les anciens démarrages signés et revanches sans option de tirage restent rejouables avec leur flux aléatoire d’origine. Les salons passent en v19 pour éviter de mélanger des clients aux schémas différents.
+- Zoom maximal porté de 160 à 400 %, commun au pincement et aux réglages. Tests des gestes tactiles Chrome à 390 × 844, 844 × 390 et 320 × 740 : deux pincements successifs 100 → 200 → 400 %, déplacement à un doigt, recentrage, retour à 200 % et conservation après rechargement. Aucun débordement horizontal ni erreur JavaScript constaté.
+- Tests moteur : chaque siège de 2 à 4 joueurs peut commencer, équipes et bots conservés, répétabilité du tirage, tours de table complets et élimination du premier joueur. Tests réseau : démarrage vérifié depuis sa preuve, actions réservées au siège actif, revanche et reprise synchronisées.
+- Recette effectuée dans Chrome avec écran tactile simulé. Aucun téléphone physique, Safari iOS ou échange entre appareils distants testé pour cette mise à jour.
+
 ## Présentation
 
 Écran de partie sous 1000 px : hauteur 100dvh, zones sûres du téléphone, quatre comptes compacts, plateau extensible et commandes tactiles en bas. En paysage, les commandes occupent la colonne droite. Les règles longues et les crédits gardent leur lecture défilante ; la partie, son carnet paginé et les décisions courantes tiennent dans le viewport.
