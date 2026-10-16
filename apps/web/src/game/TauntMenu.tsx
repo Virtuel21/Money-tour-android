@@ -6,16 +6,12 @@ export function TauntMenu({
   targetId,
   cooling,
   onSend,
-  onPlayerChange,
-  onTargetChange,
 }: {
   state: GameState;
   playerId: string;
   targetId: string;
   cooling: boolean;
   onSend: (kind: TauntKind) => void;
-  onPlayerChange?: (id: string) => void;
-  onTargetChange?: (id: string) => void;
 }) {
   const seat = state.players.findIndex((p) => p.id === playerId),
     player = state.players[seat]!;
@@ -27,35 +23,6 @@ export function TauntMenu({
         {targetId !== playerId ? ` → ${target?.name}` : ' → tout le monde'} · choisissez votre
         réaction
       </p>
-      {onPlayerChange && (
-        <label>
-          Votre personnage
-          <select value={playerId} onChange={(e) => onPlayerChange(e.target.value)}>
-            {state.players
-              .filter((p) => !p.bot && !p.eliminated)
-              .map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-          </select>
-        </label>
-      )}
-      {onTargetChange && (
-        <label>
-          Destinataire
-          <select value={targetId} onChange={(e) => onTargetChange(e.target.value)}>
-            <option value={playerId}>Tout le monde</option>
-            {state.players
-              .filter((p) => p.id !== playerId)
-              .map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-          </select>
-        </label>
-      )}
       <div className="taunt-options">
         {taunts.map((taunt) => (
           <button

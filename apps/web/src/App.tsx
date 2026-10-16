@@ -1653,20 +1653,6 @@ export default function App() {
           <Modal title="Mon carnet de voyage" onClose={() => setModal(null)}>
             <MobilePocket
               onBonus={showBonus}
-              onReactions={
-                canTaunt
-                  ? () => {
-                      const sender =
-                        tauntPlayer(current, online?.self) ??
-                        tauntPlayer(current, online?.self, humans[0]?.id);
-                      if (!sender) return;
-                      setTauntSender(sender);
-                      setTauntTarget(sender);
-                      setSelected(null);
-                      setModal('taunt');
-                    }
-                  : undefined
-              }
               key={current.turn}
               state={current}
               self={online?.self}
@@ -2188,17 +2174,6 @@ export default function App() {
               playerId={tauntSender}
               targetId={tauntTarget}
               cooling={!!tauntReadyAt}
-              onPlayerChange={
-                !online && humans.length > 1
-                  ? (id) => {
-                      const sender = tauntPlayer(current, undefined, id);
-                      if (!sender) return;
-                      setTauntSender(sender);
-                      setTauntTarget(sender);
-                    }
-                  : undefined
-              }
-              onTargetChange={setTauntTarget}
               onSend={sendTaunt}
             />
           </Modal>

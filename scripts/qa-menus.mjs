@@ -3,7 +3,7 @@
  * Axe checks are automated accessibility checks, not a full WCAG or screen-reader certification.
  */
 import assert from 'node:assert/strict';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, firefox, webkit } from 'playwright';
@@ -39,6 +39,14 @@ const result = {
   failures: [],
   pageErrors: [],
 };
+if (process.env.MENU_QA_APPEND) {
+  const previous = JSON.parse(await readFile(path.join(out, 'results.json'), 'utf8'));
+  for (const key of ['frames', 'accessibility', 'checks', 'failures', 'pageErrors'])
+    result[key] = previous[key].filter((entry) => !requested.includes(entry.browser));
+  result.browsers = Object.fromEntries(
+    Object.entries(previous.browsers).filter(([name]) => !requested.includes(name)),
+  );
+}
 await mkdir(out, { recursive: true });
 const server = await qaServer(process.env.MENU_QA_URL, 4177);
 result.url = server.url;
@@ -106,6 +114,21 @@ async function capture(page, browser, name, audit = false) {
           ? [{ name: e.getAttribute('aria-label') ?? e.textContent?.trim().slice(0, 50), ...b }]
           : [];
       }),
+      islandAmounts: [...(dialog?.querySelectorAll('.island-rent-grid dd') ?? [])].map(
+        (element) => {
+          const range = document.createRange();
+          range.selectNodeContents(element);
+          const rects = [...range.getClientRects()].filter((r) => r.width > 0);
+          const lineHeight = parseFloat(getComputedStyle(element).lineHeight);
+          const first = rects[0]?.y ?? 0;
+          const bounds = element.getBoundingClientRect();
+          return {
+            text: element.textContent,
+            lines: new Set(rects.map((r) => Math.round((r.y - first) / lineHeight))).size,
+            fits: rects.every((r) => r.x >= bounds.x - 1 && r.right <= bounds.right + 1),
+          };
+        },
+      ),
       textSize: dialog?.querySelector('.modal-body p')
         ? getComputedStyle(dialog.querySelector('.modal-body p')).fontSize
         : null,
@@ -115,6 +138,10 @@ async function capture(page, browser, name, audit = false) {
   await page.screenshot({ path: path.join(out, filename), fullPage: name === 'accueil' });
   result.frames.push({ browser, name, filename, ...details });
   assert(!details.overflow && !details.bodyOverflow, `${browser}/${name}: horizontal overflow`);
+  assert(
+    details.islandAmounts.every((amount) => amount.lines === 1 && amount.fits),
+    `${browser}/${name}: split or overflowing island amount`,
+  );
   assert(!details.clockOverlapsTitle, `${browser}/${name}: countdown obscures the title`);
   if (parseFloat(details.rootTextSize) >= 32 && details.bodyHeight !== undefined)
     assert(
@@ -460,6 +487,80 @@ async function decisions(browser, name) {
     await context.close();
   }
 }
+async function islands(browser, name) {
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    reducedMotion: 'reduce',
+    hasTouch: name !== 'firefox',
+  });
+  listen(context, name);
+  try {
+    const page = await context.newPage();
+    for (const scenario of ['resort-purchase', 'resort-buyout']) {
+      await page.goto(server.url + '/?scenario=' + scenario);
+      await ready(page);
+      if (scenario === 'resort-buyout')
+        await page.getByRole('button', { name: /^Racheter/ }).click();
+      await page.evaluate(() => (document.documentElement.style.fontSize = ''));
+      await page.locator('dialog[open] .island-rent-grid').waitFor();
+      for (const [width, height, large] of [
+        [320, 740, false],
+        [390, 844, false],
+        [844, 390, false],
+        [768, 1024, false],
+        [1440, 1000, false],
+        [320, 740, true],
+        [568, 320, true],
+      ]) {
+        await page.setViewportSize({ width, height });
+        await page.evaluate(
+          (large) => (document.documentElement.style.fontSize = large ? '200%' : ''),
+          large,
+        );
+        await page
+          .locator('dialog[open] .modal-body')
+          .evaluate((element) => (element.scrollTop = 0));
+        await capture(
+          page,
+          name,
+          'decision-' + scenario + (large ? '-200' : ''),
+          width === 390 && !large,
+        );
+        assert.equal(await page.locator('.island-rent-grid dd').count(), 4);
+        for (const amount of await page.locator('.island-rent-grid dd').all()) {
+          await amount.evaluate((element) =>
+            element.scrollIntoView({ block: 'center', inline: 'nearest' }),
+          );
+          await page.waitForFunction(
+            (element) => {
+              const b = element.getBoundingClientRect(),
+                area = element.closest('.modal-body').getBoundingClientRect();
+              const x = b.x + b.width / 2,
+                y = b.y + b.height / 2;
+              return (
+                y >= area.top &&
+                y <= area.bottom &&
+                element.contains(document.elementFromPoint(x, y))
+              );
+            },
+            await amount.elementHandle(),
+            { timeout: 1500 },
+          );
+        }
+        if (large || height < 500)
+          await capture(page, name, 'decision-' + scenario + (large ? '-200' : '') + '-loyers-bas');
+      }
+    }
+    result.checks.push({
+      browser: name,
+      test: 'island purchase and buyout: four whole price strings, no overflow, readable at 200%, desktop/portrait/landscape',
+      pass: true,
+    });
+  } finally {
+    await context.close();
+  }
+}
+
 async function preferences(browser, name) {
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 },
@@ -516,13 +617,26 @@ async function revisions(browser, name) {
         .getByRole('button', { name: 'Partie', exact: true })
         .click();
       await capture(page, name, large ? 'carnet-partie-200' : 'carnet-partie-revision', true);
-      await page.getByRole('button', { name: 'Ouvrir les réactions', exact: true }).click();
-      const target = page.getByRole('combobox', { name: 'Destinataire', exact: true });
-      await target.selectOption({ index: 1 });
-      assert.notEqual(await target.inputValue(), 'p1');
+      assert.equal(
+        await page.getByRole('button', { name: 'Ouvrir les réactions', exact: true }).count(),
+        0,
+      );
+      await close(page);
+      await page
+        .getByRole('button', { name: 'Taunts de Alexandre de la Mer', exact: true })
+        .click();
+      await page.getByRole('heading', { name: 'À vous de taquiner !', exact: true }).waitFor();
+      assert.equal(await page.locator('.taunt-picker select').count(), 0);
+      assert.equal(await page.locator('.taunt-options button').count(), 5);
       await capture(page, name, large ? 'reactions-200' : 'reactions', true);
       await close(page);
     }
+    result.checks.push({
+      browser: name,
+      test: 'reactions via pawn click; no carnet shortcut or additional selectors; no reaction sent',
+      pass: true,
+    });
+    if (process.env.MENU_QA_REACTIONS_ONLY) return;
     await page.evaluate(() => (document.documentElement.style.fontSize = ''));
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(server.url + '/');
@@ -557,7 +671,7 @@ async function revisions(browser, name) {
     );
     result.checks.push({
       browser: name,
-      test: 'reactions reachable through carnet without sending; recipient choice; saved game cancel, resume and explicit replacement',
+      test: 'reactions opened by clicking a pawn, no carnet shortcut or selectors; saved game cancel, resume and explicit replacement',
       pass: true,
     });
   } finally {
@@ -581,7 +695,11 @@ try {
               [844, 390],
             ]
           : screens;
-      if (process.env.MENU_QA_PROPERTIES_ONLY) {
+      if (process.env.MENU_QA_REACTIONS_ONLY) {
+        await revisions(browser, name);
+      } else if (process.env.MENU_QA_ISLANDS_ONLY) {
+        await islands(browser, name);
+      } else if (process.env.MENU_QA_PROPERTIES_ONLY) {
         await properties(browser, name);
       } else {
         if (!process.env.MENU_QA_REVISIONS_ONLY) {

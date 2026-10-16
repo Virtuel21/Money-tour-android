@@ -14,14 +14,12 @@ export function MobilePocket({
   onTile,
   onBonus,
   onHighlight,
-  onReactions,
 }: {
   state: GameState;
   self?: string;
   onTile: (id: number) => void;
   onBonus?: (bonus: BonusInfo) => void;
   onHighlight?: (ids: number[]) => void;
-  onReactions?: () => void;
 }) {
   const viewer =
     state.players.find((p) => p.id === self) ??
@@ -152,11 +150,6 @@ export function MobilePocket({
       )}
       {tab === 'rules' && (
         <div className="pocket-rule">
-          {onReactions && (
-            <button className="secondary" onClick={onReactions}>
-              Ouvrir les réactions
-            </button>
-          )}
           <p>{adventureText(state)}</p>
           <p>
             Tour de table {state.adventure?.round ?? 1} ·{' '}

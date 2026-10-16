@@ -617,6 +617,90 @@
 .app .modal .taunt-options span {
   font-size: 0.875rem;
 }
-.app .modal .pocket-rule > button {
+
+/* Island rents keep each amount intact instead of sharing a shrinking flex row. */
+.app .modal .purchase-simple .island-rents {
+  display: grid;
+  grid-template-columns: minmax(80px, 160px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+}
+.app .modal .purchase-simple .island-rents > .building-illustration {
   width: 100%;
+  max-width: 160px;
+  justify-self: center;
+}
+.island-rates {
+  min-width: 0;
+}
+.app .modal .island-rates h3 {
+  margin: 0 0 12px;
+  font-size: 1rem;
+  text-align: center;
+}
+.island-rent-grid {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(min(100%, max(7rem, calc((100% - 10px) / 2))), 1fr)
+  );
+  gap: 10px;
+  margin: 0;
+}
+.island-rent-grid > div {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  padding: 10px;
+  border-radius: 10px;
+  background: #fff1c3;
+  text-align: center;
+}
+.island-rent-grid dt {
+  font-size: calc(1rem * var(--ui-text-scale, 1));
+}
+.island-rent-grid dd {
+  margin: 0;
+  font-size: calc(1.125rem * var(--ui-text-scale, 1));
+  font-weight: 800;
+  white-space: nowrap;
+}
+@media (max-width: 999px) {
+  .app .modal .purchase-simple .island-rents {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+  .app .modal .purchase-simple .island-rents > .building-illustration {
+    max-width: 96px;
+  }
+}
+
+/* A scaled countdown must fit inside Passer rather than spill into the panel. */
+.app .modal .purchase-simple .purchase-buttons .purchase-pass {
+  flex-basis: auto;
+  min-width: max-content;
+}
+
+/* Keep island rates reachable when large text makes the actions taller. */
+.app .modal .purchase-simple:has(.island-rates) .purchase-buttons {
+  position: static;
+}
+.app .modal .purchase-simple:has(.island-rates) .purchase-cta {
+  flex-wrap: wrap;
+}
+.app .modal .purchase-simple:has(.island-rates) .purchase-cta > span:first-child {
+  flex: 1 1 10rem;
+  overflow-wrap: normal;
+}
+@media (max-width: 480px) {
+  .app .modal .purchase-simple:has(.island-rates) .purchase-buttons {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .app .modal .purchase-simple:has(.island-rates) .purchase-buttons .purchase-pass {
+    flex: 0 0 auto;
+    width: 100%;
+    flex-direction: row;
+    font-size: 1em;
+  }
 }
