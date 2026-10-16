@@ -7,6 +7,9 @@ it.each([
   [390, 844, 2.5],
   [844, 390, 4],
   [320, 740, 1.2],
+  [390, 844, 4],
+  [844, 390, 10],
+  [320, 740, 10],
 ])('keeps a ground point under the finger at %s × %s and zoom %s', (width, height, zoom) => {
   const bounds = cameraBounds(width!, height!, true);
   const camera = new OrthographicCamera(

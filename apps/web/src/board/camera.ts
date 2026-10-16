@@ -1,5 +1,5 @@
 export const MIN_BOARD_ZOOM = 70;
-export const MAX_BOARD_ZOOM = 160;
+export const MAX_BOARD_ZOOM = 400;
 
 /** Stored preferences are untrusted; older browsers/saves simply use the original framing. */
 export function normalizeBoardZoom(value: unknown): number {

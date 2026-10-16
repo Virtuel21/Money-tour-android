@@ -15,6 +15,10 @@ pnpm simulate 1000
 
 Les nouvelles parties utilisent des montants simples : compte initial 1 500, prime Départ 300, terrains de 100 à 475. Le journal affiche les actions publiques ; les bonus et malus sont consultables à côté des propriétés sur PC, dans le carnet sur mobile.
 
+Le premier joueur est tiré au sort à chaque nouvelle partie et revanche, en local comme en ligne. Chaque siège, humain ou bot, a la même chance de commencer. En ligne, le tirage partagé est vérifiable par tous les participants. L’ordre des sièges et les équipes sont conservés ; un tour de table commence avec le joueur tiré au sort.
+
+Sur mobile, le pincement permet de zoomer jusqu’à 400 %. Le réglage est mémorisé sur l’appareil et reste accessible dans les réglages. Glissez avec un doigt pour parcourir la vue agrandie, puis utilisez « Recentrer mon pion » pour retrouver le suivi automatique.
+
 Chaque ville possédée peut recevoir jusqu’à trois maisons sans réunir la rue complète. L’hôtel se débloque après deux tours complets du plateau du propriétaire. La durée se choisit parmi les préréglages ou de 1 à 180 minutes personnalisées. Les destinations et championnats se choisissent directement sur les cases dorées du plateau.
 
 Un Mondial coûte 50 et double le loyer de la ville pendant quatre retours du propriétaire : les doubles ne consomment pas de durée et un nouveau Mondial renouvelle les quatre tours sans cumuler le bonus. Un trophée, un ruban et des confettis signalent la ville hôte ; le badge indique les tours restants. Fermer l’offre d’achat ne termine pas le tour : cliquez de nouveau sur votre case ou sur Acheter pour la rouvrir. « Non merci, je passe » termine la décision. Les taxes sont annoncées par une fenêtre humoristique avant l’animation du prélèvement.

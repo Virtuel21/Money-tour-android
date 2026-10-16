@@ -44,6 +44,7 @@ it('replays a signed rematch in the same salon and preserves seats, settings and
     await flush();
     expect(host.state?.winner).toBeNull();
     expect(host.state?.seq).toBe(0);
+    expect(host.state?.firstPlayer).toBe(host.state?.currentPlayer);
     expect(host.state?.players.map((p) => [p.id, p.name, p.bot])).toEqual(table);
     expect(host.state?.durationMs).toBe(120000);
     expect(host.state?.presentationPace).toBe('fast');

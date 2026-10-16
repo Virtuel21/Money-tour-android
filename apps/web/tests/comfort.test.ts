@@ -21,9 +21,14 @@ it('rejects malformed zoom and bounds stale preferences so the board cannot disa
     [null, 100],
     ['150', 100],
     [-500, 70],
-    [999999, 160],
+    [999999, 400],
   ]) {
     localStorage.setItem('money-tour.comfort', JSON.stringify({ boardZoom: value }));
     expect(loadComfort().boardZoom).toBe(expected);
   }
+});
+
+it('persists the extended zoom range', () => {
+  saveComfort({ pace: 'normal', largeText: false, boardZoom: 400 });
+  expect(loadComfort().boardZoom).toBe(400);
 });
