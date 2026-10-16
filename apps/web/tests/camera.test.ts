@@ -12,8 +12,15 @@ describe('mobile camera', () => {
     );
   });
   it('keeps every tile in frame when choosing a destination, bidding, or highlighting a collection', () => {
-    expect(cameraZoom(17, true, 160, true)).toBe(1);
+    expect(cameraZoom(17, true, 400, true)).toBe(1);
     expect(cameraZoom(17, false, 70, true)).toBe(0.7);
+  });
+  it('renders the full extended zoom range in overview and follow mode', () => {
+    const { halfWidth } = cameraBounds(390, 480, true);
+    expect(cameraZoom(halfWidth, false, 400, false)).toBe(4);
+    expect(cameraZoom(halfWidth, true, 400, false)).toBeCloseTo(
+      cameraZoom(halfWidth, true, 100, false) * 4,
+    );
   });
   it.each([
     [1440, 900],

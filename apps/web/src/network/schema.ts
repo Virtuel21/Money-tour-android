@@ -84,6 +84,7 @@ export const actionSchema = z.union([
 ]);
 export const optionsSchema = z
   .object({
+    randomFirstPlayer: z.boolean().optional(),
     players: z
       .array(
         z

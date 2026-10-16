@@ -133,6 +133,15 @@ describe('guided entry and coherent rules', () => {
     expect(() => execute(state, command, 'fresh')).toThrow('Game not finished');
     const finished = reduceGame(state, { type: 'quit', playerId: 'a' }).state;
     expect(finished.winner).toBeTruthy();
+    const legacyCommand = commandSchema.parse({
+      type: 'rematch',
+      options: rematchOptions(finished, false),
+    });
+    const legacyRematch = execute(finished, legacyCommand, 'historical').state;
+    expect(legacyRematch.firstPlayer).toBeUndefined();
+    expect(legacyRematch.currentPlayer).toBe(0);
+    const fresh = execute(finished, command, 'fresh').state;
+    expect(fresh.firstPlayer).toBe(fresh.currentPlayer);
     const malicious = commandSchema.parse({
       type: 'rematch',
       options: { ...rematchOptions(finished), durationMs: 120000 },

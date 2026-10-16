@@ -10,7 +10,7 @@ import {
   verify,
 } from '../src/network/crypto';
 import { MemoryNetwork, MemoryTransport } from '../src/network/transport';
-import { Session, type SavedSession } from '../src/network/session';
+import { execute, Session, type SavedSession } from '../src/network/session';
 import { getDecisionPlayerId, getLegalActions } from '@money-tour/engine';
 import { DISCONNECT_GRACE_MS } from '../src/network/policy';
 
@@ -191,20 +191,25 @@ describe('network sessions', () => {
     await flush();
     expect(host.state).not.toBeNull();
     expect(host.frames[0]?.proof?.context.participants).toHaveLength(4);
+    const frame = host.frames[0]!;
+    expect(host.state!.firstPlayer).toBe(host.state!.currentPlayer);
+    expect(execute(null, frame.command, await drawSeed(frame.proof!)).state).toEqual(host.state);
     for (const peer of sessions) expect(peer.head).toBe(host.head);
+    const active = sessions.find((s) => s.user.id === getDecisionPlayerId(host.state!))!;
+    const waiting = sessions.find((s) => s !== active)!;
     const initial = host.head;
-    await sessions[1]!.intent({ type: 'roll', playerId: host.user.id });
+    await waiting.intent({ type: 'roll', playerId: active.user.id });
     await flush();
     expect(host.head).toBe(initial);
     // Even a correctly signed request from the waiting player's own seat is out of turn.
-    await sessions[1]!.intent({ type: 'roll', playerId: sessions[1]!.user.id });
-    await sessions[1]!.intent({ type: 'finish', playerId: sessions[1]!.user.id });
-    await sessions[1]!.intent({ type: 'sell', playerId: sessions[1]!.user.id, tile: 1 });
+    await waiting.intent({ type: 'roll', playerId: waiting.user.id });
+    await waiting.intent({ type: 'finish', playerId: waiting.user.id });
+    await waiting.intent({ type: 'sell', playerId: waiting.user.id, tile: 1 });
     await flush();
     expect(host.head).toBe(initial);
     expect(sessions.every((s) => !s.blocked)).toBe(true);
-    await host.intent({ type: 'roll', playerId: host.user.id });
-    await host.idle();
+    await active.intent({ type: 'roll', playerId: active.user.id });
+    await active.idle();
     await flush();
     expect(host.head).not.toBe(initial);
     for (const peer of sessions) expect(peer.head).toBe(host.head);
@@ -322,9 +327,10 @@ describe('network sessions', () => {
     await host.start(2, false, 1200000);
     await host.idle();
     await flush();
+    const active = sessions.find((s) => s.user.id === getDecisionPlayerId(host.state!))!;
     network.drop = (from, _to, message) =>
       from === 'peer-1' && (message as { body: { type: string } }).body.type === 'contribution';
-    await host.intent({ type: 'roll', playerId: host.user.id });
+    await active.intent({ type: 'roll', playerId: active.user.id });
     await flush();
     advance(17000);
     await host.pulse();
@@ -336,7 +342,7 @@ describe('network sessions', () => {
     network.drop = () => false;
     await client.pulse();
     await flush();
-    await host.intent({ type: 'roll', playerId: host.user.id });
+    await active.intent({ type: 'roll', playerId: active.user.id });
     await flush();
     expect(host.state!.dice).toHaveLength(2);
     expect(host.state!.players[1]!.bot).toBe(false);

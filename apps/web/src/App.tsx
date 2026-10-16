@@ -531,6 +531,7 @@ export default function App() {
   const start = () => {
     if (!validMinutes(minutes)) return;
     const next = newLocal({
+      randomFirstPlayer: true,
       players: Array.from({ length: count }, (_, i) => ({
         id: `p${i + 1}`,
         name: names[i]!.trim() || `Joueur ${i + 1}`,
