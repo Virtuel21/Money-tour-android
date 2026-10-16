@@ -33,7 +33,11 @@ async function capture(page, name) {
         if (value) texts.push(value);
       }
       const untranslated = [
-        ...new Set(texts.filter((s) => french.includes(s) && !['Vous', 'vous'].includes(s))),
+        ...new Set(
+          texts.filter(
+            (s) => (french.includes(s) || /^Carte de /.test(s)) && !['Vous', 'vous'].includes(s),
+          ),
+        ),
       ];
       const clipped = [...root.querySelectorAll('button,h1,h2,h3,p,label,select,summary')]
         .filter(

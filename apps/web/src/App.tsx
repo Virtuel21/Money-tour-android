@@ -2479,7 +2479,7 @@ export default function App() {
         {screen === 'game' && !cinema.dismissed && cinema.frame.cue.kind === 'card' && (
           <Modal
             title={
-              'Carte de ' +
+              translate('Carte de ') +
               (current.players.find((p) => p.id === cinema.frame.cue.playerId)?.name ?? active.name)
             }
             onClose={cinema.dismiss}
