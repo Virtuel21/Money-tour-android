@@ -1,5 +1,5 @@
 import { scaledAmount } from '@money-tour/engine';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useId } from 'react';
 import {
   auctionCommitment,
   getDecisionPlayerId,
@@ -36,6 +36,7 @@ export function AuctionView({
         drafts.get(draftKey) ??
         scaledAmount(state.config, 50000),
     );
+  const amountHint = useId();
   const [amount, setAmount] = useState(initialAmount);
   const [opened, setOpened] = useState(false);
   const [submitted, setSubmitted] = useState(!!readAuctionOffer(state, actor.id, gameKey));
@@ -78,7 +79,7 @@ export function AuctionView({
         Une seule offre par joueur. Seul le gagnant paie. En cas d’égalité, tirage au sort entre les
         meilleurs enchérisseurs.
       </p>
-      <div className="auction-seals" aria-label="Offres déposées">
+      <div className="auction-seals" role="group" aria-label="Offres déposées">
         {a.participants.map((id) => (
           <span key={id}>
             {state.players.find((p) => p.id === id)!.name}{' '}
@@ -116,7 +117,13 @@ export function AuctionView({
                   readOnly={submitted}
                   min="1"
                   max={actor.cash}
-                  step={scaledAmount(state.config, 1000)}
+                  step="1"
+                  aria-invalid={
+                    !Number.isSafeInteger(Number(amount)) ||
+                    Number(amount) < 1 ||
+                    Number(amount) > actor.cash
+                  }
+                  aria-describedby={amountHint}
                   value={amount}
                   onChange={(e) => {
                     setAmount(e.target.value);
@@ -124,6 +131,13 @@ export function AuctionView({
                   }}
                 />
               </label>
+              <p id={amountHint} role="status">
+                {!Number.isSafeInteger(Number(amount)) ||
+                Number(amount) < 1 ||
+                Number(amount) > actor.cash
+                  ? `Saisissez un montant entier entre 1 et ${money(actor.cash, true)}.`
+                  : 'Montant entier, sans décimales.'}
+              </p>
               {submitted && (
                 <p role="status">Offre envoyée. Un nouvel envoi conserve le même montant.</p>
               )}

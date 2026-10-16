@@ -94,7 +94,11 @@ export function PurchaseDetails({
       </header>
       {tile.type === 'city' ? (
         <>
-          <div className="purchase-levels" aria-label="Choisir les bâtiments à acheter">
+          <div
+            className="purchase-levels"
+            role="group"
+            aria-label="Choisir les bâtiments à acheter"
+          >
             {tile.rents!.map((_, index) => (
               <button
                 key={index}
@@ -158,12 +162,19 @@ export function PurchaseDetails({
       ) : (
         <div className="island-rents">
           <BuildingIllustration level={0} island />
-          {state.config.resortRents.map((rent, i) => (
-            <span key={i}>
-              {i + 1} île{i ? 's' : ''}
-              <strong>{money(rent, true)}</strong>
-            </span>
-          ))}
+          <div className="island-rates">
+            <h3>Loyer selon vos îles</h3>
+            <dl className="island-rent-grid">
+              {state.config.resortRents.map((rent, i) => (
+                <div key={i}>
+                  <dt>
+                    {i + 1} île{i ? 's' : ''}
+                  </dt>
+                  <dd>{money(rent, true)}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
         </div>
       )}
       <p className="purchase-wallet">

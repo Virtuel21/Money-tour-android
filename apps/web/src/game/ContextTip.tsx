@@ -73,7 +73,7 @@ export function ContextTip({
     return null;
   return (
     <aside className="context-tip" aria-label="Conseil de jeu">
-      <div>
+      <div tabIndex={0}>
         <strong>{tip.title}</strong>
         <p>{tip.text}</p>
       </div>

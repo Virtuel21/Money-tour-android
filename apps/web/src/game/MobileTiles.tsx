@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { getPropertyValue, type GameState } from '@money-tour/engine';
 import { ActionClock } from './ActionClock';
 import { money } from './local';
@@ -17,17 +17,47 @@ export function MobileTiles({
   onTile: (id: number) => void;
 }) {
   const [page, setPage] = useState(0);
-  const tiles = choices.length
+  const [search, setSearch] = useState('');
+  const listId = useId();
+  const available = choices.length
     ? state.config.board.filter((t) => choices.includes(t.id))
     : state.config.board;
+  const normalize = (value: string) =>
+    value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLocaleLowerCase('fr');
+  const query = normalize(search.trim());
+  const tiles = available.filter((tile) =>
+    normalize(`${tile.name} ${collectionLabel(tile)}`).includes(query),
+  );
   const selling = state.phase === 'debt';
   const size = selling ? 4 : 6;
   const pages = Math.max(1, Math.ceil(tiles.length / size));
   const index = Math.min(page, pages - 1);
   return (
     <>
+      <label className="field tile-search">
+        Rechercher une escale
+        <input
+          type="search"
+          value={search}
+          placeholder="Ville, île ou rue…"
+          autoComplete="off"
+          aria-controls={listId}
+          onChange={(event) => {
+            setSearch(event.target.value);
+            setPage(0);
+          }}
+        />
+      </label>
+      <p className="tile-results" role="status">
+        {tiles.length} escale{tiles.length > 1 ? 's' : ''}
+        {search && ` pour « ${search} »`}
+      </p>
       {choices.length > 0 && !selling && <p>Choisissez une des cases disponibles.</p>}
-      <div className="tile-list mobile-tile-list">
+      {!tiles.length && <p>Aucune escale trouvée. Essayez un autre nom ou effacez la recherche.</p>}
+      <div id={listId} className="tile-list mobile-tile-list">
         {tiles.slice(index * size, index * size + size).map((t) => (
           <button key={t.id} onClick={() => onTile(t.id)}>
             <i style={{ background: t.color ?? '#e6b94a' }} />
@@ -54,19 +84,22 @@ export function MobileTiles({
           <button
             disabled={!index}
             aria-label="Cases précédentes"
+            aria-controls={listId}
             onClick={() => setPage(index - 1)}
           >
             <GameIcon name="arrowLeft" />
+            Précédent
           </button>
-          <span>
+          <span role="status" aria-label={`Page ${index + 1} sur ${pages}`}>
             {index + 1} / {pages}
           </span>
           <button
             disabled={index === pages - 1}
             aria-label="Cases suivantes"
+            aria-controls={listId}
             onClick={() => setPage(index + 1)}
           >
-            <GameIcon name="arrowRight" />
+            Suivant <GameIcon name="arrowRight" />
           </button>
         </div>
       )}

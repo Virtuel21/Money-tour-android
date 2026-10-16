@@ -129,3 +129,23 @@ it('opens debug from a property decision and keeps frozen bots from advancing af
   await act(() => vi.advanceTimersByTime(30000));
   expect(loadDebug()!.state.seq).toBe(seq);
 });
+
+it('keeps a saved game until replacing it is explicitly confirmed', async () => {
+  const normal = newLocal({
+    players: [
+      { id: 'a', name: 'Alice' },
+      { id: 'b', name: 'Bob', bot: true },
+    ],
+  });
+  normal.state.players[0]!.cash = 1234;
+  persistLocal(normal);
+  await mount();
+  await click('Nouvelle partie sur cet appareil');
+  expect(loadLocal()).toEqual(normal);
+  await click('Annuler');
+  expect(loadLocal()).toEqual(normal);
+  await click('Nouvelle partie sur cet appareil');
+  await click('Remplacer et commencer');
+  expect(loadLocal()!.state.players[0]!.id).toBe('p1');
+  expect(loadLocal()!.state.players[0]!.cash).not.toBe(1234);
+});

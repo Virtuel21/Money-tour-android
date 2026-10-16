@@ -20,6 +20,7 @@ export function previewScenario(): LocalSave | null {
       'card',
       'crowded',
       'showcase',
+      'menu-review',
       'rent',
       'attack',
       'purchase',
@@ -317,5 +318,40 @@ export function previewScenario(): LocalSave | null {
   }
   if (name === 'alliance') state.phase = 'alliance';
   if (name === 'crisis') state.crisis = { remaining: state.players.map((p) => p.id) };
+  if (name === 'menu-review') {
+    const cities = state.config.board.filter((tile) => tile.type === 'city');
+    const names = [
+      'Alexandre de la Mer',
+      'Maximilien du Rivage',
+      'Lou à l’île lointaine',
+      'Noa le Navigateur',
+    ];
+    state.players.forEach((p, index) => {
+      p.name = names[index]!;
+      p.laps = 3;
+    });
+    state.turn = 8;
+    cities.forEach((tile, index) => {
+      state.properties[tile.id] = {
+        ownerId: index % 3 ? 'p1' : 'p2',
+        level: index % 5,
+        championships: 0,
+      };
+    });
+    for (const effect of ['fraud', 'squatter']) {
+      const card = state.config.cards.find((item) => item.effect === effect);
+      if (card) hold(card.id);
+    }
+    return {
+      version: 1,
+      seed: 'visual-review',
+      state,
+      history: Array.from(
+        { length: 80 },
+        (_, index) =>
+          `Tour ${80 - index} · ${names[index % names.length]} : ${cities[index % cities.length]!.name}, construction et règlement du loyer.`,
+      ),
+    };
+  }
   return { version: 1, seed: 'visual-review', state };
 }

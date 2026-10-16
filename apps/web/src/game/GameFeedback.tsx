@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useState, type CSSProperties } from 'react';
 import type { GameState, Player } from '@money-tour/engine';
 import type { Cue } from './presentation';
 import { money } from './local';
@@ -15,6 +15,12 @@ export function TurnBanner({
   local: boolean;
   color: string;
 }) {
+  const [visible, setVisible] = useState(true);
+  useEffect(() => {
+    const timer = setTimeout(() => setVisible(false), 2800);
+    return () => clearTimeout(timer);
+  }, []);
+  if (!visible) return null;
   const yours = !player.bot && (local || self === player.id);
   return (
     <div className="turn-banner" role="status" style={{ '--turn-color': color } as CSSProperties}>

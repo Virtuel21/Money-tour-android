@@ -68,7 +68,8 @@ export function MobilePocket({
       </nav>
       {(tab === 'cities' || tab === 'bonus') && (
         <>
-          <div className="pocket-owners" aria-label="Joueur consulté">
+          <p className="pocket-owner-label">Voyageur consulté</p>
+          <div className="pocket-owners" role="group" aria-label="Joueur consulté">
             {state.players.map((p) => (
               <button
                 key={p.id}
@@ -84,7 +85,7 @@ export function MobilePocket({
           </div>
           {tab === 'cities' ? (
             <div className="pocket-cities">
-              {!!groups.length && <h3>{groups[index]![0]}</h3>}
+              {!!groups.length && <h3 aria-live="polite">{groups[index]![0]}</h3>}
               {(groups[index]?.[1] ?? []).map((t) => (
                 <button key={t.id} style={{ borderTopColor: t.color }} onClick={() => onTile(t.id)}>
                   <b>{t.name}</b>
@@ -115,17 +116,17 @@ export function MobilePocket({
           {pages > 1 && (
             <div className="pocket-pages">
               <button
-                aria-label="Page précédente"
+                aria-label={tab === 'cities' ? 'Rue précédente' : 'Bonus précédents'}
                 disabled={!index}
                 onClick={() => setPage(index - 1)}
               >
                 <GameIcon name="arrowLeft" />
               </button>
-              <span>
+              <span role="status" aria-label={`Page ${index + 1} sur ${pages}`}>
                 {index + 1} / {pages}
               </span>
               <button
-                aria-label="Page suivante"
+                aria-label={tab === 'cities' ? 'Rue suivante' : 'Bonus suivants'}
                 disabled={index === pages - 1}
                 onClick={() => setPage(index + 1)}
               >

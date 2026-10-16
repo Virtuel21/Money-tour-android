@@ -18,15 +18,20 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "pnpm typecheck && pnpm lint && pnpm test:coverage && pnpm build"
+    "check": "pnpm typecheck && pnpm lint && pnpm test:coverage && pnpm build",
+    "qa:board:install": "playwright install chromium firefox webkit",
+    "qa:board": "node scripts/qa-board.mjs",
+    "qa:menus": "node scripts/qa-menus.mjs"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
     "@eslint/js": "10.0.1",
     "@types/node": "^22.19.0",
     "@vitest/coverage-v8": "5.0.2",
     "eslint": "10.11.0",
     "globals": "^16.5.0",
     "happy-dom": "^20.14.5",
+    "playwright": "1.65.0-alpha-2026-10-16",
     "prettier": "^3.7.4",
     "sharp": "^0.34.5",
     "tsx": "^4.21.0",

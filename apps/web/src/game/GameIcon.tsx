@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import './game-icons.css';
 
 const paths = {
+  compass: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm4 5-3 5-5 3 3-5 5-3Z',
   coin: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm2.5 5H11a2 2 0 0 0 0 4h2a2 2 0 0 1 0 4H9.5M12 6v12',
   house: 'm3 11 9-8 9 8M5 10v11h14V10M10 21v-7h4v7',
   hotel: 'M5 21V5h14v16M3 21h18M9 8h1m4 0h1M9 12h1m4 0h1M10 21v-5h4v5M9 2h6',

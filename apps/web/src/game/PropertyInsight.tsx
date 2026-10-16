@@ -73,7 +73,11 @@ export function PropertyInsight({
                 : `Avec cette propriété : ${group.owned + 1} / ${group.tiles.length} pour compléter cette rue.`}
           </p>
           {onTile && (
-            <div className="property-neighbours" aria-label="Propriétés de la collection">
+            <div
+              className="property-neighbours"
+              role="group"
+              aria-label="Propriétés de la collection"
+            >
               {group.tiles
                 .filter((t) => t.id !== tileId)
                 .map((t) => (

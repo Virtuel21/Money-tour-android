@@ -112,7 +112,7 @@ it('keeps streets together on desktop and paginates whole streets on mobile with
   expect(host.querySelector('.roach-badge')!.textContent).toContain('2 tours');
   await act(() => root.render(createElement(MobilePocket, { state, self: 'p1', onTile: open })));
   expect(host.querySelectorAll('.pocket-cities button')).toHaveLength(3);
-  await act(() => host.querySelector<HTMLButtonElement>('[aria-label="Page suivante"]')!.click());
+  await act(() => host.querySelector<HTMLButtonElement>('[aria-label="Rue suivante"]')!.click());
   expect(host.querySelector('.pocket-cities h3')!.textContent).toBe('Rue 2');
   expect(host.querySelector('.roach-badge')!.textContent).toContain('2 tours');
   await act(() => host.querySelector<HTMLButtonElement>('.pocket-cities button')!.click());
