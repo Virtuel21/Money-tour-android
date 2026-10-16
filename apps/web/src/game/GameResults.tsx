@@ -1,3 +1,4 @@
+import { translate } from '../i18n/translate';
 import { getNetWorth, type GameState } from '@money-tour/engine';
 import { money } from './local';
 import type { GameStats } from './gameStats';
@@ -21,8 +22,12 @@ export function GameResults({
     (a, b) => getNetWorth(state, b.id) - getNetWorth(state, a.id),
   );
   return (
-    <section className="game-summary" aria-label="Bilan du voyage">
-      <p>Classement par patrimoine · {Math.floor(state.elapsedMs / 60000)} min de jeu</p>
+    <section className="game-summary" aria-label={translate('Bilan du voyage')}>
+      <p>
+        {translate('Classement par patrimoine · ')}
+        {Math.floor(state.elapsedMs / 60000)}
+        {translate(' min de jeu')}
+      </p>
       {ranked.map((player) => {
         const owned = state.config.board.filter(
           (tile) => state.properties[tile.id]?.ownerId === player.id,
@@ -38,58 +43,69 @@ export function GameResults({
           >
             <header>
               <strong>{player.name}</strong>
-              <b>{money(getNetWorth(state, player.id))}</b>
+              <b>{translate(money(getNetWorth(state, player.id)))}</b>
             </header>
             <dl>
               <div>
-                <dt>Argent disponible</dt>
-                <dd>{money(player.cash)}</dd>
+                <dt>{translate('Argent disponible')}</dt>
+                <dd>{translate(money(player.cash))}</dd>
               </div>
               <div>
-                <dt>Propriétés conservées</dt>
+                <dt>{translate('Propriétés conservées')}</dt>
                 <dd>
-                  {owned.length} dont{' '}
+                  {owned.length}
+                  {translate(' dont')}{' '}
                   {
                     owned.filter((t) => state.properties[t.id]?.level === state.config.hotelLevel)
                       .length
                   }{' '}
-                  hôtel(s)
+                  {translate('hôtel(s)')}
                 </dd>
               </div>
               <div>
-                <dt>Rues complètes{state.mode === 'teams' ? ' de l’équipe' : ''}</dt>
+                <dt>
+                  {translate('Rues complètes')}
+                  {state.mode === 'teams' ? translate(' de l’équipe') : ''}
+                </dt>
                 <dd>{collections}</dd>
               </div>
               <div>
-                <dt>Tours complets du plateau</dt>
+                <dt>{translate('Tours complets du plateau')}</dt>
                 <dd>{player.laps}</dd>
               </div>
               {stats && (
                 <div>
-                  <dt>Loyers encaissés{!stats.complete ? ' depuis la reprise' : ''}</dt>
-                  <dd>{money(stats.rent[player.id] ?? 0)}</dd>
+                  <dt>
+                    {translate('Loyers encaissés')}
+                    {!stats.complete ? translate(' depuis la reprise') : ''}
+                  </dt>
+                  <dd>{translate(money(stats.rent[player.id] ?? 0))}</dd>
                 </div>
               )}
             </dl>
             {best && (
               <p className="summary-highlight">
-                Plus gros revenu locatif : {state.config.board[Number(best[0])]?.name} ·{' '}
-                {money(best[1])}
+                {translate('Plus gros revenu locatif : ')}
+                {translate(state.config.board[Number(best[0])]?.name)} · {translate(money(best[1]))}
               </p>
             )}
           </article>
         );
       })}
-      {!stats && <p>Les loyers historiques ne sont pas disponibles pour cette sauvegarde.</p>}
+      {!stats && (
+        <p>{translate('Les loyers historiques ne sont pas disponibles pour cette sauvegarde.')}</p>
+      )}
       {onRematch ? (
         <button className="primary" disabled={rematchDisabled} onClick={onRematch}>
-          {rematchLabel ?? 'Revanche avec les mêmes joueurs'}
+          {translate(rematchLabel ?? 'Revanche avec les mêmes joueurs')}
         </button>
       ) : (
-        rematchLabel && <p role="status">{rematchLabel}</p>
+        rematchLabel && <p role="status">{translate(rematchLabel)}</p>
       )}
       <small>
-        Mêmes joueurs, équipes et durée. Un nouveau plateau et de nouveaux objectifs sont tirés.
+        {translate(
+          'Mêmes joueurs, équipes et durée. Un nouveau plateau et de nouveaux objectifs sont tirés.',
+        )}
       </small>
     </section>
   );

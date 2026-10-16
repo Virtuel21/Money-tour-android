@@ -1,3 +1,4 @@
+import { translate } from '../i18n/translate';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { GameState } from '@money-tour/engine';
 import type { Celebration } from './celebrations';
@@ -71,8 +72,8 @@ export function EventCelebration({
             />
           </span>
           <span>
-            <strong>{item.title}</strong>
-            <small>{item.detail}</small>
+            <strong>{translate(item.title)}</strong>
+            <small>{translate(item.detail)}</small>
           </span>
         </div>
       ))}

@@ -21,7 +21,8 @@
     "check": "pnpm typecheck && pnpm lint && pnpm test:coverage && pnpm build",
     "qa:board:install": "playwright install chromium firefox webkit",
     "qa:board": "node scripts/qa-board.mjs",
-    "qa:menus": "node scripts/qa-menus.mjs"
+    "qa:menus": "node scripts/qa-menus.mjs",
+    "qa:language": "node scripts/qa-language.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",

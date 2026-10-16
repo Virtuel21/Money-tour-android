@@ -1,3 +1,4 @@
+import { translate, formatText } from '../i18n/translate';
 import { playerBonuses, type BonusInfo } from './bonuses';
 import { useState } from 'react';
 import { adventureText, getRent, type GameState } from '@money-tour/engine';
@@ -42,7 +43,7 @@ export function MobilePocket({
   const index = Math.min(page, pages - 1);
   return (
     <div className="mobile-pocket">
-      <nav aria-label="Votre carnet">
+      <nav aria-label={translate('Votre carnet')}>
         {(['cities', 'strategy', 'bonus', 'quest', 'rules'] as const)
           .filter((item) => item !== 'quest' || hasQuest)
           .map((item) => (
@@ -54,22 +55,22 @@ export function MobilePocket({
                 setPage(0);
               }}
             >
-              {
+              {translate(
                 {
                   cities: 'Villes',
                   strategy: 'Victoire',
                   bonus: 'Bonus',
                   quest: 'Objectif',
                   rules: 'Partie',
-                }[item]
-              }
+                }[item],
+              )}
             </button>
           ))}
       </nav>
       {(tab === 'cities' || tab === 'bonus') && (
         <>
-          <p className="pocket-owner-label">Voyageur consulté</p>
-          <div className="pocket-owners" role="group" aria-label="Joueur consulté">
+          <p className="pocket-owner-label">{translate('Voyageur consulté')}</p>
+          <div className="pocket-owners" role="group" aria-label={translate('Joueur consulté')}>
             {state.players.map((p) => (
               <button
                 key={p.id}
@@ -85,48 +86,59 @@ export function MobilePocket({
           </div>
           {tab === 'cities' ? (
             <div className="pocket-cities">
-              {!!groups.length && <h3 aria-live="polite">{groups[index]![0]}</h3>}
+              {!!groups.length && <h3 aria-live="polite">{translate(groups[index]![0])}</h3>}
               {(groups[index]?.[1] ?? []).map((t) => (
                 <button key={t.id} style={{ borderTopColor: t.color }} onClick={() => onTile(t.id)}>
-                  <b>{t.name}</b>
-                  <span>Loyer {money(getRent(state, t.id), true)}</span>
+                  <b>{translate(t.name)}</b>
+                  <span>
+                    {translate('Loyer ')}
+                    {translate(money(getRent(state, t.id), true))}
+                  </span>
                   {!!state.properties[t.id]!.roachTurns && (
                     <span className="roach-badge">
-                      <GameIcon name="bug" /> Cafards · {state.properties[t.id]!.roachTurns} tours ·
-                      loyer −50 %
+                      <GameIcon name="bug" />
+                      {translate(' Cafards · ')}
+                      {state.properties[t.id]!.roachTurns}
+                      {translate(' tours · loyer −50 %')}
                     </span>
                   )}
                 </button>
               ))}
-              {!groups.length && <p>Aucune propriété pour le moment.</p>}
+              {!groups.length && <p>{translate('Aucune propriété pour le moment.')}</p>}
             </div>
           ) : (
             <div className="pocket-bonuses">
               {bonuses.slice(index * 2, index * 2 + 2).map((b, i) => (
                 <button key={i} onClick={() => onBonus?.(b)}>
                   <strong>
-                    <GameIcon name={b.icon ?? 'info'} /> {b.title}
+                    <GameIcon name={b.icon ?? 'info'} /> {translate(b.title)}
                   </strong>
-                  <span>{b.description}</span>
+                  <span>{translate(b.description)}</span>
                 </button>
               ))}
-              {!bonuses.length && <p>Les cartes conservées et les jetons apparaîtront ici.</p>}
+              {!bonuses.length && (
+                <p>{translate('Les cartes conservées et les jetons apparaîtront ici.')}</p>
+              )}
             </div>
           )}
           {pages > 1 && (
             <div className="pocket-pages">
               <button
-                aria-label={tab === 'cities' ? 'Rue précédente' : 'Bonus précédents'}
+                aria-label={
+                  tab === 'cities' ? translate('Rue précédente') : translate('Bonus précédents')
+                }
                 disabled={!index}
                 onClick={() => setPage(index - 1)}
               >
                 <GameIcon name="arrowLeft" />
               </button>
-              <span role="status" aria-label={`Page ${index + 1} sur ${pages}`}>
+              <span role="status" aria-label={formatText('Page {0} sur {1}', index + 1, pages)}>
                 {index + 1} / {pages}
               </span>
               <button
-                aria-label={tab === 'cities' ? 'Rue suivante' : 'Bonus suivants'}
+                aria-label={
+                  tab === 'cities' ? translate('Rue suivante') : translate('Bonus suivants')
+                }
                 disabled={index === pages - 1}
                 onClick={() => setPage(index + 1)}
               >
@@ -150,24 +162,27 @@ export function MobilePocket({
       )}
       {tab === 'rules' && (
         <div className="pocket-rule">
-          <p>{adventureText(state)}</p>
+          <p>{translate(adventureText(state))}</p>
           <p>
-            Tour de table {state.adventure?.round ?? 1} ·{' '}
+            {translate('Tour de table ')}
+            {state.adventure?.round ?? 1} ·{' '}
             {state.adventure?.tenderDone
-              ? 'Appel d’offres proposé'
-              : 'Un appel d’offres secret aura lieu pendant cette partie.'}
+              ? translate('Appel d’offres proposé')
+              : translate('Un appel d’offres secret aura lieu pendant cette partie.')}
           </p>
           {state.crisis && (
             <p>
-              <GameIcon name="trendDown" /> Crise : loyers −50 % · {state.crisis.remaining.length}{' '}
-              joueur(s) doivent encore jouer.
+              <GameIcon name="trendDown" />
+              {translate(' Crise : loyers −50 % · ')}
+              {state.crisis.remaining.length} {translate('joueur(s) doivent encore jouer.')}
             </p>
           )}
           {state.alliance && (
             <p>
               <GameIcon name="people" />{' '}
-              {state.players.find((p) => p.id === state.alliance!.beneficiaryId)?.name} reçoit 50 %
-              des gains de {state.players.find((p) => p.id === state.alliance!.targetId)?.name}.
+              {state.players.find((p) => p.id === state.alliance!.beneficiaryId)?.name}
+              {translate(' reçoit 50 % des gains de ')}
+              {state.players.find((p) => p.id === state.alliance!.targetId)?.name}.
             </p>
           )}
         </div>

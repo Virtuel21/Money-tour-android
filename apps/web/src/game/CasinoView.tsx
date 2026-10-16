@@ -1,3 +1,4 @@
+import { translate, formatText } from '../i18n/translate';
 import { useEffect, useState, type CSSProperties } from 'react';
 import { getLegalActions, type GameAction, type GameState } from '@money-tour/engine';
 import type { Cue } from './presentation';
@@ -46,11 +47,11 @@ export function CasinoView({
               {cue && !revealed ? (
                 <span className="reel-strip">
                   {[...symbols, symbols[0]].map((symbol, index) => (
-                    <b key={index}>{symbol}</b>
+                    <b key={index}>{translate(symbol)}</b>
                   ))}
                 </span>
               ) : (
-                <b>{symbols[revealed ? (cue?.casinoReels?.[i] ?? 0) : i]}</b>
+                <b>{translate(symbols[revealed ? (cue?.casinoReels?.[i] ?? 0) : i])}</b>
               )}
             </span>
           ))}
@@ -61,21 +62,26 @@ export function CasinoView({
           <h3>
             {revealed
               ? cue.jackpot
-                ? 'JACKPOT !'
+                ? translate('JACKPOT !')
                 : (cue.amount ?? 0) > 0
-                  ? 'Bien joué !'
-                  : 'La chance prend une pause…'
-              : 'La chance est en mouvement…'}
+                  ? translate('Bien joué !')
+                  : translate('La chance prend une pause…')
+              : translate('La chance est en mouvement…')}
           </h3>
           {revealed && (
             <>
               <p>
                 {game === 'roulette'
-                  ? `La bille s’arrête sur ${cue.casinoColor === 'red' ? 'rouge' : 'noir'}.`
-                  : 'Les rouleaux ont parlé !'}
+                  ? formatText(
+                      'La bille s’arrête sur {0}.',
+                      cue.casinoColor === 'red' ? translate('rouge') : translate('noir'),
+                    )
+                  : translate('Les rouleaux ont parlé !')}
               </p>
               <strong>
-                {(cue.amount ?? 0) > 0 ? '+' + money(cue.amount!) : 'Aucun gain, aucune perte'}
+                {(cue.amount ?? 0) > 0
+                  ? translate('+' + translate(money(cue.amount!)))
+                  : translate('Aucun gain, aucune perte')}
               </strong>
             </>
           )}
@@ -83,25 +89,34 @@ export function CasinoView({
       ) : (
         <>
           <p className="eyebrow">
-            ENTRÉE OFFERTE · {game === 'roulette' ? 'ROULETTE ROUGE / NOIR' : 'MACHINE À SOUS'}
+            {translate('ENTRÉE OFFERTE · ')}
+            {game === 'roulette' ? translate('ROULETTE ROUGE / NOIR') : translate('MACHINE À SOUS')}
           </p>
           <h3>
-            Jackpot potentiel :{' '}
-            {money(Math.max(state.config.casinoMinWin ?? 0, Math.floor(player.cash * 0.1)), true)}
+            {translate('Jackpot potentiel :')}{' '}
+            {translate(
+              money(Math.max(state.config.casinoMinWin ?? 0, Math.floor(player.cash * 0.1)), true),
+            )}
           </h3>
           <p>
-            {state.casino?.chance} % de chances de jackpot. La probabilité monte de{' '}
-            {state.config.casinoChanceStep} points à chaque visite de ce casino, jusqu’à{' '}
-            {state.config.casinoMaxChance} %, puis repart à {state.config.casinoBaseChance} % après
-            un jackpot.
+            {state.casino?.chance}
+            {translate(' % de chances de jackpot. La probabilité monte de')}{' '}
+            {state.config.casinoChanceStep}
+            {translate(' points à chaque visite de ce casino, jusqu’à')}{' '}
+            {state.config.casinoMaxChance}
+            {translate(' %, puis repart à ')}
+            {state.config.casinoBaseChance}
+            {translate(' % après un jackpot.')}
           </p>
           <p className="setup-note">
             {game === 'roulette'
-              ? 'Bonne couleur : +2 % de votre compte.'
-              : 'Deux symboles identiques : +2 % ; trois : +5 %.'}{' '}
-            Jackpot : +10 % de votre compte, sans cumul. Pas de mise ni de perte.
-            {!!state.config.casinoMinWin &&
-              ` Chaque résultat gagnant rapporte au moins ${money(state.config.casinoMinWin, true)}, avant partage éventuel de l’alliance.`}
+              ? translate('Bonne couleur : +2 % de votre compte.')
+              : translate('Deux symboles identiques : +2 % ; trois : +5 %.')}{' '}
+            {translate('Jackpot : +10 % de votre compte, sans cumul. Pas de mise ni de perte.')}
+            {translate(
+              !!state.config.casinoMinWin &&
+                ` Chaque résultat gagnant rapporte au moins ${money(state.config.casinoMinWin, true)}, avant partage éventuel de l’alliance.`,
+            )}
           </p>
           <div className="casino-actions">
             {getLegalActions(state)
@@ -110,10 +125,10 @@ export function CasinoView({
                 <button key={a.type} className={'primary ' + a.type} onClick={() => act(a)}>
                   <span>
                     {a.type === 'casino_red'
-                      ? 'Choisir rouge'
+                      ? translate('Choisir rouge')
                       : a.type === 'casino_black'
-                        ? 'Choisir noir'
-                        : 'Lancer les rouleaux'}
+                        ? translate('Choisir noir')
+                        : translate('Lancer les rouleaux')}
                   </span>
                   <ActionClock />
                 </button>
@@ -123,7 +138,8 @@ export function CasinoView({
             className="secondary"
             onClick={() => act({ type: 'finish', playerId: player.id })}
           >
-            Passer mon tour au casino <ActionClock />
+            {translate('Passer mon tour au casino ')}
+            <ActionClock />
           </button>
         </>
       )}

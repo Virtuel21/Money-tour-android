@@ -71,7 +71,7 @@ export function eventCelebrations(
         id: `${after.seq}:collection:${group[0]!.id}:${ids.join(',')}`,
         kind: 'collection',
         title: group[0]!.type === 'resort' ? 'Archipel complet !' : 'Rue complète !',
-        detail: `${players.map((p) => p.name).join(' et ')} · ${group.length} propriétés réunies`,
+        detail: `${players.map((p) => p.name).join(' & ')} · ${group.length} propriétés réunies`,
         playerId: events[eventIndex]!.playerId,
         tile: events[eventIndex]!.tile,
         eventIndex,

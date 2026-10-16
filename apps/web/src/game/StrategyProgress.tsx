@@ -1,3 +1,4 @@
+import { translate, formatText } from '../i18n/translate';
 import type { GameState } from '@money-tour/engine';
 import { publicVictoryProgress, type CollectionProgress } from './strategy';
 import { money } from './local';
@@ -27,30 +28,35 @@ export function StrategyProgress({
   const renderCollection = (group: CollectionProgress) => (
     <li key={group.key}>
       <div className="strategy-collection-title">
-        <strong>{group.label}</strong>
-        <span>{group.complete ? 'Complète' : `${group.owned} / ${group.tiles.length}`}</span>
+        <strong>{translate(group.label)}</strong>
+        <span>
+          {group.complete
+            ? translate('Complète')
+            : translate(`${group.owned} / ${group.tiles.length}`)}
+        </span>
         {onHighlight && (
           <button
             type="button"
-            aria-label={`Repérer ${group.label} sur le plateau`}
+            aria-label={formatText('Repérer {0} sur le plateau', translate(group.label))}
             onClick={() => onHighlight(group.tiles.map((t) => t.id))}
           >
-            <GameIcon name="map" /> Repérer
+            <GameIcon name="map" />
+            {translate(' Repérer')}
           </button>
         )}
       </div>
       {!!group.missing.length && (
         <p>
-          Il manque{' '}
+          {translate('Il manque')}{' '}
           {group.missing.map(({ tile, owner }, i) => (
             <span key={tile.id}>
-              {i > 0 && ', '}
+              {translate(i > 0 && ', ')}
               <button
                 type="button"
                 className="strategy-destination"
                 onClick={() => onTile(tile.id)}
               >
-                {tile.name} <small>({owner})</small>
+                {translate(tile.name)} <small>({translate(owner)})</small>
               </button>
             </span>
           ))}
@@ -60,20 +66,25 @@ export function StrategyProgress({
     </li>
   );
   return (
-    <section className="strategy-progress" aria-label={`Progression vers la victoire de ${name}`}>
+    <section
+      className="strategy-progress"
+      aria-label={formatText('Progression vers la victoire de {0}', name)}
+    >
       <header>
         <span>
-          <GameIcon name="trophy" /> {state.mode === 'teams' ? `Équipe de ${name}` : name} · Cap sur
-          la victoire
+          <GameIcon name="trophy" />{' '}
+          {state.mode === 'teams' ? formatText('Équipe de {0}', name) : name}
+          {translate(' · Cap sur la victoire')}
         </span>
         <strong>
-          {progress.completed} / {progress.target} rues complètes
+          {progress.completed} / {progress.target}
+          {translate(' rues complètes')}
         </strong>
       </header>
       <div
         className="strategy-meter"
         role="progressbar"
-        aria-label="Rues complètes"
+        aria-label={translate('Rues complètes')}
         aria-valuemin={0}
         aria-valuemax={progress.target}
         aria-valuenow={Math.min(progress.completed, progress.target)}
@@ -86,51 +97,61 @@ export function StrategyProgress({
       </div>
       <dl className="strategy-money">
         <div>
-          <dt>Argent disponible</dt>
-          <dd>{money(progress.cash, true)}</dd>
+          <dt>{translate('Argent disponible')}</dt>
+          <dd>{translate(money(progress.cash, true))}</dd>
         </div>
         <div>
-          <dt>Patrimoine</dt>
-          <dd>{money(progress.netWorth, true)}</dd>
+          <dt>{translate('Patrimoine')}</dt>
+          <dd>{translate(money(progress.netWorth, true))}</dd>
         </div>
       </dl>
       <p className="strategy-note">
-        Au chrono, le patrimoine départage : argent + valeur des propriétés et bâtiments.
+        {translate(
+          'Au chrono, le patrimoine départage : argent + valeur des propriétés et bâtiments.',
+        )}
       </p>
       {progress.eliminated ? (
-        <p>Éliminé : aucune collection active.</p>
+        <p>{translate('Éliminé : aucune collection active.')}</p>
       ) : (
         <details open={expanded || undefined}>
-          <summary>Voir les propriétés à obtenir</summary>
+          <summary>{translate('Voir les propriétés à obtenir')}</summary>
           <p className="strategy-note">
             {state.mode === 'teams'
-              ? 'Les possessions des équipiers encore en jeu sont réunies. '
+              ? translate('Les possessions des équipiers encore en jeu sont réunies. ')
               : ''}
             {progress.islands
-              ? `Les ${progress.islands.tiles.length} îles réunies comptent pour une rue complète.`
+              ? formatText(
+                  'Les {0} îles réunies comptent pour une rue complète.',
+                  progress.islands.tiles.length,
+                )
               : ''}
           </p>
           <ul className="strategy-collections">{collections.map(renderCollection)}</ul>
           {(progress.lines.length > 0 || (progress.islandVictory && progress.islands)) && (
             <details className="strategy-alternatives">
-              <summary>Autres victoires par les propriétés</summary>
+              <summary>{translate('Autres victoires par les propriétés')}</summary>
               {progress.lines.length > 0 && (
                 <>
-                  <p>Posséder toutes les propriétés d’un même côté du plateau.</p>
+                  <p>{translate('Posséder toutes les propriétés d’un même côté du plateau.')}</p>
                   <ul className="strategy-collections">{progress.lines.map(renderCollection)}</ul>
                 </>
               )}
               {progress.islandVictory && progress.islands && (
                 <p>
-                  Réunir les {progress.islands.tiles.length} îles donne aussi une victoire
-                  immédiate.
+                  {translate('Réunir les ')}
+                  {progress.islands.tiles.length}
+                  {translate(' îles donne aussi une victoire immédiate.')}
                 </p>
               )}
             </details>
           )}
           <p className="strategy-note">
-            Faillites : {progress.opposingSides}{' '}
-            {state.mode === 'teams' ? 'équipe(s) adverse(s)' : 'adversaire(s)'} encore en jeu.
+            {translate('Faillites : ')}
+            {progress.opposingSides}{' '}
+            {state.mode === 'teams'
+              ? translate('équipe(s) adverse(s)')
+              : translate('adversaire(s)')}
+            {translate(' encore en jeu.')}
           </p>
         </details>
       )}

@@ -1,3 +1,4 @@
+import { translate } from '../i18n/translate';
 import type { TileLabelAnchors } from './tileLabels';
 
 let context: CanvasRenderingContext2D | null | undefined;
@@ -62,7 +63,7 @@ export function TileLabel({
           fontSize={size}
           fontWeight={kind === 'rent' ? 900 : 700}
         >
-          {text}
+          {translate(text)}
         </text>
       </svg>
     </svg>
@@ -72,7 +73,9 @@ export function TileLabel({
       {frame(anchors.name, 60, 'name', name, 46, true)}
       {conditions.length > 0 &&
         frame(anchors.condition, 36, 'condition', conditions.join(' · '), 23, true)}
-      {rent && frame(insured ? anchors.insuredRent : anchors.rent, 120, 'rent', rent, 116, false)}
+      {translate(
+        rent && frame(insured ? anchors.insuredRent : anchors.rent, 120, 'rent', rent, 116, false),
+      )}
     </>
   );
 }

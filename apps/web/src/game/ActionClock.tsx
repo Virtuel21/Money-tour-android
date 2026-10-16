@@ -1,3 +1,4 @@
+import { translate } from '../i18n/translate';
 import { createContext, useContext } from 'react';
 import type { GameState } from '@money-tour/engine';
 import { duration } from './local';
@@ -18,16 +19,18 @@ export function ActionClock({ full = false }: { full?: boolean }) {
       className={`cta-clock ${!held && seconds <= 10 ? 'clock-urgent' : ''}`}
       title={
         held
-          ? 'Décompte suspendu pendant la pause ou l’animation'
-          : 'Temps restant pour cette décision'
+          ? translate('Décompte suspendu pendant la pause ou l’animation')
+          : translate('Temps restant pour cette décision')
       }
     >
-      {held ? '⏸' : '⏱'} {seconds} s
+      {held ? '⏸' : '⏱'} {seconds}
+      {translate(' s')}
       {full && (
         <>
           {' '}
-          · Partie {duration(Math.max(0, state.durationMs - state.elapsedMs))}
-          {held ? ' · décompte suspendu' : ''}
+          {translate('· Partie ')}
+          {translate(duration(Math.max(0, state.durationMs - state.elapsedMs)))}
+          {held ? translate(' · décompte suspendu') : ''}
         </>
       )}
     </span>

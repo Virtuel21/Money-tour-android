@@ -1,4 +1,5 @@
 import { accumulateStats, newGameStats, validGameStats, type GameStats } from './gameStats';
+import { numberLocale } from '../i18n/language';
 import {
   config,
   legacyConfig,
@@ -128,7 +129,8 @@ export function persistLocal(save: LocalSave): boolean {
 }
 
 export const money = (value: number, compact = false): string =>
-  new Intl.NumberFormat('fr-FR', { maximumFractionDigits: compact ? 0 : 2 }).format(value) + ' 💵';
+  new Intl.NumberFormat(numberLocale(), { maximumFractionDigits: compact ? 0 : 2 }).format(value) +
+  ' 💵';
 export const duration = (ms: number): string =>
   `${Math.floor(ms / 60000)
     .toString()

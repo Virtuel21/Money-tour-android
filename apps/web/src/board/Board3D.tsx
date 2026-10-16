@@ -1,3 +1,5 @@
+import { translate, formatText } from '../i18n/translate';
+import { numberLocale } from '../i18n/language';
 import { InsuranceBadge, type InsuranceStyle } from './InsuranceBadge';
 import { architectureFamilies, architectureForCity } from '../game/architecture';
 import { tauntAsset, type Taunt } from '../game/taunts';
@@ -1154,8 +1156,15 @@ export default function Board({
       ref={shell}
       className={`board-shell board-3d ${mobile && !demo && onZoomChange ? 'board-pinch-zoom' : ''} ${demo ? 'board-demo' : ''} ${cue?.reason === 'earthquake' && !reducedMotion ? 'board-earthquake' : ''}`}
     >
-      <div ref={host} className="board-canvas" role="img" aria-label="Plateau 3D Money Tour" />
-      {!ready && !error && <div className="board-loading">Construction de votre archipel…</div>}
+      <div
+        ref={host}
+        className="board-canvas"
+        role="img"
+        aria-label={translate('Plateau 3D Money Tour')}
+      />
+      {!ready && !error && (
+        <div className="board-loading">{translate('Construction de votre archipel…')}</div>
+      )}
       {ready && (
         <>
           {!demo && (
@@ -1204,7 +1213,7 @@ export default function Board({
               className="board-hit-polygons"
               viewBox="0 0 100 100"
               preserveAspectRatio="none"
-              aria-label="Cases du plateau"
+              aria-label={translate('Cases du plateau')}
             >
               {state.config.board.map((t, i) => (
                 <polygon
@@ -1213,14 +1222,17 @@ export default function Board({
                   tabIndex={0}
                   role="button"
                   aria-label={
-                    (choices.includes(t.id) ? 'Choisir ' : 'Voir ') +
-                    tileTitle(t) +
-                    (state.players.some(
-                      (p) => p.insurance?.tile === t.id && p.id === state.properties[t.id]?.ownerId,
-                    )
-                      ? ' · Propriété assurée'
-                      : '') +
-                    (auctionTile === t.id ? ' · Aux enchères' : '')
+                    translate(choices.includes(t.id) ? 'Choisir ' : 'Voir ') +
+                    translate(tileTitle(t)) +
+                    translate(
+                      state.players.some(
+                        (p) =>
+                          p.insurance?.tile === t.id && p.id === state.properties[t.id]?.ownerId,
+                      )
+                        ? ' · Propriété assurée'
+                        : '',
+                    ) +
+                    translate(auctionTile === t.id ? ' · Aux enchères' : '')
                   }
                   className={
                     auctionTile === t.id
@@ -1275,7 +1287,7 @@ export default function Board({
                   <button
                     key={player.id}
                     className="pawn-hit"
-                    aria-label={`Taunts de ${player.name}`}
+                    aria-label={formatText('Taunts de {0}', player.name)}
                     disabled={!onPlayer}
                     onClick={() => onPlayer?.(player.id)}
                     style={
@@ -1325,13 +1337,14 @@ export default function Board({
                   }}
                 >
                   <b>{p.name}</b>
-                  <strong>{new Intl.NumberFormat('fr-FR').format(p.cash)} 💵</strong>
+                  <strong>{new Intl.NumberFormat(numberLocale()).format(p.cash)} 💵</strong>
                 </div>
               ))}
             <div className="board-watermark">
-              MONEY
+              {translate('MONEY')}
               <br />
-              TOUR <span>✦</span>
+              {translate('TOUR ')}
+              <span>✦</span>
             </div>
             {state.players.map((player, i) => {
               const id = player.insurance?.tile;
@@ -1352,7 +1365,7 @@ export default function Board({
                 <TileLabel
                   key={t.id}
                   id={t.id}
-                  name={boardTileTitle(t)}
+                  name={translate(boardTileTitle(t))}
                   insured={
                     badgeStyle !== 'outline' &&
                     state.players.some(
@@ -1374,7 +1387,7 @@ export default function Board({
                   ]}
                   rent={
                     state.properties[t.id]?.ownerId
-                      ? new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 3 }).format(
+                      ? new Intl.NumberFormat(numberLocale(), { maximumFractionDigits: 3 }).format(
                           getRent(state, t.id),
                         )
                       : undefined
@@ -1387,11 +1400,14 @@ export default function Board({
       )}
       {error && (
         <div className="board-fallback">
-          <p>Le rendu 3D n’a pas pu démarrer : {error}</p>
+          <p>
+            {translate('Le rendu 3D n’a pas pu démarrer : ')}
+            {translate(error)}
+          </p>
           <div className="tile-list">
             {state.config.board.map((t) => (
               <button key={t.id} onClick={() => onTile(t.id)}>
-                {tileTitle(t)}
+                {translate(tileTitle(t))}
               </button>
             ))}
           </div>
