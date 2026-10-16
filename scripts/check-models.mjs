@@ -74,6 +74,21 @@ for (const [file, roots] of [
     );
   }
 }
+const boardBytes = readFileSync(
+  new URL('../apps/web/public/models/board-layout.glb', import.meta.url),
+);
+assert.equal(boardBytes.toString('utf8', 0, 4), 'glTF');
+const board = JSON.parse(boardBytes.toString('utf8', 20, 20 + boardBytes.readUInt32LE(12)));
+assert.equal(board.scenes.length, 1);
+assert.deepEqual(board.scenes[0].nodes.map((i) => board.nodes[i].name).sort(), [
+  'board_26',
+  'board_28',
+  'board_30',
+  'board_32',
+  'board_surfaces',
+]);
+assert.equal(board.images.length, 18, 'All original lossless surface swatches must be embedded');
+assert(boardBytes.length < 500_000, 'Board geometry and swatches must stay below 500 kB');
 console.log(
-  '16 runtime Blender roots verified across board, wealth and fortune libraries. Visual QA separately checks placement and transparency.',
+  '16 Blender piece roots, four authored board layouts and 18 embedded surface textures verified. Visual QA separately checks rendering and interaction.',
 );

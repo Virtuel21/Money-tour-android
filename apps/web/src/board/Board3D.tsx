@@ -11,18 +11,13 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { reservedCity, getRent, type GameState } from '@money-tour/engine';
 import type { Cue } from '../game/presentation';
-import { streetSurface } from './surfaces';
+import { boardModel, boardArtwork } from './boardModel';
 import { colors } from '../game/local';
 import { boardTileTitle, tileTitle } from '../game/tileTitle';
 import { concertSprite, festivalBeat } from './specialArt';
-import { advanceScenery, lagoonIslands, lagoonScale } from './lagoon';
+import { advanceScenery, lagoonScale } from './lagoon';
 import { festivalFlag, lagoonBoat } from './scenery';
-import {
-  projectTileLabels,
-  tileLabelRegions,
-  tileDecorationPoint,
-  type TileLabelAnchors,
-} from './tileLabels';
+import { projectTileLabels, tileDecorationPoint, type TileLabelAnchors } from './tileLabels';
 import { TileLabel } from './TileLabel';
 
 import { boardShape, tileFrame, tilePoint, wealthPoints } from './layout';
@@ -209,17 +204,21 @@ export default function Board({
     let observer: ResizeObserver | undefined;
     const resources = new THREE.Group();
     const festivalScene = new THREE.Scene();
+    const pendingAssets: THREE.Object3D[] = [];
     const disposePending = (root: THREE.Object3D) =>
       root.traverse((node) => {
         if (node instanceof THREE.Mesh) {
           node.geometry.dispose();
-          for (const m of Array.isArray(node.material) ? node.material : [node.material])
+          for (const m of Array.isArray(node.material) ? node.material : [node.material]) {
+            (m as THREE.MeshStandardMaterial).map?.dispose();
             m.dispose();
+          }
         }
       });
     let cleanup = () => {
       disposePending(resources);
       disposePending(festivalScene);
+      pendingAssets.forEach(disposePending);
     };
     const initialize = async () => {
       try {
@@ -287,7 +286,12 @@ export default function Board({
         ground.receiveShadow = true;
         resources.add(ground);
         const loader = new GLTFLoader();
-        const gltf = await loader.loadAsync(
+        const loadModel = async (url: string) => {
+          const asset = await loader.loadAsync(url);
+          pendingAssets.push(asset.scene);
+          return asset;
+        };
+        const gltf = await loadModel(
           `${import.meta.env.BASE_URL}models/money-tour.glb?v=${import.meta.env.VITE_MODEL_REVISION}`,
         );
         if (disposed) {
@@ -296,8 +300,6 @@ export default function Board({
         }
         const templates = new Map<string, THREE.Group>();
         for (const name of [
-          'board',
-          'tile',
           'die',
           'palm',
           'chance',
@@ -312,7 +314,7 @@ export default function Board({
           templates.set(name, compact(original));
         }
         const clone = (name: string) => templates.get(name)!.clone(true);
-        const fortuneGltf = await loader.loadAsync(import.meta.env.BASE_URL + 'models/fortune.glb');
+        const fortuneGltf = await loadModel(import.meta.env.BASE_URL + 'models/fortune.glb');
         if (disposed) {
           disposePending(fortuneGltf.scene);
           disposePending(gltf.scene);
@@ -320,15 +322,37 @@ export default function Board({
         }
         for (const name of ['casino_roulette', 'casino_slots', 'insurance_shield', 'karma_scale'])
           templates.set(name, compact(fortuneGltf.scene.getObjectByName(name)!));
-        const shape = boardShape(live.current.state.config.board.length);
-        const platform = clone('board');
-        platform.scale.set(
-          (shape.x * 2 + shape.depth) / 16.65,
-          1,
-          (shape.z * 2 + shape.depth) / 16.65,
+        const boardGltf = await loadModel(
+          `${import.meta.env.BASE_URL}models/board-layout.glb?v=${import.meta.env.VITE_BOARD_REVISION}`,
         );
-        resources.add(platform);
-        const wealthGltf = await loader.loadAsync(import.meta.env.BASE_URL + 'models/wealth.glb');
+        if (disposed) {
+          disposePending(boardGltf.scene);
+          disposePending(gltf.scene);
+          disposePending(fortuneGltf.scene);
+          return;
+        }
+        const shape = boardShape(live.current.state.config.board.length);
+        const authoredBoard = boardModel(
+          boardGltf.scene,
+          live.current.state.config.board,
+          renderer.capabilities.getMaxAnisotropy(),
+        );
+        // Batch the original solid meshes without touching the authored surface UVs.
+        const tileCount = live.current.state.config.board.length;
+        for (const key of [
+          `platform_${tileCount}`,
+          ...live.current.state.config.board.map((t) => `tile_${tileCount}_${t.id}`),
+        ]) {
+          const original = authoredBoard.root.getObjectByName(key)!;
+          const batch = compact(original);
+          batch.position.copy(original.position);
+          batch.quaternion.copy(original.quaternion);
+          batch.scale.copy(original.scale);
+          original.visible = false;
+          original.parent!.add(batch);
+        }
+        resources.add(authoredBoard.root);
+        const wealthGltf = await loadModel(import.meta.env.BASE_URL + 'models/wealth.glb');
         if (disposed) {
           disposePending(wealthGltf.scene);
           disposePending(gltf.scene);
@@ -459,63 +483,35 @@ export default function Board({
         const lagoon = new THREE.Group();
         lagoon.scale.setScalar(lagoonScale(live.current.state.config.board.length));
         resources.add(lagoon);
-        lagoonIslands.forEach(({ x, z }, i) => {
-          const island = atlasSprite(architecture, i + 2, 3, 3.05, 3.05);
-          island.position.set(x!, 0.08, z!);
-          lagoon.add(island);
-        });
-        const sea = new THREE.Mesh(
-          new THREE.BoxGeometry(shape.x * 2 - shape.depth, 0.06, shape.z * 2 - shape.depth),
-          new THREE.MeshStandardMaterial({ color: '#31cbd0', roughness: 0.4 }),
-        );
-        sea.position.y = 0.02;
-        resources.add(sea);
+        for (let i = 0; i < 4; i++) {
+          const island = authoredBoard.root.getObjectByName(
+            `island_${live.current.state.config.board.length}_${i}`,
+          ) as THREE.Mesh;
+          const map = boardArtwork(architecture);
+          const index = i + 2;
+          map.center.set(0, 0);
+          map.repeat.set(1 / 3, 0.5);
+          map.offset.set((index % 3) / 3, index < 3 ? 0 : 0.5);
+          map.anisotropy = renderer!.capabilities.getMaxAnisotropy();
+          island.material = new THREE.MeshBasicMaterial({
+            map,
+            alphaTest: 0.7,
+            transparent: true,
+            depthWrite: false,
+            toneMapped: false,
+          });
+        }
         const boats = [lagoonBoat('cruise', 0), lagoonBoat('sail', 1)];
         boats.forEach((boat) => lagoon.add(boat.root));
-        for (let i = 0; i < 34; i++) {
-          const ripple = new THREE.Mesh(
-            new THREE.PlaneGeometry(0.22 + (i % 3) * 0.13, 0.045),
-            new THREE.MeshBasicMaterial({ color: '#b1f5ed', transparent: true, opacity: 0.55 }),
-          );
-          ripple.rotation.x = -Math.PI / 2;
-          ripple.rotation.z = -Math.PI / 4;
-          ripple.position.set(((i * 37) % 113) / 10 - 5.5, 0.06, ((i * 29) % 109) / 10 - 5.4);
-          resources.add(ripple);
-        }
-        // The water and its graphic ripples are authored in Blender with the islands.
+        const { trims, borders, rentQuays } = authoredBoard;
         const buildings: THREE.Group[] = [],
-          trims: THREE.Mesh[] = [],
-          borders: THREE.Mesh[] = [],
           championships: THREE.Group[] = [],
           confetti: THREE.Group[] = [];
         const festivalFlags: ReturnType<typeof festivalFlag>[] = [];
         const concertBeats: { value: number }[] = [];
-        const rentQuays = new Map<number, THREE.Group>();
         for (const tile of live.current.state.config.board) {
-          const p = tileFrame(tile.id, live.current.state.config.board.length),
-            cell = clone('tile');
-          cell.position.set(p.x, 0, p.z);
-          cell.scale.set(p.width / 1.66, 1, p.depth / 1.66);
-          resources.add(cell);
-          if (['city', 'resort'].includes(tile.type)) {
-            const r = tileLabelRegions(tile.id, live.current.state.config.board.length);
-            const quay = new THREE.Group();
-            const edge = new THREE.Mesh(
-              new THREE.BoxGeometry(r.width + 0.06, 0.16, 1.5),
-              new THREE.MeshStandardMaterial({ color: '#537e80', roughness: 0.9 }),
-            );
-            const floor = new THREE.Mesh(
-              new THREE.BoxGeometry(r.width, 0.05, 1.44),
-              new THREE.MeshStandardMaterial({ color: '#fff1cc', roughness: 0.9 }),
-            );
-            floor.position.y = 0.1;
-            quay.add(edge, floor);
-            quay.position.set(r.rent.x, 0.16, r.rent.z);
-            quay.rotation.y = p.angle;
-            quay.visible = !!live.current.state.properties[tile.id]?.ownerId;
-            resources.add(quay);
-            rentQuays.set(tile.id, quay);
-          }
+          const p = tileFrame(tile.id, live.current.state.config.board.length);
+          const { surface, wreck } = authoredBoard.cells[tile.id]!;
           const illustratedTile =
             tile.type === 'chance'
               ? chanceArt
@@ -525,65 +521,20 @@ export default function Board({
                   ? insuranceArt
                   : undefined;
           const extra = ['casino', 'karma'].includes(tile.type);
-          const tileMap = illustratedTile
-            ? illustratedTile.clone()
-            : extra
-              ? expansionTiles.clone()
-              : streetSurface(tile);
-          if (extra) {
-            const index = tile.type === 'casino' ? (tile.id < 15 ? 0 : 1) : 3;
-            tileMap.repeat.set(0.5, 0.5);
-            tileMap.offset.set((index % 2) * 0.5, index < 2 ? 0.5 : 0);
-            tileMap.colorSpace = THREE.SRGBColorSpace;
-            tileMap.anisotropy = renderer!.capabilities.getMaxAnisotropy();
-          }
-          if (illustratedTile) {
-            tileMap.center.set(0.5, 0.5);
-            tileMap.rotation = p.angle;
-            tileMap.colorSpace = THREE.SRGBColorSpace;
-            tileMap.anisotropy = renderer!.capabilities.getMaxAnisotropy();
-          }
-          const iconSize = Math.min(p.width, p.depth) - 0.12;
-          if (extra) {
-            const backdrop = new THREE.Mesh(
-              new THREE.PlaneGeometry(p.width - 0.12, p.depth - 0.12),
-              new THREE.MeshStandardMaterial({
-                color:
-                  tile.type === 'chance' ? '#722caf' : tile.type === 'tax' ? '#c77337' : '#25625e',
-                roughness: 0.95,
-              }),
+          if (illustratedTile || extra) {
+            const tileMap = boardArtwork(
+              illustratedTile ?? expansionTiles,
+              illustratedTile ? p.angle : 0,
             );
-            backdrop.rotation.x = -Math.PI / 2;
-            backdrop.position.set(p.x, 0.276, p.z);
-            resources.add(backdrop);
+            if (extra) {
+              const index = tile.type === 'casino' ? (tile.id < 15 ? 0 : 1) : 3;
+              tileMap.repeat.set(0.5, 0.5);
+              tileMap.center.set(0, 0);
+              tileMap.offset.set((index % 2) * 0.5, index < 2 ? 0 : 0.5);
+            }
+            tileMap.anisotropy = renderer!.capabilities.getMaxAnisotropy();
+            surface.material = new THREE.MeshStandardMaterial({ map: tileMap, roughness: 0.95 });
           }
-          const surface = new THREE.Mesh(
-            new THREE.PlaneGeometry(
-              extra ? iconSize : p.width - 0.12,
-              extra ? iconSize : p.depth - 0.12,
-            ),
-            new THREE.MeshStandardMaterial({ map: tileMap, roughness: 0.95 }),
-          );
-          surface.rotation.x = -Math.PI / 2;
-          surface.position.set(p.x, 0.28, p.z);
-          surface.receiveShadow = true;
-          resources.add(surface);
-          const trim = new THREE.Mesh(
-            new THREE.BoxGeometry((p.corner ? shape.depth : shape.step) - 0.04, 0.5, 0.16),
-            new THREE.MeshStandardMaterial({ color: 0xffffff }),
-          );
-          trim.position.set(p.x + p.normal.x * 1.69, 0.305, p.z + p.normal.z * 1.69);
-          trim.rotation.y = p.angle;
-          resources.add(trim);
-          trims.push(trim);
-          const outline = new THREE.Mesh(
-            new THREE.BoxGeometry(p.width - 0.15, 0.025, p.depth - 0.15),
-            new THREE.MeshStandardMaterial({ color: 0xffdf55, transparent: true, opacity: 0.7 }),
-          );
-          outline.position.set(p.x, 0.27, p.z);
-          outline.visible = false;
-          resources.add(outline);
-          borders.push(outline);
           const city = new THREE.Group();
           const cityPosition = tileDecorationPoint(
             tile.id,
@@ -595,21 +546,15 @@ export default function Board({
           resources.add(city);
           buildings.push(city);
           if (tile.type === 'island') {
-            // A decal belongs to the beach plane; a billboard stood upright over the pawns.
-            const wreck = new THREE.Mesh(
-              new THREE.PlaneGeometry(2.65, 2.65),
-              new THREE.MeshStandardMaterial({
-                map: lostIslandArt,
-                transparent: true,
-                alphaTest: 0.05,
-                depthWrite: false,
-                roughness: 0.95,
-              }),
-            );
-            wreck.rotation.set(-Math.PI / 2, 0, p.angle);
-            wreck.position.set(p.x - p.normal.x * 0.3, 0.286, p.z - p.normal.z * 0.3);
-            wreck.receiveShadow = true;
-            resources.add(wreck);
+            const map = boardArtwork(lostIslandArt);
+            map.colorSpace = lostIslandArt.colorSpace;
+            wreck.material = new THREE.MeshStandardMaterial({
+              map,
+              transparent: true,
+              alphaTest: 0.05,
+              depthWrite: false,
+              roughness: 0.95,
+            });
           }
           if (tile.type === 'championship') {
             const concert = concertSprite(festivalArt, 3.1);
@@ -1152,6 +1097,7 @@ export default function Board({
           gather(festivalScene);
           gather(diceScene);
           gather(gltf.scene);
+          gather(boardGltf.scene);
           gather(wealthGltf.scene);
           gather(fortuneGltf.scene);
           gather(note);
@@ -1163,7 +1109,13 @@ export default function Board({
           materials.forEach((m) => m.dispose());
           textures.forEach((t) => t.dispose());
         };
-        setReady(true);
+        // Texture decoding and shader linking can outlive the glTF load on WebKit.
+        // Keep the loading state until the GPU programs and a drawn frame are ready.
+        await renderer.compileAsync(scene, camera);
+        if (disposed) return;
+        await festivalRenderer.compileAsync(festivalScene, camera);
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        if (!disposed) setReady(true);
       } catch (e) {
         if (!disposed) setError(e instanceof Error ? e.message : 'Rendu 3D indisponible');
       }
