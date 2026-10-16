@@ -10,7 +10,8 @@ import { loadComfort, saveComfort } from './game/comfort';
 import { guardGameNavigation } from './game/navigationGuard';
 import { loadOnlineResume, type OnlineResume } from './network/storage';
 import { invitationCode } from './network/invitation';
-import { MIN_BOARD_ZOOM, MAX_BOARD_ZOOM, normalizeBoardZoom } from './board/camera';
+import { SettingsPanel } from './game/SettingsPanel';
+import { restoreDialogFocus, trapDialogFocus } from './game/dialogFocus';
 import { ContextTip } from './game/ContextTip';
 import { GameResults } from './game/GameResults';
 import { rematchOptions } from './game/gameStats';
@@ -34,7 +35,16 @@ import { MobilePocket } from './game/MobilePocket';
 import { AuctionView } from './game/AuctionView';
 import { AdventureBanner, PrivateQuest, PlayerInventory } from './game/AdventureHUD';
 import { ActionClock, GameClockContext } from './game/ActionClock';
-import { createContext, useContext, lazy, Suspense, useEffect, useRef, useState } from 'react';
+import {
+  createContext,
+  useContext,
+  lazy,
+  Suspense,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react';
 import {
   chooseBotAction,
   config,
@@ -118,20 +128,31 @@ function Modal({
   children,
   onClose,
   className = '',
+  footer,
 }: {
   title: string;
   children: React.ReactNode;
   onClose?: () => void;
   className?: string;
+  footer?: React.ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
   const openDebug = useContext(DebugAccessContext);
   useEffect(() => {
-    ref.current?.showModal();
+    const opener = document.activeElement;
+    const dialog = ref.current;
+    dialog?.showModal();
+    return () => {
+      dialog?.close();
+      restoreDialogFocus(opener);
+    };
   }, []);
   return (
     <dialog
       ref={ref}
+      aria-labelledby={titleId}
+      onKeyDown={trapDialogFocus}
       onCancel={(event) => {
         event.preventDefault();
         onClose?.();
@@ -142,7 +163,7 @@ function Modal({
         <ActionClock full />
       </div>
       <div className="modal-heading">
-        <h2>{title}</h2>
+        <h2 id={titleId}>{title}</h2>
         {openDebug && className !== 'debug-modal' && (
           <button className="debug-access" onClick={openDebug}>
             Debug
@@ -154,7 +175,10 @@ function Modal({
           </button>
         )}
       </div>
-      {children}
+      <div className="modal-body" tabIndex={0}>
+        {children}
+      </div>
+      {footer && <div className="modal-footer">{footer}</div>}
     </dialog>
   );
 }
@@ -206,6 +230,7 @@ export default function App() {
     | 'settings'
     | 'tiles'
     | 'leave'
+    | 'new-game'
     | 'online'
     | 'pocket'
     | 'bonus'
@@ -653,6 +678,20 @@ export default function App() {
   const options = legal.filter((a): a is Extract<GameAction, { tile: number }> =>
     ['travel', 'place_championship', 'insure', 'attack', 'sell'].includes(a.type),
   );
+  const browseTile = (id: number) => {
+    const actionable = !interactionDisabled && options.some((action) => action.tile === id);
+    if (
+      actionable ||
+      current.phase === 'championship' ||
+      purchaseOffer(current, online?.self)?.tile.id === id
+    ) {
+      setModal(null);
+      chooseTile(id);
+    } else if (!rolling) {
+      setInspectedOwner(null);
+      setSelected(id);
+    }
+  };
   const actionDescription =
     current.phase === 'auction'
       ? 'Une ville neutre attend vos offres secrètes. Suivez la fenêtre d’enchère.'
@@ -706,6 +745,11 @@ export default function App() {
         className={`app${comfort.largeText ? ' text-large' : ''}`}
         style={{ '--ui-text-scale': comfort.largeText ? 1.15 : 1 } as React.CSSProperties}
         onPointerDownCapture={() => void sound.current?.unlock()}
+        onClickCapture={(event) => {
+          // Safari does not focus buttons on pointer activation; remember the invoking control.
+          const button = event.target instanceof Element ? event.target.closest('button') : null;
+          button?.focus({ preventScroll: true });
+        }}
         onKeyDownCapture={() => void sound.current?.unlock()}
       >
         <header className="topbar">
@@ -825,6 +869,16 @@ export default function App() {
                 </div>
                 <button
                   className="primary launch"
+                  onClick={() => (save && !save.state.winner ? setModal('new-game') : start())}
+                  disabled={!!online || !validMinutes(minutes)}
+                >
+                  {save && !save.state.winner
+                    ? 'Nouvelle partie sur cet appareil'
+                    : 'Jouer sur cet appareil'}{' '}
+                  <span>→</span>
+                </button>
+                <button
+                  className="secondary local-launch"
                   onClick={() => {
                     setResumeRequest(undefined);
                     setCreateSalon(true);
@@ -832,14 +886,7 @@ export default function App() {
                   }}
                   disabled={!!online || !validMinutes(minutes)}
                 >
-                  Embarquer <span>→</span>
-                </button>
-                <button
-                  className="secondary local-launch"
-                  onClick={start}
-                  disabled={!!online || !validMinutes(minutes)}
-                >
-                  Jouer sur cet appareil · solo / local
+                  Créer un salon en ligne
                 </button>
                 {(online?.state || onlineResume) && (
                   <>
@@ -975,7 +1022,7 @@ export default function App() {
                       : 'PARTIE LOCALE'}{' '}
                   · TOUR DE JEU {current.turn}
                 </span>
-                <h1>Le tour de la fortune</h1>
+                <h1 className="game-title">Le tour de la fortune</h1>
               </div>
               <div className="game-tools">
                 <button
@@ -1056,7 +1103,7 @@ export default function App() {
                       <span aria-hidden="true">{collapsedPlayers[p.id] ? '+' : '−'}</span>
                     </button>
                   )}
-                  <span className={`avatar portrait portrait-${i}`} aria-label={pawnNames[i]} />
+                  <span className={`avatar portrait portrait-${i}`} aria-hidden="true" />
                   <div className="player-summary">
                     <span className="player-name">
                       {p.name === 'Vous' && online ? `Joueur ${i + 1}` : p.name}{' '}
@@ -1229,26 +1276,60 @@ export default function App() {
                 )}
               </div>
               <div className="board-controls">
-                <button className="strategy-button icon-label" onClick={() => setModal('strategy')}>
-                  <GameIcon name="target" />
-                  Ma stratégie{' '}
-                  <small>
-                    {victoryProgress.completed}/{victoryProgress.target}
-                  </small>
+                <button
+                  className="strategy-button icon-label"
+                  aria-label={`Ma stratégie · ${victoryProgress.completed}/${victoryProgress.target} collections`}
+                  onClick={() => setModal('strategy')}
+                >
+                  <span className="board-nav-symbol">
+                    <GameIcon name="target" />
+                    <small aria-hidden="true">
+                      {victoryProgress.completed}/{victoryProgress.target}
+                    </small>
+                  </span>
+                  <span className="board-nav-label">{mobile ? 'Stratégie' : 'Ma stratégie'}</span>
                 </button>
-                <button className="icon-label" onClick={() => setModal('journal')}>
+                <button
+                  className="icon-label"
+                  aria-label="Journal des actions"
+                  onClick={() => setModal('journal')}
+                >
                   <GameIcon name="journal" />
-                  Journal des actions
+                  <span className="board-nav-label">
+                    {mobile ? 'Journal' : 'Journal des actions'}
+                  </span>
                 </button>
-                <button className="icon-label" onClick={() => setModal('tiles')}>
+                <button
+                  className="icon-label"
+                  aria-label={
+                    mobile && options.length && !interactionDisabled
+                      ? 'Choisir une case'
+                      : 'Explorer les cases'
+                  }
+                  onClick={() => setModal('tiles')}
+                >
                   <GameIcon name="map" />
-                  {mobile && options.length && !interactionDisabled
-                    ? 'Choisir une case'
-                    : 'Explorer les cases'}
+                  <span className="board-nav-label">
+                    {mobile
+                      ? options.length && !interactionDisabled
+                        ? 'Choisir'
+                        : 'Escales'
+                      : 'Explorer les cases'}
+                  </span>
                 </button>
                 {mobile ? (
                   <>
                     <button
+                      className="icon-label"
+                      aria-label={
+                        inspectedOwner
+                          ? 'Tout afficher'
+                          : boardPanned
+                            ? 'Recentrer mon pion'
+                            : overview
+                              ? 'Suivre mon pion'
+                              : 'Vue globale'
+                      }
                       aria-pressed={overview || boardPanned}
                       onClick={() => {
                         if (inspectedOwner) setInspectedOwner(null);
@@ -1258,17 +1339,24 @@ export default function App() {
                         } else setOverview(!overview);
                       }}
                     >
-                      {inspectedOwner
-                        ? 'Tout afficher'
-                        : boardPanned
-                          ? 'Recentrer mon pion'
-                          : overview
-                            ? 'Suivre mon pion'
-                            : 'Vue globale'}
+                      <GameIcon name={boardPanned ? 'target' : 'compass'} />
+                      <span className="board-nav-label">
+                        {inspectedOwner
+                          ? 'Tout voir'
+                          : boardPanned
+                            ? 'Recentrer'
+                            : overview
+                              ? 'Suivre'
+                              : 'Vue globale'}
+                      </span>
                     </button>
-                    <button className="icon-label" onClick={() => setModal('pocket')}>
+                    <button
+                      className="icon-label"
+                      aria-label="Mon carnet"
+                      onClick={() => setModal('pocket')}
+                    >
                       <GameIcon name="book" />
-                      Mon carnet
+                      <span className="board-nav-label">Carnet</span>
                     </button>
                   </>
                 ) : (
@@ -1565,6 +1653,20 @@ export default function App() {
           <Modal title="Mon carnet de voyage" onClose={() => setModal(null)}>
             <MobilePocket
               onBonus={showBonus}
+              onReactions={
+                canTaunt
+                  ? () => {
+                      const sender =
+                        tauntPlayer(current, online?.self) ??
+                        tauntPlayer(current, online?.self, humans[0]?.id);
+                      if (!sender) return;
+                      setTauntSender(sender);
+                      setTauntTarget(sender);
+                      setSelected(null);
+                      setModal('taunt');
+                    }
+                  : undefined
+              }
               key={current.turn}
               state={current}
               self={online?.self}
@@ -1574,10 +1676,7 @@ export default function App() {
                 setInspectedOwner(null);
                 setModal(null);
               }}
-              onTile={(id) => {
-                setModal(null);
-                chooseTile(id);
-              }}
+              onTile={browseTile}
             />
           </Modal>
         )}
@@ -1594,7 +1693,6 @@ export default function App() {
                 setModal(null);
               }}
               onTile={(id) => {
-                setModal(null);
                 setSelected(id);
               }}
             />
@@ -1713,159 +1811,32 @@ export default function App() {
           </Modal>
         )}
         {modal === 'settings' && (
-          <Modal title="Votre confort de voyage" onClose={() => setModal(null)}>
-            {screen === 'game' && !online && !debugging && save && (
-              <button className="debug-launch" onClick={() => startDebug(save)}>
-                Tester une copie en mode debug
+          <Modal
+            title="Votre confort de voyage"
+            onClose={() => setModal(null)}
+            footer={
+              <button className="primary" onClick={() => setModal(null)}>
+                Terminé
               </button>
-            )}
-            <div className="comfort-options">
-              <section className="board-zoom-setting" aria-label="Réglage du zoom">
-                <div className="board-zoom-heading">
-                  <label htmlFor="board-zoom">Zoom du plateau</label>
-                  <output htmlFor="board-zoom">{comfort.boardZoom} %</output>
-                </div>
-                <div className="board-zoom-controls">
-                  <button
-                    type="button"
-                    aria-label="Réduire le zoom"
-                    disabled={comfort.boardZoom <= MIN_BOARD_ZOOM}
-                    onClick={() =>
-                      setComfort((old) => ({
-                        ...old,
-                        boardZoom: normalizeBoardZoom(old.boardZoom - 5),
-                      }))
-                    }
-                  >
-                    −
-                  </button>
-                  <input
-                    id="board-zoom"
-                    type="range"
-                    min={MIN_BOARD_ZOOM}
-                    max={MAX_BOARD_ZOOM}
-                    step="5"
-                    value={comfort.boardZoom}
-                    aria-valuetext={`${comfort.boardZoom} %`}
-                    aria-describedby="board-zoom-help"
-                    onChange={(e) =>
-                      setComfort((old) => ({
-                        ...old,
-                        boardZoom: normalizeBoardZoom(Number(e.target.value)),
-                      }))
-                    }
-                  />
-                  <button
-                    type="button"
-                    aria-label="Augmenter le zoom"
-                    disabled={comfort.boardZoom >= MAX_BOARD_ZOOM}
-                    onClick={() =>
-                      setComfort((old) => ({
-                        ...old,
-                        boardZoom: normalizeBoardZoom(old.boardZoom + 5),
-                      }))
-                    }
-                  >
-                    +
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  className="secondary board-zoom-reset"
-                  disabled={comfort.boardZoom === 100}
-                  onClick={() => setComfort((old) => ({ ...old, boardZoom: 100 }))}
-                >
-                  Revenir à 100 %
-                </button>
-                <p id="board-zoom-help">
-                  Réglage personnel, mémorisé sur cet appareil. Le zoom s’applique au plateau et au
-                  suivi du pion. Une vue complète est conservée pour les enchères et le repérage des
-                  cases. Sur mobile, pincez pour zoomer et glissez avec un doigt pour déplacer la
-                  vue agrandie. « Recentrer mon pion » rétablit le cadrage automatique.
-                </p>
-              </section>
-              <label className="field">
-                Rythme des animations
-                <select
-                  value={online ? (online.state?.presentationPace ?? 'normal') : comfort.pace}
-                  disabled={!!online}
-                  onChange={(e) =>
-                    setComfort((old) => ({
-                      ...old,
-                      pace: e.target.value === 'fast' ? 'fast' : 'normal',
-                    }))
-                  }
-                >
-                  <option value="normal">Normal · prendre le temps de voir</option>
-                  <option value="fast">Rapide · aller à l’essentiel</option>
-                </select>
-              </label>
-              <p>
-                {online
-                  ? 'En ligne, le rythme est choisi par l’hôte avant la partie et partagé par tous.'
-                  : 'Le mode rapide raccourcit les animations. Le temps pour décider reste identique.'}
-              </p>
-              <label className="toggle">
-                <input
-                  type="checkbox"
-                  checked={comfort.largeText}
-                  onChange={(e) => setComfort((old) => ({ ...old, largeText: e.target.checked }))}
-                />
-                Textes d’interface agrandis
-              </label>
-            </div>
-            <label className="toggle">
-              <input
-                type="checkbox"
-                checked={audioPrefs.effects}
-                onChange={(e) => setAudioPrefs((old) => ({ ...old, effects: e.target.checked }))}
-              />{' '}
-              Effets sonores
-            </label>
-            <label className="toggle">
-              <input
-                type="checkbox"
-                checked={audioPrefs.music}
-                onChange={(e) => setAudioPrefs((old) => ({ ...old, music: e.target.checked }))}
-              />{' '}
-              Musique de l’archipel
-            </label>
-            <label className="field">
-              Volume
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.05"
-                value={audioPrefs.volume}
-                onChange={(e) =>
-                  setAudioPrefs((old) => ({ ...old, volume: Number(e.target.value) }))
-                }
-              />
-            </label>
-            <button
-              className="secondary"
-              onClick={() => {
+            }
+          >
+            <SettingsPanel
+              comfort={comfort}
+              setComfort={setComfort}
+              audio={audioPrefs}
+              setAudio={setAudioPrefs}
+              reduced={reduced}
+              setReduced={setReduced}
+              sharedPace={online ? (online.state?.presentationPace ?? 'normal') : undefined}
+              onPreview={() => {
                 void sound.current?.unlock().then(() => sound.current?.effect('victory'));
               }}
-            >
-              Écouter un aperçu
-            </button>
-            <label className="toggle">
-              <input
-                type="checkbox"
-                checked={reduced}
-                onChange={(e) => setReduced(e.target.checked)}
-              />{' '}
-              Réduire les animations
-            </label>
-            <p>
-              La partie locale se sauvegarde dans ce navigateur. Revenir à l’accueil la met en
-              pause.
-            </p>
-            <button className="primary" onClick={() => setModal(null)}>
-              Enregistrer
-            </button>
+              onTest={
+                screen === 'game' && !online && !debugging && save
+                  ? () => startDebug(save)
+                  : undefined
+              }
+            />
           </Modal>
         )}
         {modal === 'tiles' && (
@@ -1881,10 +1852,7 @@ export default function App() {
               <MobileTiles
                 state={current}
                 choices={interactionDisabled ? [] : options.map((a) => a.tile)}
-                onTile={(id) => {
-                  setModal(null);
-                  chooseTile(id);
-                }}
+                onTile={browseTile}
               />
             ) : (
               <div className="tile-list">
@@ -1893,7 +1861,6 @@ export default function App() {
                     key={t.id}
                     onClick={() => {
                       setSelected(t.id);
-                      setModal(null);
                     }}
                   >
                     <i style={{ background: t.color ?? '#e6b94a' }} />
@@ -1903,6 +1870,37 @@ export default function App() {
                 ))}
               </div>
             )}
+          </Modal>
+        )}
+        {modal === 'new-game' && save && (
+          <Modal title="Commencer une nouvelle partie ?" onClose={() => setModal(null)}>
+            <p>
+              Votre partie locale du tour {save.state.turn} est conservée. Commencer une nouvelle
+              partie remplacera cette sauvegarde sur cet appareil.
+            </p>
+            <button
+              className="primary"
+              onClick={() => {
+                cinema.reset(save.state);
+                setScreen('game');
+                setPaused(false);
+                setModal(null);
+              }}
+            >
+              Reprendre la partie conservée
+            </button>
+            <button className="secondary" onClick={() => setModal(null)}>
+              Annuler
+            </button>
+            <button
+              className="secondary danger-action"
+              onClick={() => {
+                setModal(null);
+                start();
+              }}
+            >
+              Remplacer et commencer
+            </button>
           </Modal>
         )}
         {modal === 'leave' && (
@@ -1925,7 +1923,7 @@ export default function App() {
               Accueil et sauvegarde
             </button>
             <button
-              className="secondary"
+              className="secondary danger-action"
               onClick={() => {
                 act({ type: 'quit', playerId: online?.self ?? active.id });
                 setModal(null);
@@ -2190,6 +2188,17 @@ export default function App() {
               playerId={tauntSender}
               targetId={tauntTarget}
               cooling={!!tauntReadyAt}
+              onPlayerChange={
+                !online && humans.length > 1
+                  ? (id) => {
+                      const sender = tauntPlayer(current, undefined, id);
+                      if (!sender) return;
+                      setTauntSender(sender);
+                      setTauntTarget(sender);
+                    }
+                  : undefined
+              }
+              onTargetChange={setTauntTarget}
               onSend={sendTaunt}
             />
           </Modal>
@@ -2277,7 +2286,13 @@ export default function App() {
               </p>
             )}
             <button className="secondary" onClick={() => setSelected(null)}>
-              Retour au plateau
+              {modal === 'pocket'
+                ? 'Retour au carnet'
+                : modal === 'tiles'
+                  ? 'Retour aux escales'
+                  : modal === 'strategy'
+                    ? 'Retour à ma stratégie'
+                    : 'Retour au plateau'}
             </button>
           </Modal>
         )}

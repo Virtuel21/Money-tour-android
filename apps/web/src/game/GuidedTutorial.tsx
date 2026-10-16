@@ -263,7 +263,7 @@ function Lesson({
             />
           </Suspense>
           {lesson.target === 'board' && !done && (
-            <div className="tutorial-destinations" aria-label="Cases disponibles">
+            <div className="tutorial-destinations" role="group" aria-label="Cases disponibles">
               {targetActions.map((a) => (
                 <button key={a.tile} disabled={cinema.busy} onClick={() => act(a)}>
                   {state.config.board[a.tile]!.name}

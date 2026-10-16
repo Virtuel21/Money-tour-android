@@ -1,6 +1,6 @@
 import { scaledAmount } from '@money-tour/engine';
 import { readPrivateChoice, savePrivateChoice } from './privateStorage';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useId } from 'react';
 import {
   duelCommitment,
   duelChoices,
@@ -29,6 +29,7 @@ export function DuelView({
   const d = state.duel!;
   const actor = state.players.find((p) => p.id === getDecisionPlayerId(state))!;
   const canPlay = !disabled && !actor.bot && (!self || self === actor.id);
+  const amountHint = useId();
   const [amount, setAmount] = useState(String(scaledAmount(state.config, 50000)));
   const [error, setError] = useState('');
   const secrets = useRef<Record<string, { choice: DuelChoice; salt: string }>>({});
@@ -80,7 +81,7 @@ export function DuelView({
       <p className="eyebrow">
         {canPlay ? `À vous, ${actor.name}` : `${actor.name} prépare son duel`}
       </p>
-      <div className="duel-balances" aria-label="Argent des joueurs">
+      <div className="duel-balances" role="group" aria-label="Argent des joueurs">
         {state.players
           .filter((p) => !p.eliminated)
           .map((p) => (
@@ -109,13 +110,27 @@ export function DuelView({
                 <input
                   aria-label="Mise par joueur"
                   type="number"
+                  inputMode="numeric"
                   min="1"
                   max={actor.cash}
-                  step={scaledAmount(state.config, 1000)}
+                  step="1"
+                  aria-invalid={
+                    !Number.isSafeInteger(Number(amount)) ||
+                    Number(amount) < 1 ||
+                    Number(amount) > actor.cash
+                  }
+                  aria-describedby={amountHint}
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                 />
               </label>
+              <p id={amountHint} role="status">
+                {!Number.isSafeInteger(Number(amount)) ||
+                Number(amount) < 1 ||
+                Number(amount) > actor.cash
+                  ? `Saisissez un montant entier entre 1 et ${money(actor.cash, true)}.`
+                  : 'Montant entier, sans décimales.'}
+              </p>
               <div className="decision-actions">
                 {getLegalActions(state)
                   .filter((a) => a.type === 'duel_offer')

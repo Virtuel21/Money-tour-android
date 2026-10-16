@@ -20,9 +20,11 @@
     "format:check": "prettier --check .",
     "check": "pnpm typecheck && pnpm lint && pnpm test:coverage && pnpm build",
     "qa:board:install": "playwright install chromium firefox webkit",
-    "qa:board": "node scripts/qa-board.mjs"
+    "qa:board": "node scripts/qa-board.mjs",
+    "qa:menus": "node scripts/qa-menus.mjs"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
     "@eslint/js": "10.0.1",
     "@types/node": "^22.19.0",
     "@vitest/coverage-v8": "5.0.2",

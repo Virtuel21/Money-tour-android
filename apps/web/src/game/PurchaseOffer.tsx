@@ -94,7 +94,11 @@ export function PurchaseDetails({
       </header>
       {tile.type === 'city' ? (
         <>
-          <div className="purchase-levels" aria-label="Choisir les bâtiments à acheter">
+          <div
+            className="purchase-levels"
+            role="group"
+            aria-label="Choisir les bâtiments à acheter"
+          >
             {tile.rents!.map((_, index) => (
               <button
                 key={index}

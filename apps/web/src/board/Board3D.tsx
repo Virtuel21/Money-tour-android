@@ -141,6 +141,7 @@ export default function Board({
   const panEnabled = useRef(false);
   const pan = useRef<(dx: number, dy: number) => void>(() => {});
   const frameAll =
+    overview ||
     selecting ||
     auctionTile !== undefined ||
     state.phase === 'auction' ||
@@ -903,6 +904,7 @@ export default function Board({
           if (manualView.current) focus.copy(target);
           else focus.lerp(target, factor);
           const frameAll =
+            live.current.overview ||
             live.current.selecting ||
             live.current.auctionTile !== undefined ||
             game.phase === 'auction' ||
@@ -1152,7 +1154,7 @@ export default function Board({
       ref={shell}
       className={`board-shell board-3d ${mobile && !demo && onZoomChange ? 'board-pinch-zoom' : ''} ${demo ? 'board-demo' : ''} ${cue?.reason === 'earthquake' && !reducedMotion ? 'board-earthquake' : ''}`}
     >
-      <div ref={host} className="board-canvas" aria-label="Plateau 3D Money Tour" />
+      <div ref={host} className="board-canvas" role="img" aria-label="Plateau 3D Money Tour" />
       {!ready && !error && <div className="board-loading">Construction de votre archipel…</div>}
       {ready && (
         <>

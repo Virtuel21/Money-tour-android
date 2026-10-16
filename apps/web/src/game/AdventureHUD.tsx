@@ -79,7 +79,7 @@ export function PlayerInventory({
   const groups = estateGroups(state, player.id);
   return (
     <div className="player-inventory">
-      <div className="mini-properties" aria-label={`Propriétés de ${player.name}`}>
+      <div className="mini-properties" role="group" aria-label={`Propriétés de ${player.name}`}>
         {groups.map(([street, cities]) => (
           <section className="estate-street" key={street} aria-label={street}>
             <h4 style={{ borderColor: cities[0]?.color }}>{street}</h4>
@@ -118,7 +118,7 @@ export function PlayerInventory({
         ))}
         {!groups.length && <small className="empty-estate">Aucune propriété pour le moment</small>}
       </div>
-      <div className="bonus-tokens" aria-label={`Bonus et malus de ${player.name}`}>
+      <div className="bonus-tokens" role="group" aria-label={`Bonus et malus de ${player.name}`}>
         {playerBonuses(state, player).map((bonus, index) => (
           <button key={index} onClick={() => onBonus?.(bonus)} title={bonus.description}>
             <GameIcon name={bonus.icon ?? 'info'} /> {bonus.title}

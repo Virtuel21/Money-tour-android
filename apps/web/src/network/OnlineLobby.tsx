@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
+import { GameIcon } from '../game/GameIcon';
+import { restoreDialogFocus, trapDialogFocus } from '../game/dialogFocus';
 import { identity, secret, type Identity } from './crypto';
 import { Session, type SessionView } from './session';
 import {
@@ -39,6 +41,7 @@ export default function OnlineLobby({
   };
 }) {
   const [invited] = useState(() => invitationCode(location.hash));
+  const titleId = useId();
   const [code, setCode] = useState(
     () => new URLSearchParams(location.hash.slice(1)).get('room') ?? '',
   );
@@ -64,8 +67,14 @@ export default function OnlineLobby({
   const callbacks = useRef({ onSession, onView, onLeave });
   callbacks.current = { onSession, onView, onLeave };
   useEffect(() => {
+    const opener = document.activeElement;
+    const element = dialog.current;
     if (open) dialog.current?.showModal();
     else dialog.current?.close();
+    return () => {
+      element?.close();
+      restoreDialogFocus(opener);
+    };
   }, [open]);
   useEffect(
     () => () => {
@@ -211,276 +220,294 @@ export default function OnlineLobby({
     }
   }
   return (
-    <dialog ref={dialog} className="modal online-modal" onCancel={onClose}>
+    <dialog
+      ref={dialog}
+      className="modal online-modal"
+      aria-labelledby={titleId}
+      onKeyDown={trapDialogFocus}
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+    >
       <div className="modal-heading">
-        <h2>Le voyage entre amis</h2>
+        <h2 id={titleId}>Le voyage entre amis</h2>
         <button className="icon-button" aria-label="Fermer le salon" onClick={onClose}>
-          ×
+          <GameIcon name="close" />
         </button>
       </div>
-      {!view ? (
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (name.trim()) void connect(false);
-          }}
-        >
-          <p>
-            {invited
-              ? 'Vous êtes invité à une partie ! Choisissez votre nom pour rejoindre vos amis.'
-              : 'Rejoignez vos amis avec leur code ou créez un salon. Jusqu’à quatre voyageurs, chacun sur son écran.'}
-          </p>
-          <label className="field">
-            Votre nom
-            <input
-              autoFocus
-              autoComplete="nickname"
-              required
-              maxLength={20}
-              placeholder="Votre prénom ou pseudo"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </label>
-          {!invited && (
-            <>
-              <button
-                type="button"
-                className="primary"
-                disabled={working || !name.trim()}
-                onClick={() => void connect(true)}
-              >
-                Créer un salon
-              </button>
-              <div className="divider">OU REJOINDRE</div>
-              <label className="field">
-                Code du salon
-                <input
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  placeholder="Code de 32 caractères"
-                  spellCheck={false}
-                />
-              </label>
-            </>
-          )}
-          <button type="submit" className="primary" disabled={working || !name.trim()}>
-            {working ? 'Connexion…' : 'Rejoindre le salon'}
-          </button>
-          {(!invited || error) && (
-            <details className="advanced">
-              <summary>Aide à la connexion · serveur TURN</summary>
-              <p>
-                Facultatif, pour les réseaux qui bloquent la connexion directe. Ces paramètres
-                restent dans cet onglet.
-              </p>
-              <label className="field">
-                Adresse TURN
-                <input
-                  value={turnUrl}
-                  onChange={(e) => setTurnUrl(e.target.value)}
-                  placeholder="turn:serveur:3478"
-                />
-              </label>
-              <label className="field">
-                Identifiant
-                <input value={turnUser} onChange={(e) => setTurnUser(e.target.value)} />
-              </label>
-              <label className="field">
-                Mot de passe TURN
-                <input
-                  type="password"
-                  value={turnPassword}
-                  onChange={(e) => setTurnPassword(e.target.value)}
-                />
-              </label>
-            </details>
-          )}
-        </form>
-      ) : (
-        <>
-          {!view.host && (
-            <div className="connection-wait" role="status">
-              <h3>Connexion au salon…</h3>
-              <p>{view.status}</p>
-              <p>
-                Gardez cette page ouverte, ainsi que le salon de votre ami. La connexion peut
-                prendre quelques secondes.
-              </p>
-              <button className="primary" disabled={working} onClick={() => void connect(false)}>
-                Réessayer la connexion
-              </button>
-              <button
-                className="secondary"
-                onClick={() => {
-                  attempt.current++;
-                  abort.current?.abort();
-                  connecting.current = false;
-                  setWorking(false);
-                  session.current?.close();
-                  session.current = null;
-                  setView(null);
-                  setError(
-                    'Si le problème persiste en 4G/5G, essayez le Wi-Fi ou configurez un relais TURN dans l’aide à la connexion.',
-                  );
-                }}
-              >
-                Aide à la connexion
-              </button>
-            </div>
-          )}
-          {view.host && (
-            <>
-              <p className="eyebrow">SALON PRIVÉ · {view.members.length}/4 VOYAGEURS</p>
-              <div className="invite-code">
-                <small>CODE D’INVITATION</small>
-                <code>{code.match(/.{1,8}/g)?.join(' ')}</code>
-                <button className="secondary" onClick={() => void copy()}>
-                  {copied ? 'Lien copié ✓' : 'Copier le lien d’invitation'}
+      <div className="modal-body" tabIndex={0}>
+        {!view ? (
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (name.trim()) void connect(false);
+            }}
+          >
+            <p>
+              {invited
+                ? 'Vous êtes invité à une partie ! Choisissez votre nom pour rejoindre vos amis.'
+                : 'Rejoignez vos amis avec leur code ou créez un salon. Jusqu’à quatre voyageurs, chacun sur son écran.'}
+            </p>
+            <label className="field">
+              Votre nom
+              <input
+                autoComplete="nickname"
+                required
+                maxLength={20}
+                placeholder="Votre prénom ou pseudo"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </label>
+            {!invited && (
+              <>
+                <button
+                  type="button"
+                  className="primary"
+                  disabled={working || !name.trim()}
+                  onClick={() => void connect(true)}
+                >
+                  Créer un salon
                 </button>
-                <input
-                  aria-label="Lien d’invitation"
-                  readOnly
-                  value={`${location.origin}${location.pathname}#room=${code}`}
-                />
+                <div className="divider">OU REJOINDRE</div>
+                <label className="field">
+                  Code du salon
+                  <input
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    placeholder="Code de 32 caractères"
+                    autoComplete="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                  />
+                </label>
+              </>
+            )}
+            <button type="submit" className="primary" disabled={working || !name.trim()}>
+              {working ? 'Connexion…' : 'Rejoindre le salon'}
+            </button>
+            {(!invited || error) && (
+              <details className="advanced">
+                <summary>Aide à la connexion · serveur TURN</summary>
+                <p>
+                  Facultatif, pour les réseaux qui bloquent la connexion directe. Ces paramètres
+                  restent dans cet onglet.
+                </p>
+                <label className="field">
+                  Adresse TURN
+                  <input
+                    value={turnUrl}
+                    onChange={(e) => setTurnUrl(e.target.value)}
+                    placeholder="turn:serveur:3478"
+                  />
+                </label>
+                <label className="field">
+                  Identifiant
+                  <input value={turnUser} onChange={(e) => setTurnUser(e.target.value)} />
+                </label>
+                <label className="field">
+                  Mot de passe TURN
+                  <input
+                    type="password"
+                    value={turnPassword}
+                    onChange={(e) => setTurnPassword(e.target.value)}
+                  />
+                </label>
+              </details>
+            )}
+          </form>
+        ) : (
+          <>
+            {!view.host && (
+              <div className="connection-wait" role="status">
+                <h3>Connexion au salon…</h3>
+                <p>{view.status}</p>
+                <p>
+                  Gardez cette page ouverte, ainsi que le salon de votre ami. La connexion peut
+                  prendre quelques secondes.
+                </p>
+                <button className="primary" disabled={working} onClick={() => void connect(false)}>
+                  Réessayer la connexion
+                </button>
                 <button
                   className="secondary"
                   onClick={() => {
-                    void navigator.clipboard
-                      .writeText(code)
-                      .then(() => setCopied(true))
-                      .catch(() => setError('Copiez le code affiché ci-dessus.'));
+                    attempt.current++;
+                    abort.current?.abort();
+                    connecting.current = false;
+                    setWorking(false);
+                    session.current?.close();
+                    session.current = null;
+                    setView(null);
+                    setError(
+                      'Si le problème persiste en 4G/5G, essayez le Wi-Fi ou configurez un relais TURN dans l’aide à la connexion.',
+                    );
                   }}
                 >
-                  Copier le code du salon
+                  Aide à la connexion
                 </button>
               </div>
-              {!view.state && (
-                <form
-                  className="lobby-name"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    void session.current?.rename(name);
-                  }}
-                >
-                  <label className="field">
-                    Votre nom dans le salon
-                    <input maxLength={20} value={name} onChange={(e) => setName(e.target.value)} />
-                  </label>
-                  <button className="secondary" disabled={!name.trim() || view.busy}>
-                    Enregistrer mon nom
+            )}
+            {view.host && (
+              <>
+                <p className="eyebrow">SALON PRIVÉ · {view.members.length}/4 VOYAGEURS</p>
+                <div className="invite-code">
+                  <small>CODE D’INVITATION</small>
+                  <code>{code.match(/.{1,8}/g)?.join(' ')}</code>
+                  <button className="secondary" onClick={() => void copy()}>
+                    {copied ? 'Lien copié ✓' : 'Copier le lien d’invitation'}
                   </button>
-                </form>
-              )}
-              <ul className="lobby-members">
-                {view.members.map((member, i) => (
-                  <li key={member.id}>
-                    <span className="seat-number">{i + 1}</span>
-                    <strong>
-                      {member.name}
-                      {member.id === view.self ? ' (vous)' : ''}
-                    </strong>
-                    <small>
-                      {member.id === view.host
-                        ? 'HÔTE'
-                        : view.connected.includes(member.id)
-                          ? 'CONNECTÉ'
-                          : 'ABSENT'}
-                    </small>
-                  </li>
-                ))}
-              </ul>
-              <p role="status" className="network-status">
-                {view.status}
-              </p>
-              {!view.state && view.host === view.self && (
-                <>
-                  <div className="setup-options">
-                    <label>
-                      Sièges
-                      <select
-                        value={count}
-                        disabled={teams}
-                        onChange={(e) => setCount(Number(e.target.value))}
-                      >
-                        {[2, 3, 4].map((n) => (
-                          <option key={n}>{n}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <DurationPicker value={minutes} onChange={setMinutes} />
-                    <label className="field">
-                      Rythme partagé
-                      <select
-                        value={pace}
-                        onChange={(e) => setPace(e.target.value === 'fast' ? 'fast' : 'normal')}
-                      >
-                        <option value="normal">Animations normales</option>
-                        <option value="fast">Animations rapides</option>
-                      </select>
-                    </label>
-                  </div>
-                  <label className="toggle">
-                    <input
-                      type="checkbox"
-                      checked={teams}
-                      onChange={(e) => {
-                        setTeams(e.target.checked);
-                        if (e.target.checked) setCount(4);
-                      }}
-                    />{' '}
-                    Équipes 2v2 · sièges 1 et 3 contre 2 et 4
-                  </label>
-                  <p>Les sièges libres seront occupés par des bots.</p>
+                  <input
+                    aria-label="Lien d’invitation"
+                    readOnly
+                    value={`${location.origin}${location.pathname}#room=${code}`}
+                  />
                   <button
-                    className="primary"
-                    disabled={view.busy || view.blocked || !validMinutes(minutes)}
-                    onClick={() => void session.current?.start(count, teams, minutes * 60000, pace)}
+                    className="secondary"
+                    onClick={() => {
+                      void navigator.clipboard
+                        .writeText(code)
+                        .then(() => setCopied(true))
+                        .catch(() => setError('Copiez le code affiché ci-dessus.'));
+                    }}
                   >
-                    {view.busy ? 'Préparation du plateau…' : 'Lancer la partie'}
+                    Copier le code du salon
                   </button>
-                </>
-              )}
-              {view.state && (
-                <button
-                  className="primary"
-                  onClick={() => {
-                    callbacks.current.onView(view);
-                    onClose();
-                  }}
-                >
-                  Retour au plateau
-                </button>
-              )}
-              <details className="advanced">
-                <summary>État de la connexion</summary>
-                <p>
-                  Époque {view.epoch} · état {view.hash.slice(0, 12)}
-                </p>
-                <ul>
-                  {view.incidents.map((incident, i) => (
-                    <li key={i}>{incident}</li>
+                </div>
+                {!view.state && (
+                  <form
+                    className="lobby-name"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void session.current?.rename(name);
+                    }}
+                  >
+                    <label className="field">
+                      Votre nom dans le salon
+                      <input
+                        maxLength={20}
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                      />
+                    </label>
+                    <button className="secondary" disabled={!name.trim() || view.busy}>
+                      Enregistrer mon nom
+                    </button>
+                  </form>
+                )}
+                <ul className="lobby-members">
+                  {view.members.map((member, i) => (
+                    <li key={member.id}>
+                      <span className="seat-number">{i + 1}</span>
+                      <strong>
+                        {member.name}
+                        {member.id === view.self ? ' (vous)' : ''}
+                      </strong>
+                      <small>
+                        {member.id === view.host
+                          ? 'HÔTE'
+                          : view.connected.includes(member.id)
+                            ? 'CONNECTÉ'
+                            : 'ABSENT'}
+                      </small>
+                    </li>
                   ))}
                 </ul>
-              </details>
-            </>
-          )}
-          <button className="text-button" onClick={leave}>
-            Quitter ce salon
-          </button>
-        </>
-      )}
-      {error && (
-        <p role="alert" className="network-error">
-          {error}
+                <p role="status" className="network-status">
+                  {view.status}
+                </p>
+                {!view.state && view.host === view.self && (
+                  <>
+                    <div className="setup-options">
+                      <label>
+                        Sièges
+                        <select
+                          value={count}
+                          disabled={teams}
+                          onChange={(e) => setCount(Number(e.target.value))}
+                        >
+                          {[2, 3, 4].map((n) => (
+                            <option key={n}>{n}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <DurationPicker value={minutes} onChange={setMinutes} />
+                      <label className="field">
+                        Rythme partagé
+                        <select
+                          value={pace}
+                          onChange={(e) => setPace(e.target.value === 'fast' ? 'fast' : 'normal')}
+                        >
+                          <option value="normal">Animations normales</option>
+                          <option value="fast">Animations rapides</option>
+                        </select>
+                      </label>
+                    </div>
+                    <label className="toggle">
+                      <input
+                        type="checkbox"
+                        checked={teams}
+                        onChange={(e) => {
+                          setTeams(e.target.checked);
+                          if (e.target.checked) setCount(4);
+                        }}
+                      />{' '}
+                      Équipes 2v2 · sièges 1 et 3 contre 2 et 4
+                    </label>
+                    <p>Les sièges libres seront occupés par des bots.</p>
+                    <button
+                      className="primary"
+                      disabled={view.busy || view.blocked || !validMinutes(minutes)}
+                      onClick={() =>
+                        void session.current?.start(count, teams, minutes * 60000, pace)
+                      }
+                    >
+                      {view.busy ? 'Préparation du plateau…' : 'Lancer la partie'}
+                    </button>
+                  </>
+                )}
+                {view.state && (
+                  <button
+                    className="primary"
+                    onClick={() => {
+                      callbacks.current.onView(view);
+                      onClose();
+                    }}
+                  >
+                    Retour au plateau
+                  </button>
+                )}
+                <details className="advanced">
+                  <summary>État de la connexion</summary>
+                  <p>
+                    Époque {view.epoch} · état {view.hash.slice(0, 12)}
+                  </p>
+                  <ul>
+                    {view.incidents.map((incident, i) => (
+                      <li key={i}>{incident}</li>
+                    ))}
+                  </ul>
+                </details>
+              </>
+            )}
+            <button className="text-button" onClick={leave}>
+              Quitter ce salon
+            </button>
+          </>
+        )}
+        {error && (
+          <p role="alert" className="network-error">
+            {error}
+          </p>
+        )}
+        <p className="setup-note">
+          Vous pouvez reprendre votre siège sur cet appareil pendant 24 h. Après une coupure, la
+          partie attend jusqu’à 90 secondes avant de confier votre siège à un bot. Une coupure de
+          l’hôte déclenche une relève après 15 secondes. Certains réseaux nécessitent un TURN.
+          Partagez le lien uniquement avec vos invités.
         </p>
-      )}
-      <p className="setup-note">
-        Vous pouvez reprendre votre siège sur cet appareil pendant 24 h. Après une coupure, la
-        partie attend jusqu’à 90 secondes avant de confier votre siège à un bot. Une coupure de
-        l’hôte déclenche une relève après 15 secondes. Certains réseaux nécessitent un TURN.
-        Partagez le lien uniquement avec vos invités.
-      </p>
+      </div>
     </dialog>
   );
 }
