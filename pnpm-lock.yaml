@@ -26,6 +26,9 @@ importers:
       happy-dom:
         specifier: ^20.14.5
         version: 20.14.5
+      playwright:
+        specifier: 1.65.0-alpha-2026-10-16
+        version: 1.65.0-alpha-2026-10-16
       prettier:
         specifier: ^3.7.4
         version: 3.9.9
@@ -1258,6 +1261,16 @@ packages:
   picomatch@4.0.7:
     resolution: {integrity: sha512-qcJu88Q2IWqJsDD529JKMdwGm/dvInW4HvQnRwiH9JtihJvzGOscDtHE3x1pBKeUOTysQ8kVmLnJ2kJu7yhcGA==}
     engines: {node: '>=12'}
+
+  playwright-core@1.65.0-alpha-2026-10-16:
+    resolution: {integrity: sha512-pRALOFp9Ekwak+75F3Z5g4c1LtDvJPasuDHmVh+XPBVR0bcADsxKoTLaEsn+PGaPfFZEbAOYt5T9CwcJnzRadg==}
+    engines: {node: '>=20'}
+    hasBin: true
+
+  playwright@1.65.0-alpha-2026-10-16:
+    resolution: {integrity: sha512-JHM8WBZ1pBgbUo8kUhyqvAWuFIoQXVbixbeN8BbvShYJvdUPX6ZCqZCwdM1IM8Uw4PS0PTEIoY1J0mN2NrLrBg==}
+    engines: {node: '>=20'}
+    hasBin: true
 
   postcss@8.5.28:
     resolution: {integrity: sha512-RRuzqDtt5Y9h3quz5hWhK+TPnsmVs6WwSU6LkJMeY4HstUEDuYTG8UJSdawMRzmzAtV+KEoG8N3Qg2qLy5vM/A==}
@@ -2547,6 +2560,12 @@ snapshots:
   picocolors@1.1.1: {}
 
   picomatch@4.0.7: {}
+
+  playwright-core@1.65.0-alpha-2026-10-16: {}
+
+  playwright@1.65.0-alpha-2026-10-16:
+    dependencies:
+      playwright-core: 1.65.0-alpha-2026-10-16
 
   postcss@8.5.28:
     dependencies:

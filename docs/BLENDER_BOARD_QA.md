@@ -24,24 +24,34 @@ Le chargement attend la compilation des shaders et une image rendue. Le bandeau 
 
 ## Recette visuelle et interactions
 
-Comparaison de captures Chromium entre le composant d’origine de `HEAD` et le composant final : 320×740, 390×844, 844×390, 768×1024, 1024×768, 1440×1000, 1920×1080, 2560×1440. L’interception de référence vérifie que l’ancien composant ne charge pas le nouveau GLB. Les différences numériques résiduelles sont conservées dans le rapport de livraison ; ce contrôle ne revendique pas une identité mathématique de tous les pixels.
+Comparaison de captures Chrome entre le composant d’origine de `ebf13ab` et le composant final : 320×740, 390×844, 844×390, 768×1024, 1024×768, 1440×1000, 1920×1080, 2560×1440. Les deux composants utilisent la même interface corrigée afin d’isoler le plateau. L’interception de référence vérifie que l’ancien composant ne charge pas le nouveau GLB. Les différences numériques résiduelles sont conservées dans le rapport de livraison ; ce contrôle ne revendique pas une identité mathématique de tous les pixels.
 
-Chrome 155, Edge 155 et Firefox 153 : matrice de onze résolutions, de 320×740 à 3840×2160, sans erreur JavaScript ni débordement horizontal ; présence du rendu contrôlée dans les captures. Scènes supplémentaires : achat, voyage, Mondial, personnages regroupés, architecture, assurance et enchère.
+Chromium 156, Chrome 155, Edge 155, Firefox 157 et WebKit 27.2 : matrice de onze résolutions successives, de 320×740 à 3840×2160 ; présence du rendu contrôlée dans les captures composées. Trois allers-retours portrait/paysage par navigateur à densité 2. Scènes supplémentaires en portrait et paysage : achat, voyage, Mondial, personnages regroupés, architecture, assurance et enchère. Les exceptions JavaScript, débordements horizontaux et pertes du contexte WebGL provoquent un échec.
 
-Interactions jouées dans Chrome, Firefox et WebKit : ouverture d’une propriété à la souris, passage à la vue globale mobile, présence des 32 noms et ouverture d’une propriété. Les taps sont émulés dans Chrome et WebKit ; Firefox utilise la souris. Chrome : pincement jusqu’à 160 %, déplacement tactile puis recentrage validés. Les gestes utilisent des événements de navigateur, sans téléphone physique.
+La passe finale compte **198 captures et 18 groupes de contrôles d’interaction, sans échec**. La commande autonome `pnpm qa:board`, sans serveur préexistant, passe aussi ses 39 captures WebKit et arrête son serveur en fin d’exécution.
 
-## Réserve empêchant la publication
+Interactions : ouverture d’une propriété à la souris, passage à la vue globale mobile, présence des 32 noms et ouverture d’une propriété dans les cinq navigateurs. Les taps sont émulés dans Chromium, Chrome, Edge et WebKit ; Firefox utilise la souris. Chromium, Chrome et Edge : pincement au-delà de 100 %, déplacement tactile puis recentrage validés. Les gestes utilisent des événements de navigateur, sans téléphone physique.
 
-Le WebKit 26.5 automatisé sous Windows affiche le plateau à taille fixe, mais peut perdre la composition du canvas après un changement de taille : rotation simulée, changement de viewport ou fermeture du conseil modifiant la place du plateau. Le défaut se reproduit aussi avec le composant d’origine de `HEAD`, sans le nouveau GLB. Les noms HTML et les commandes restent visibles ; l’absence de rendu WebGL est donc relevée comme un échec visuel, même lorsque les contrôles DOM passent.
+Le premier lancement en paysage est aussi vérifié en 568×320, 667×375 et 844×390. Le panneau de conseil débordait au-dessus de la fenêtre ; son texte défile désormais dans la place disponible avec accès clavier, et « Compris » reste visible avec une cible de 44 pixels. La hauteur minimale héritée de 250 pixels de la carte d’action est retirée en paysage : le lancer reste accessible après fermeture du conseil. Le panneau latéral peut défiler sur les écrans les plus courts et quand l’historique est ouvert.
 
-Les essais de conservation du buffer, de désactivation MSAA, de remise à zéro de l’état WebGL et de recréation de la couche CSS n’ont pas résolu cette limite du banc automatisé. Aucun de ces contournements expérimentaux n’est ajouté au produit. Les vues fixes et interactions WebKit ne constituent pas une validation Safari/iOS.
+Le build de production est ensuite ouvert dans les cinq navigateurs, avec cinq tailles successives chacun : 25 captures, les quatre GLB chargés en HTTP 200, aucun échec réseau ni exception JavaScript. WebKit signale qu’il ignore la directive optionnelle de viewport `interactive-widget` ; ce message est conservé dans les preuves et distingué des erreurs de l’application. Les sauvegardes reconnues à 26 et 28 cases ainsi qu’une partie à 32 cases avec rues mélangées sont reprises dans Chrome, Firefox et WebKit, sur bureau et en vue globale mobile : 18 captures supplémentaires avec rendu présent et nombre de noms conforme.
+
+## Défaut WebKit résolu dans le banc de recette
+
+Le WebKit 26.5 automatisé sous Windows perdait la composition du canvas après un changement de taille, avec l’ancien plateau comme avec le nouveau modèle. Le contenu lu directement dans le buffer WebGL restait correct tandis que la capture de la page ne montrait plus le plateau. Un canvas WebGL minimal sans Three.js reproduit le défaut.
+
+La cause correspond au [défaut Playwright Windows #42885](https://github.com/microsoft/playwright/issues/42885), corrigé dans [WebKit #75957](https://github.com/WebKit/WebKit/pull/75957), commit `26c9d56` / `322870@main` : l’état de présentation du canvas après redimensionnement pouvait empêcher la transmission d’une nouvelle image au compositeur. Le banc utilise désormais Playwright **1.65.0-alpha-2026-10-16**, avec WebKit **27.2, révision 2376**. La version stable 1.64.1 / révision 2370 reproduisait encore le défaut lors de la contre-vérification. Cette dépendance de développement est verrouillée ; elle ne fait pas partie du bundle du jeu.
+
+Le script pérenne `scripts/qa-board.mjs` refuse une ancienne révision WebKit Windows et exécute d’abord trois redimensionnements d’un canvas rouge minimal, puis la recette réelle du jeu. Les captures composées doivent montrer la mer du plateau ; contrôler seulement les étiquettes DOM ou le buffer WebGL masquerait le défaut. Aucun contournement expérimental de rendu n’est ajouté au produit.
+
+## Limites et publication
 
 Téléphones Android et iPhone, Safari réel, rotations et retour d’arrière-plan sur ces appareils : **non testés**. La recette « tous les appareils et écrans » n’est donc pas entièrement validée. **Aucun push ni déploiement de cette modification.**
 
 ## Reproduction
 
-1. Démarrer le jeu avec `pnpm dev --port 4173`.
-2. Au besoin, régénérer les mesures et motifs : `node scripts/bake-board-source.mjs`. Playwright doit être installé ou fourni par `PLAYWRIGHT_MODULE` pointant vers son module `index.mjs`.
+1. Installer les dépendances verrouillées avec `pnpm install --frozen-lockfile`, puis les moteurs avec `pnpm qa:board:install`. La version de développement épinglée est nécessaire au correctif WebKit Windows vérifié ici.
+2. Lancer `pnpm qa:board`. Le script démarre et arrête son propre serveur local et conserve captures et résultats dans `artifacts/board-qa`. `BOARD_QA_URL` réutilise un serveur de développement ; `BOARD_QA_OUT` change le dossier de preuves et `BOARD_QA_BROWSERS` sélectionne les navigateurs. Sous Windows, Chrome et Edge installés sont aussi vérifiés ; ailleurs, Chromium, Firefox et WebKit sont les valeurs par défaut. Au besoin, régénérer les mesures et motifs avec `node scripts/bake-board-source.mjs` après démarrage du jeu sur le port 4173.
 3. Dans le MCP Blender, exécuter `scripts/build_board.py` en fournissant son chemin comme `__file__`. Il crée ses propres scènes et préserve les scènes utilisateur. Une nouvelle exécution remplace uniquement les scènes portant son marqueur de génération.
 4. Le GLB de jeu est écrit dans `apps/web/public/models/board-layout.glb`, et le `.blend` dans `artifacts/money-tour-board.blend`. `MONEY_TOUR_BOARD_BLEND_OUT` permet de choisir le chemin du `.blend`.
 5. Après reconstruction de la bibliothèque Fortune : `node scripts/prune-model-uvs.mjs apps/web/public/models/fortune.glb`.
