@@ -1,3 +1,4 @@
+import { translate, formatText } from '../i18n/translate';
 import { useId, useState } from 'react';
 import {
   reservedCity,
@@ -80,24 +81,24 @@ export function PurchaseDetails({
           <small>
             {buyout
               ? tile.type === 'resort'
-                ? 'RACHETER CETTE ÎLE'
-                : 'RACHETER CETTE VILLE'
+                ? translate('RACHETER CETTE ÎLE')
+                : translate('RACHETER CETTE VILLE')
               : owned
-                ? 'AMÉLIORER MA VILLE'
+                ? translate('AMÉLIORER MA VILLE')
                 : tile.type === 'resort'
-                  ? 'ÎLE PRIVÉE'
-                  : 'VILLE DISPONIBLE'}
+                  ? translate('ÎLE PRIVÉE')
+                  : translate('VILLE DISPONIBLE')}
           </small>
-          <h3>{tile.name}</h3>
+          <h3>{translate(tile.name)}</h3>
         </div>
-        <span>{money(quote.total, true)}</span>
+        <span>{translate(money(quote.total, true))}</span>
       </header>
       {tile.type === 'city' ? (
         <>
           <div
             className="purchase-levels"
             role="group"
-            aria-label="Choisir les bâtiments à acheter"
+            aria-label={translate('Choisir les bâtiments à acheter')}
           >
             {tile.rents!.map((_, index) => (
               <button
@@ -107,13 +108,21 @@ export function PurchaseDetails({
                 className={
                   index === 4 && hotelLocked && !getQuote(index)?.available ? 'level-locked' : ''
                 }
-                aria-label={`${labels[index]} : loyer ${money(getQuote(index)!.rent, true)}${index === 4 && hotelLocked && !getQuote(index)?.available ? ', hôtel verrouillé' : ''}`}
+                aria-label={formatText(
+                  '{0} : loyer {1}{2}',
+                  translate(labels[index]),
+                  translate(money(getQuote(index)!.rent, true)),
+                  index === 4 && hotelLocked && !getQuote(index)?.available
+                    ? translate(', hôtel verrouillé')
+                    : '',
+                )}
                 onClick={() => setLevel(index)}
               >
                 <BuildingIllustration level={index} cityName={tile.name} />
-                <strong>{labels[index]}</strong>
+                <strong>{translate(labels[index])}</strong>
                 <span className="level-rent">
-                  Loyer <b>{money(getQuote(index)!.rent, true)}</b>
+                  {translate('Loyer ')}
+                  <b>{translate(money(getQuote(index)!.rent, true))}</b>
                 </span>
                 <span className="level-check" aria-hidden="true">
                   {level === index && (
@@ -131,7 +140,9 @@ export function PurchaseDetails({
                 </span>
                 {index === 4 && hotelLocked && !getQuote(index)?.available && (
                   <span className="level-lock">
-                    Après {state.config.hotelUnlockLaps ?? 1} tours
+                    {translate('Après ')}
+                    {state.config.hotelUnlockLaps ?? 1}
+                    {translate(' tours')}
                   </span>
                 )}
               </button>
@@ -139,38 +150,60 @@ export function PurchaseDetails({
           </div>
           <div className="purchase-preview" aria-live="polite">
             <span>
-              Loyer après achat <strong>{money(quote.rent, true)}</strong>
+              {translate('Loyer après achat ')}
+              <strong>{translate(money(quote.rent, true))}</strong>
             </span>
             {level > 0 && (
               <span>
-                Construction <strong>+{money(quote.buildings, true)}</strong>
+                {translate('Construction ')}
+                <strong>+{translate(money(quote.buildings, true))}</strong>
               </span>
             )}
           </div>
           <p className="purchase-rule">
             {modern
-              ? `Maisons sans rue complète. Construction d’un hôtel après ${state.config.hotelUnlockLaps ?? 1} tours du plateau. Un hôtel existant peut être racheté avant.`
-              : 'Rue complète requise. Deux maisons maximum avant le premier passage Départ.'}{' '}
+              ? formatText(
+                  'Maisons sans rue complète. Construction d’un hôtel après {0} tours du plateau. Un hôtel existant peut être racheté avant.',
+                  state.config.hotelUnlockLaps ?? 1,
+                )
+              : translate(
+                  'Rue complète requise. Deux maisons maximum avant le premier passage Départ.',
+                )}{' '}
             {buyout
-              ? `Rachat à ${state.players.find((p) => p.id === state.properties[tile.id]?.ownerId)?.name} : ${money(quote.land, true)}. Les bâtiments existants sont conservés ; seuls les nouveaux sont ajoutés au prix. Un chantier par visite.`
+              ? formatText(
+                  'Rachat à {0} : {1}. Les bâtiments existants sont conservés ; seuls les nouveaux sont ajoutés au prix. Un chantier par visite.',
+                  state.players.find((p) => p.id === state.properties[tile.id]?.ownerId)?.name,
+                  translate(money(quote.land, true)),
+                )
               : owned
-                ? `Vous possédez déjà ${currentLevel === 0 ? 'le terrain' : labels[currentLevel].toLowerCase()}. Seuls les nouveaux bâtiments sont facturés. Un chantier par visite.`
-                : 'Le prix comprend le terrain et les bâtiments sélectionnés. Un achat par visite.'}
-            {!state.config.bundledPurchase && 'Cette sauvegarde conserve l’achat du terrain seul.'}
+                ? formatText(
+                    'Vous possédez déjà {0}. Seuls les nouveaux bâtiments sont facturés. Un chantier par visite.',
+                    currentLevel === 0
+                      ? translate('le terrain')
+                      : translate(labels[currentLevel].toLowerCase()),
+                  )
+                : translate(
+                    'Le prix comprend le terrain et les bâtiments sélectionnés. Un achat par visite.',
+                  )}
+            {translate(
+              !state.config.bundledPurchase && 'Cette sauvegarde conserve l’achat du terrain seul.',
+            )}
           </p>
         </>
       ) : (
         <div className="island-rents">
           <BuildingIllustration level={0} island />
           <div className="island-rates">
-            <h3>Loyer selon vos îles</h3>
+            <h3>{translate('Loyer selon vos îles')}</h3>
             <dl className="island-rent-grid">
               {state.config.resortRents.map((rent, i) => (
                 <div key={i}>
                   <dt>
-                    {i + 1} île{i ? 's' : ''}
+                    {i + 1}
+                    {translate(' île')}
+                    {i ? translate('s') : ''}
                   </dt>
-                  <dd>{money(rent, true)}</dd>
+                  <dd>{translate(money(rent, true))}</dd>
                 </div>
               ))}
             </dl>
@@ -178,14 +211,23 @@ export function PurchaseDetails({
         </div>
       )}
       <p className="purchase-wallet">
-        Votre compte <strong>{money(player.cash, true)}</strong>
-        {canBuy && <span> · Après achat {money(player.cash - quote.total, true)}</span>}
+        {translate('Votre compte ')}
+        <strong>{translate(money(player.cash, true))}</strong>
+        {canBuy && (
+          <span>
+            {translate(' · Après achat ')}
+            {translate(money(player.cash - quote.total, true))}
+          </span>
+        )}
       </p>
       {!canBuy && (
         <p id={feedbackId} className="purchase-feedback" role="status">
           {!quote.available
-            ? 'Ce niveau n’est pas encore disponible.'
-            : `Fonds insuffisants. Il manque ${money(Math.max(0, quote.total - player.cash), true)} pour cet achat.`}
+            ? translate('Ce niveau n’est pas encore disponible.')
+            : formatText(
+                'Fonds insuffisants. Il manque {0} pour cet achat.',
+                translate(money(Math.max(0, quote.total - player.cash), true)),
+              )}
         </p>
       )}
       <div className="purchase-buttons">
@@ -196,31 +238,37 @@ export function PurchaseDetails({
           onClick={() => onBuy(level)}
         >
           <span>
-            {buyout ? 'Racheter' : owned ? 'Passer à' : 'Acheter'}{' '}
+            {buyout ? translate('Racheter') : owned ? translate('Passer à') : translate('Acheter')}{' '}
             {tile.type === 'resort'
-              ? 'l’île'
+              ? translate('l’île')
               : level === 0
-                ? 'le terrain'
-                : `${owned ? '' : 'avec '}${level === 4 ? 'hôtel' : labels[level]}`}{' '}
-            · {money(quote.total, true)}
+                ? translate('le terrain')
+                : owned
+                  ? translate(level === 4 ? 'hôtel' : labels[level])
+                  : formatText('avec {0}', translate(level === 4 ? 'hôtel' : labels[level]))}{' '}
+            · {translate(money(quote.total, true))}
           </span>
           <ActionClock />
         </button>
         <button className="secondary purchase-pass" onClick={onPass}>
-          <span>{buyout ? 'Annuler' : 'Passer'}</span>
+          <span>{buyout ? translate('Annuler') : translate('Passer')}</span>
           <ActionClock />
         </button>
       </div>
       <p className="purchase-buyout">
-        Rachat par un adversaire :{' '}
+        {translate('Rachat par un adversaire :')}{' '}
         <strong>
-          {money(
-            Math.floor(
-              (tile.price! +
-                (tile.buildCosts ?? []).slice(1, level + 1).reduce((sum, cost) => sum + cost, 0)) *
-                state.config.buyoutMultiplier,
+          {translate(
+            money(
+              Math.floor(
+                (tile.price! +
+                  (tile.buildCosts ?? [])
+                    .slice(1, level + 1)
+                    .reduce((sum, cost) => sum + cost, 0)) *
+                  state.config.buyoutMultiplier,
+              ),
+              true,
             ),
-            true,
           )}
         </strong>
       </p>
@@ -231,12 +279,14 @@ export function PurchaseDetails({
             disabled={!fraudQuote.canBuy}
             onClick={() => onFraud(level)}
           >
-            Fraude fiscale · {money(fraudQuote.total, true)}
+            {translate('Fraude fiscale · ')}
+            {translate(money(fraudQuote.total, true))}
             <ActionClock />
           </button>
           <p className="fraud-risk">
-            Réduction sur le terrain uniquement. Risque : {money(tile.price! * 2, true)} sur Taxe,
-            jusqu’au prochain Départ.
+            {translate('Réduction sur le terrain uniquement. Risque : ')}
+            {translate(money(tile.price! * 2, true))}
+            {translate(' sur Taxe, jusqu’au prochain Départ.')}
           </p>
         </>
       )}

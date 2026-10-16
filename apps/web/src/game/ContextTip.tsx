@@ -1,3 +1,4 @@
+import { translate } from '../i18n/translate';
 import { useState } from 'react';
 import { getDecisionPlayerId, type GameState } from '@money-tour/engine';
 import './game-summary.css';
@@ -72,13 +73,13 @@ export function ContextTip({
   if (disabled || !tip || seen.includes(tip.id) || !player || player.bot || player.eliminated)
     return null;
   return (
-    <aside className="context-tip" aria-label="Conseil de jeu">
+    <aside className="context-tip" aria-label={translate('Conseil de jeu')}>
       <div tabIndex={0}>
-        <strong>{tip.title}</strong>
-        <p>{tip.text}</p>
+        <strong>{translate(tip.title)}</strong>
+        <p>{translate(tip.text)}</p>
       </div>
       <button
-        aria-label="Masquer ce conseil"
+        aria-label={translate('Masquer ce conseil')}
         onClick={() => {
           const next = [...seen, tip.id];
           setSeen(next);
@@ -89,7 +90,7 @@ export function ContextTip({
           }
         }}
       >
-        Compris
+        {translate('Compris')}
       </button>
     </aside>
   );

@@ -1,3 +1,4 @@
+import { translate } from '../i18n/translate';
 import { useState } from 'react';
 
 export const validMinutes = (value: number) =>
@@ -14,7 +15,7 @@ export function DurationPicker({
   return (
     <div className="duration-picker">
       <label>
-        Durée
+        {translate('Durée')}
         <select
           value={custom ? 'custom' : String(value)}
           onChange={(event) => {
@@ -25,28 +26,32 @@ export function DurationPicker({
         >
           {[5, 10, 20, 30].map((minutes) => (
             <option key={minutes} value={minutes}>
-              {minutes} min{minutes === 20 ? ' · classique' : ''}
+              {minutes}
+              {translate(' min')}
+              {minutes === 20 ? translate(' · classique') : ''}
             </option>
           ))}
-          <option value="custom">Temps personnalisé</option>
+          <option value="custom">{translate('Temps personnalisé')}</option>
         </select>
       </label>
       {custom && (
         <label>
-          Minutes (1 à 180)
+          {translate('Minutes (1 à 180)')}
           <input
             type="number"
             inputMode="numeric"
             min={1}
             max={180}
             step={1}
-            aria-label="Durée personnalisée en minutes"
+            aria-label={translate('Durée personnalisée en minutes')}
             value={value || ''}
             onChange={(event) => onChange(Number(event.target.value))}
           />
         </label>
       )}
-      {!validMinutes(value) && <small role="alert">Choisissez de 1 à 180 minutes entières.</small>}
+      {!validMinutes(value) && (
+        <small role="alert">{translate('Choisissez de 1 à 180 minutes entières.')}</small>
+      )}
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { translate, formatText } from '../i18n/translate';
 import { scaledAmount } from '@money-tour/engine';
 import { playerBonuses, type BonusInfo } from './bonuses';
 import { useState } from 'react';
@@ -13,17 +14,19 @@ import { estateGroups } from './estate';
 import { GameIcon } from './GameIcon';
 export function AdventureBanner({ state }: { state: GameState }) {
   return (
-    <section className="adventure-banner" aria-label="Règle spéciale de cette partie">
+    <section className="adventure-banner" aria-label={translate('Règle spéciale de cette partie')}>
       <span>
-        <GameIcon name="sparkles" /> CETTE PARTIE
+        <GameIcon name="sparkles" />
+        {translate(' CETTE PARTIE')}
       </span>
-      <strong>{adventureText(state)}</strong>
+      <strong>{translate(adventureText(state))}</strong>
       {state.adventure && (
         <small>
-          Tour de table {state.adventure.round} ·{' '}
+          {translate('Tour de table ')}
+          {state.adventure.round} ·{' '}
           {state.adventure.tenderDone
-            ? 'Appel d’offres proposé'
-            : 'Un appel d’offres secret aura lieu pendant la partie'}
+            ? translate('Appel d’offres proposé')
+            : translate('Un appel d’offres secret aura lieu pendant la partie')}
         </small>
       )}
     </section>
@@ -43,23 +46,24 @@ export function PrivateQuest({
   if (!q || q.completed || player.bot || (self && self !== player.id)) return null;
   const rule = questRules[q.kind];
   return (
-    <section className="private-quest" aria-label="Mon objectif secret">
+    <section className="private-quest" aria-label={translate('Mon objectif secret')}>
       {opened ? (
         <>
           <strong>
-            <GameIcon name="lock" /> {rule.title}
+            <GameIcon name="lock" /> {translate(rule.title)}
           </strong>
           <span>
-            {Math.min(q.progress, rule.goal)} / {rule.goal} · Récompense{' '}
-            {money(scaledAmount(state.config, 100000))}
+            {Math.min(q.progress, rule.goal)} / {rule.goal}
+            {translate(' · Récompense')} {translate(money(scaledAmount(state.config, 100000)))}
           </span>
           <button aria-expanded={true} onClick={() => setOpened(false)}>
-            Masquer mon objectif
+            {translate('Masquer mon objectif')}
           </button>
         </>
       ) : (
         <button aria-expanded={false} onClick={() => setOpened(true)}>
-          <GameIcon name="lock" /> {player.name} · voir mon objectif secret
+          <GameIcon name="lock" /> {player.name}
+          {translate(' · voir mon objectif secret')}
         </button>
       )}
     </section>
@@ -79,10 +83,14 @@ export function PlayerInventory({
   const groups = estateGroups(state, player.id);
   return (
     <div className="player-inventory">
-      <div className="mini-properties" role="group" aria-label={`Propriétés de ${player.name}`}>
+      <div
+        className="mini-properties"
+        role="group"
+        aria-label={formatText('Propriétés de {0}', player.name)}
+      >
         {groups.map(([street, cities]) => (
-          <section className="estate-street" key={street} aria-label={street}>
-            <h4 style={{ borderColor: cities[0]?.color }}>{street}</h4>
+          <section className="estate-street" key={street} aria-label={translate(street)}>
+            <h4 style={{ borderColor: cities[0]?.color }}>{translate(street)}</h4>
             <div className="estate-street-cards">
               {cities.map((t) => (
                 <button
@@ -90,7 +98,11 @@ export function PlayerInventory({
                   className="mini-property"
                   style={{ borderTopColor: t.color ?? '#f1d17b' }}
                   onClick={() => onTile(t.id)}
-                  title={`${t.name} · loyer ${money(getRent(state, t.id))}`}
+                  title={formatText(
+                    '{0} · loyer {1}',
+                    translate(t.name),
+                    translate(money(getRent(state, t.id))),
+                  )}
                 >
                   <span>
                     <GameIcon
@@ -103,12 +115,14 @@ export function PlayerInventory({
                       }
                     />
                   </span>
-                  <b>{t.name}</b>
-                  <small>{money(getRent(state, t.id), true)}</small>
+                  <b>{translate(t.name)}</b>
+                  <small>{translate(money(getRent(state, t.id), true))}</small>
                   {!!state.properties[t.id]!.roachTurns && (
                     <span className="roach-badge">
-                      <GameIcon name="bug" /> Cafards · {state.properties[t.id]!.roachTurns} tours ·
-                      −50 %
+                      <GameIcon name="bug" />
+                      {translate(' Cafards · ')}
+                      {state.properties[t.id]!.roachTurns}
+                      {translate(' tours · −50 %')}
                     </span>
                   )}
                 </button>
@@ -116,12 +130,18 @@ export function PlayerInventory({
             </div>
           </section>
         ))}
-        {!groups.length && <small className="empty-estate">Aucune propriété pour le moment</small>}
+        {!groups.length && (
+          <small className="empty-estate">{translate('Aucune propriété pour le moment')}</small>
+        )}
       </div>
-      <div className="bonus-tokens" role="group" aria-label={`Bonus et malus de ${player.name}`}>
+      <div
+        className="bonus-tokens"
+        role="group"
+        aria-label={formatText('Bonus et malus de {0}', player.name)}
+      >
         {playerBonuses(state, player).map((bonus, index) => (
-          <button key={index} onClick={() => onBonus?.(bonus)} title={bonus.description}>
-            <GameIcon name={bonus.icon ?? 'info'} /> {bonus.title}
+          <button key={index} onClick={() => onBonus?.(bonus)} title={translate(bonus.description)}>
+            <GameIcon name={bonus.icon ?? 'info'} /> {translate(bonus.title)}
           </button>
         ))}
       </div>

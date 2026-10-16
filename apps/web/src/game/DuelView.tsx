@@ -1,3 +1,4 @@
+import { translate, formatText } from '../i18n/translate';
 import { scaledAmount } from '@money-tour/engine';
 import { readPrivateChoice, savePrivateChoice } from './privateStorage';
 import { useEffect, useRef, useState, useId } from 'react';
@@ -79,36 +80,46 @@ export function DuelView({
         ✊ <span>✋</span> ✌️
       </div>
       <p className="eyebrow">
-        {canPlay ? `À vous, ${actor.name}` : `${actor.name} prépare son duel`}
+        {canPlay
+          ? formatText('À vous, {0}', actor.name)
+          : formatText('{0} prépare son duel', actor.name)}
       </p>
-      <div className="duel-balances" role="group" aria-label="Argent des joueurs">
+      <div className="duel-balances" role="group" aria-label={translate('Argent des joueurs')}>
         {state.players
           .filter((p) => !p.eliminated)
           .map((p) => (
             <div key={p.id}>
               <span>{p.name}</span>
-              <strong>{money(p.cash)}</strong>
+              <strong>{translate(money(p.cash))}</strong>
               {d.escrow && [d.challengerId, d.targetId].includes(p.id) && (
-                <small>+ {money(d.amount, true)} déjà dans le pot</small>
+                <small>
+                  + {translate(money(d.amount, true))}
+                  {translate(' déjà dans le pot')}
+                </small>
               )}
             </div>
           ))}
       </div>
       {(d.round ?? 1) > 1 && (
-        <p role="status">Manche {d.round} · égalité précédente, même pot, aucune nouvelle mise.</p>
+        <p role="status">
+          {translate('Manche ')}
+          {d.round}
+          {translate(' · égalité précédente, même pot, aucune nouvelle mise.')}
+        </p>
       )}
       {d.stage === 'offer' ? (
         <>
           <p>
-            Choisissez votre adversaire et une mise identique pour chacun. Il pourra accepter ou
-            refuser.
+            {translate(
+              'Choisissez votre adversaire et une mise identique pour chacun. Il pourra accepter ou refuser.',
+            )}
           </p>
           {canPlay && (
             <>
               <label>
-                Mise par joueur
+                {translate('Mise par joueur')}
                 <input
-                  aria-label="Mise par joueur"
+                  aria-label={translate('Mise par joueur')}
                   type="number"
                   inputMode="numeric"
                   min="1"
@@ -128,8 +139,11 @@ export function DuelView({
                 {!Number.isSafeInteger(Number(amount)) ||
                 Number(amount) < 1 ||
                 Number(amount) > actor.cash
-                  ? `Saisissez un montant entier entre 1 et ${money(actor.cash, true)}.`
-                  : 'Montant entier, sans décimales.'}
+                  ? formatText(
+                      'Saisissez un montant entier entre 1 et {0}.',
+                      translate(money(actor.cash, true)),
+                    )
+                  : translate('Montant entier, sans décimales.')}
               </p>
               <div className="decision-actions">
                 {getLegalActions(state)
@@ -151,13 +165,16 @@ export function DuelView({
                           }
                           onClick={() => act({ ...a, amount: Number(amount) })}
                         >
-                          Défier {state.players.find((p) => p.id === a.targetId)!.name}
+                          {translate('Défier ')}
+                          {state.players.find((p) => p.id === a.targetId)!.name}
                           <small>
-                            Maximum :{' '}
-                            {money(
-                              Math.min(
-                                actor.cash,
-                                state.players.find((p) => p.id === a.targetId)!.cash,
+                            {translate('Maximum :')}{' '}
+                            {translate(
+                              money(
+                                Math.min(
+                                  actor.cash,
+                                  state.players.find((p) => p.id === a.targetId)!.cash,
+                                ),
                               ),
                             )}
                           </small>
@@ -170,7 +187,8 @@ export function DuelView({
                 className="secondary"
                 onClick={() => act({ type: 'duel_cancel', playerId: actor.id })}
               >
-                Passer ce duel <ActionClock />
+                {translate('Passer ce duel ')}
+                <ActionClock />
               </button>
             </>
           )}
@@ -178,19 +196,25 @@ export function DuelView({
       ) : (
         <>
           <p>
-            <strong>{state.players.find((p) => p.id === d.challengerId)!.name}</strong> contre{' '}
+            <strong>{state.players.find((p) => p.id === d.challengerId)!.name}</strong>
+            {translate(' contre')}{' '}
             <strong>{state.players.find((p) => p.id === d.targetId)!.name}</strong>
           </p>
           <p>
-            Mise : <strong>{money(d.amount)}</strong> chacun · Pot :{' '}
-            <strong>{money(d.amount * 2)}</strong>
+            {translate('Mise : ')}
+            <strong>{translate(money(d.amount))}</strong>
+            {translate(' chacun · Pot :')} <strong>{translate(money(d.amount * 2))}</strong>
           </p>
           {d.stage === 'accept' && (
             <>
               <p>
                 {state.config.duelReplayTies
-                  ? 'Le gagnant remporte le pot. En cas d’égalité, rejouez sans miser à nouveau jusqu’à un vainqueur.'
-                  : 'Le gagnant remporte le pot. En cas d’égalité, chacun récupère sa mise.'}
+                  ? translate(
+                      'Le gagnant remporte le pot. En cas d’égalité, rejouez sans miser à nouveau jusqu’à un vainqueur.',
+                    )
+                  : translate(
+                      'Le gagnant remporte le pot. En cas d’égalité, chacun récupère sa mise.',
+                    )}
               </p>
               {canPlay && (
                 <div className="decision-actions">
@@ -198,13 +222,15 @@ export function DuelView({
                     className="primary"
                     onClick={() => act({ type: 'duel_accept', playerId: actor.id })}
                   >
-                    Accepter et miser {money(d.amount)} <ActionClock />
+                    {translate('Accepter et miser ')}
+                    {translate(money(d.amount))} <ActionClock />
                   </button>
                   <button
                     className="secondary"
                     onClick={() => act({ type: 'duel_decline', playerId: actor.id })}
                   >
-                    Refuser le duel <ActionClock />
+                    {translate('Refuser le duel ')}
+                    <ActionClock />
                   </button>
                 </div>
               )}
@@ -213,15 +239,17 @@ export function DuelView({
           {d.stage === 'commit' && (
             <>
               <p>
-                Votre choix reste secret jusqu’à ce que les deux joueurs soient prêts.
-                {!self && ' Passez l’écran au joueur indiqué avant de choisir.'}
+                {translate(
+                  'Votre choix reste secret jusqu’à ce que les deux joueurs soient prêts.',
+                )}
+                {translate(!self && ' Passez l’écran au joueur indiqué avant de choisir.')}
               </p>
               {canPlay && (
                 <div className="duel-choices">
                   {duelChoices.map((choice) => (
                     <button className="primary" key={choice} onClick={() => choose(choice)}>
-                      <span aria-hidden="true">{hands[choice]}</span>
-                      {labels[choice]}
+                      <span aria-hidden="true">{translate(hands[choice])}</span>
+                      {translate(labels[choice])}
                       <ActionClock />
                     </button>
                   ))}
@@ -230,28 +258,33 @@ export function DuelView({
             </>
           )}
           {d.stage === 'reveal' && (
-            <p role="status">Les choix sont verrouillés. Révélation automatique en cours…</p>
+            <p role="status">
+              {translate('Les choix sont verrouillés. Révélation automatique en cours…')}
+            </p>
           )}
           {d.escrow && (
             <p className="setup-note">
-              Une fois la mise acceptée, abandonner ou laisser expirer son délai donne le pot à
-              l’adversaire.
+              {translate(
+                'Une fois la mise acceptée, abandonner ou laisser expirer son délai donne le pot à l’adversaire.',
+              )}
             </p>
           )}
           {error && (
             <>
-              <p role="alert">{error}</p>
+              <p role="alert">{translate(error)}</p>
               <button
                 className="secondary"
                 onClick={() => act({ type: 'duel_cancel', playerId: actor.id })}
               >
-                Abandonner ce duel
+                {translate('Abandonner ce duel')}
               </button>
             </>
           )}
         </>
       )}
-      {!canPlay && <p role="status">Votre adversaire joue. Le résultat apparaîtra ici.</p>}
+      {!canPlay && (
+        <p role="status">{translate('Votre adversaire joue. Le résultat apparaîtra ici.')}</p>
+      )}
     </div>
   );
 }

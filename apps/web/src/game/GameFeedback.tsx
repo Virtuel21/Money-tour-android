@@ -1,3 +1,4 @@
+import { translate, formatText } from '../i18n/translate';
 import { useEffect, useLayoutEffect, useState, type CSSProperties } from 'react';
 import type { GameState, Player } from '@money-tour/engine';
 import type { Cue } from './presentation';
@@ -25,9 +26,11 @@ export function TurnBanner({
   return (
     <div className="turn-banner" role="status" style={{ '--turn-color': color } as CSSProperties}>
       <small>
-        {player.name} · {yours ? 'À VOUS DE JOUER' : 'EN ACTION'}
+        {player.name} · {yours ? translate('À VOUS DE JOUER') : translate('EN ACTION')}
       </small>
-      <strong>{yours ? 'C’est votre tour !' : `Au tour de ${player.name}`}</strong>
+      <strong>
+        {yours ? translate('C’est votre tour !') : formatText('Au tour de {0}', player.name)}
+      </strong>
     </div>
   );
 }
@@ -89,51 +92,51 @@ export function MoneyFlight({
       <div className="money-toast" role="status">
         <button
           className="icon-button money-close"
-          aria-label="Fermer l’information de paiement"
+          aria-label={translate('Fermer l’information de paiement')}
           onClick={onClose}
         >
-          ×
+          {translate('×')}
         </button>
         <small>
           {cue.reason === 'duel_stake'
-            ? 'MISE AU POT DU DUEL'
+            ? translate('MISE AU POT DU DUEL')
             : cue.reason === 'duel_prize'
-              ? 'DUEL REMPORTÉ'
+              ? translate('DUEL REMPORTÉ')
               : cue.reason === 'duel_refund'
-                ? 'MISE REMBOURSÉE'
+                ? translate('MISE REMBOURSÉE')
                 : cue.reason === 'alliance'
-                  ? 'GAINS PARTAGÉS · ALLIANCE'
+                  ? translate('GAINS PARTAGÉS · ALLIANCE')
                   : cue.reason === 'jackpot'
-                    ? 'JACKPOT DU CASINO'
+                    ? translate('JACKPOT DU CASINO')
                     : cue.reason === 'casino'
-                      ? 'GAIN AU CASINO'
+                      ? translate('GAIN AU CASINO')
                       : cue.reason === 'karma'
                         ? recipient
-                          ? 'LE KARMA VOUS RÉCOMPENSE'
-                          : 'LE KARMA RÉÉQUILIBRE'
+                          ? translate('LE KARMA VOUS RÉCOMPENSE')
+                          : translate('LE KARMA RÉÉQUILIBRE')
                         : cue.reason === 'purchase'
-                          ? 'PROPRIÉTÉ ACHETÉE'
+                          ? translate('PROPRIÉTÉ ACHETÉE')
                           : cue.reason === 'build'
-                            ? 'CONSTRUCTION'
+                            ? translate('CONSTRUCTION')
                             : cue.reason === 'championship'
-                              ? 'FESTIVAL ORGANISÉ'
+                              ? translate('FESTIVAL ORGANISÉ')
                               : cue.reason === 'start_bonus'
-                                ? 'PRIME DE DÉPART'
+                                ? translate('PRIME DE DÉPART')
                                 : cue.reason === 'rent'
-                                  ? 'LOYER VERSÉ'
+                                  ? translate('LOYER VERSÉ')
                                   : cue.reason === 'attack'
-                                    ? 'ATTAQUE RÉUSSIE'
+                                    ? translate('ATTAQUE RÉUSSIE')
                                     : recipient
-                                      ? 'ARGENT REÇU'
-                                      : 'TAXE / FRAIS PAYÉS'}
+                                      ? translate('ARGENT REÇU')
+                                      : translate('TAXE / FRAIS PAYÉS')}
         </small>
         <strong>
           {recipient ? '+' : '−'}
-          {money(cue.amount ?? 0, true)}
+          {translate(money(cue.amount ?? 0, true))}
         </strong>
         <span>
-          {payer ? `${payer} → ` : ''}
-          {recipient ?? (cue.reason === 'duel_stake' ? 'Le pot du duel' : 'La banque')}
+          {payer ? translate(`${payer} → `) : ''}
+          {recipient ?? translate(cue.reason === 'duel_stake' ? 'Le pot du duel' : 'La banque')}
         </span>
       </div>
     </div>

@@ -1,3 +1,4 @@
+import { translate } from '../i18n/translate';
 import { useEffect, useId, useRef, useState } from 'react';
 import { GameIcon } from '../game/GameIcon';
 import { restoreDialogFocus, trapDialogFocus } from '../game/dialogFocus';
@@ -195,7 +196,9 @@ export default function OnlineLobby({
       view?.state &&
       !view.state.winner &&
       !window.confirm(
-        'Quitter le salon ? Votre siège sera conservé pendant 90 secondes avant de passer en bot.',
+        translate(
+          'Quitter le salon ? Votre siège sera conservé pendant 90 secondes avant de passer en bot.',
+        ),
       )
     )
       return;
@@ -231,8 +234,8 @@ export default function OnlineLobby({
       }}
     >
       <div className="modal-heading">
-        <h2 id={titleId}>Le voyage entre amis</h2>
-        <button className="icon-button" aria-label="Fermer le salon" onClick={onClose}>
+        <h2 id={titleId}>{translate('Le voyage entre amis')}</h2>
+        <button className="icon-button" aria-label={translate('Fermer le salon')} onClick={onClose}>
           <GameIcon name="close" />
         </button>
       </div>
@@ -246,16 +249,20 @@ export default function OnlineLobby({
           >
             <p>
               {invited
-                ? 'Vous êtes invité à une partie ! Choisissez votre nom pour rejoindre vos amis.'
-                : 'Rejoignez vos amis avec leur code ou créez un salon. Jusqu’à quatre voyageurs, chacun sur son écran.'}
+                ? translate(
+                    'Vous êtes invité à une partie ! Choisissez votre nom pour rejoindre vos amis.',
+                  )
+                : translate(
+                    'Rejoignez vos amis avec leur code ou créez un salon. Jusqu’à quatre voyageurs, chacun sur son écran.',
+                  )}
             </p>
             <label className="field">
-              Votre nom
+              {translate('Votre nom')}
               <input
                 autoComplete="nickname"
                 required
                 maxLength={20}
-                placeholder="Votre prénom ou pseudo"
+                placeholder={translate('Votre prénom ou pseudo')}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
@@ -268,15 +275,15 @@ export default function OnlineLobby({
                   disabled={working || !name.trim()}
                   onClick={() => void connect(true)}
                 >
-                  Créer un salon
+                  {translate('Créer un salon')}
                 </button>
-                <div className="divider">OU REJOINDRE</div>
+                <div className="divider">{translate('OU REJOINDRE')}</div>
                 <label className="field">
-                  Code du salon
+                  {translate('Code du salon')}
                   <input
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
-                    placeholder="Code de 32 caractères"
+                    placeholder={translate('Code de 32 caractères')}
                     autoComplete="off"
                     autoCapitalize="none"
                     spellCheck={false}
@@ -285,29 +292,30 @@ export default function OnlineLobby({
               </>
             )}
             <button type="submit" className="primary" disabled={working || !name.trim()}>
-              {working ? 'Connexion…' : 'Rejoindre le salon'}
+              {working ? translate('Connexion…') : translate('Rejoindre le salon')}
             </button>
             {(!invited || error) && (
               <details className="advanced">
-                <summary>Aide à la connexion · serveur TURN</summary>
+                <summary>{translate('Aide à la connexion · serveur TURN')}</summary>
                 <p>
-                  Facultatif, pour les réseaux qui bloquent la connexion directe. Ces paramètres
-                  restent dans cet onglet.
+                  {translate(
+                    'Facultatif, pour les réseaux qui bloquent la connexion directe. Ces paramètres restent dans cet onglet.',
+                  )}
                 </p>
                 <label className="field">
-                  Adresse TURN
+                  {translate('Adresse TURN')}
                   <input
                     value={turnUrl}
                     onChange={(e) => setTurnUrl(e.target.value)}
-                    placeholder="turn:serveur:3478"
+                    placeholder={translate('turn:serveur:3478')}
                   />
                 </label>
                 <label className="field">
-                  Identifiant
+                  {translate('Identifiant')}
                   <input value={turnUser} onChange={(e) => setTurnUser(e.target.value)} />
                 </label>
                 <label className="field">
-                  Mot de passe TURN
+                  {translate('Mot de passe TURN')}
                   <input
                     type="password"
                     value={turnPassword}
@@ -321,14 +329,15 @@ export default function OnlineLobby({
           <>
             {!view.host && (
               <div className="connection-wait" role="status">
-                <h3>Connexion au salon…</h3>
-                <p>{view.status}</p>
+                <h3>{translate('Connexion au salon…')}</h3>
+                <p>{translate(view.status)}</p>
                 <p>
-                  Gardez cette page ouverte, ainsi que le salon de votre ami. La connexion peut
-                  prendre quelques secondes.
+                  {translate(
+                    'Gardez cette page ouverte, ainsi que le salon de votre ami. La connexion peut prendre quelques secondes.',
+                  )}
                 </p>
                 <button className="primary" disabled={working} onClick={() => void connect(false)}>
-                  Réessayer la connexion
+                  {translate('Réessayer la connexion')}
                 </button>
                 <button
                   className="secondary"
@@ -345,21 +354,25 @@ export default function OnlineLobby({
                     );
                   }}
                 >
-                  Aide à la connexion
+                  {translate('Aide à la connexion')}
                 </button>
               </div>
             )}
             {view.host && (
               <>
-                <p className="eyebrow">SALON PRIVÉ · {view.members.length}/4 VOYAGEURS</p>
+                <p className="eyebrow">
+                  {translate('SALON PRIVÉ · ')}
+                  {view.members.length}
+                  {translate('/4 VOYAGEURS')}
+                </p>
                 <div className="invite-code">
-                  <small>CODE D’INVITATION</small>
-                  <code>{code.match(/.{1,8}/g)?.join(' ')}</code>
+                  <small>{translate('CODE D’INVITATION')}</small>
+                  <code>{translate(code.match(/.{1,8}/g)?.join(' '))}</code>
                   <button className="secondary" onClick={() => void copy()}>
-                    {copied ? 'Lien copié ✓' : 'Copier le lien d’invitation'}
+                    {copied ? translate('Lien copié ✓') : translate('Copier le lien d’invitation')}
                   </button>
                   <input
-                    aria-label="Lien d’invitation"
+                    aria-label={translate('Lien d’invitation')}
                     readOnly
                     value={`${location.origin}${location.pathname}#room=${code}`}
                   />
@@ -372,7 +385,7 @@ export default function OnlineLobby({
                         .catch(() => setError('Copiez le code affiché ci-dessus.'));
                     }}
                   >
-                    Copier le code du salon
+                    {translate('Copier le code du salon')}
                   </button>
                 </div>
                 {!view.state && (
@@ -384,7 +397,7 @@ export default function OnlineLobby({
                     }}
                   >
                     <label className="field">
-                      Votre nom dans le salon
+                      {translate('Votre nom dans le salon')}
                       <input
                         maxLength={20}
                         value={name}
@@ -392,7 +405,7 @@ export default function OnlineLobby({
                       />
                     </label>
                     <button className="secondary" disabled={!name.trim() || view.busy}>
-                      Enregistrer mon nom
+                      {translate('Enregistrer mon nom')}
                     </button>
                   </form>
                 )}
@@ -402,26 +415,26 @@ export default function OnlineLobby({
                       <span className="seat-number">{i + 1}</span>
                       <strong>
                         {member.name}
-                        {member.id === view.self ? ' (vous)' : ''}
+                        {member.id === view.self ? translate(' (vous)') : ''}
                       </strong>
                       <small>
                         {member.id === view.host
-                          ? 'HÔTE'
+                          ? translate('HÔTE')
                           : view.connected.includes(member.id)
-                            ? 'CONNECTÉ'
-                            : 'ABSENT'}
+                            ? translate('CONNECTÉ')
+                            : translate('ABSENT')}
                       </small>
                     </li>
                   ))}
                 </ul>
                 <p role="status" className="network-status">
-                  {view.status}
+                  {translate(view.status)}
                 </p>
                 {!view.state && view.host === view.self && (
                   <>
                     <div className="setup-options">
                       <label>
-                        Sièges
+                        {translate('Sièges')}
                         <select
                           value={count}
                           disabled={teams}
@@ -434,13 +447,13 @@ export default function OnlineLobby({
                       </label>
                       <DurationPicker value={minutes} onChange={setMinutes} />
                       <label className="field">
-                        Rythme partagé
+                        {translate('Rythme partagé')}
                         <select
                           value={pace}
                           onChange={(e) => setPace(e.target.value === 'fast' ? 'fast' : 'normal')}
                         >
-                          <option value="normal">Animations normales</option>
-                          <option value="fast">Animations rapides</option>
+                          <option value="normal">{translate('Animations normales')}</option>
+                          <option value="fast">{translate('Animations rapides')}</option>
                         </select>
                       </label>
                     </div>
@@ -453,9 +466,9 @@ export default function OnlineLobby({
                           if (e.target.checked) setCount(4);
                         }}
                       />{' '}
-                      Équipes 2v2 · sièges 1 et 3 contre 2 et 4
+                      {translate('Équipes 2v2 · sièges 1 et 3 contre 2 et 4')}
                     </label>
-                    <p>Les sièges libres seront occupés par des bots.</p>
+                    <p>{translate('Les sièges libres seront occupés par des bots.')}</p>
                     <button
                       className="primary"
                       disabled={view.busy || view.blocked || !validMinutes(minutes)}
@@ -463,7 +476,9 @@ export default function OnlineLobby({
                         void session.current?.start(count, teams, minutes * 60000, pace)
                       }
                     >
-                      {view.busy ? 'Préparation du plateau…' : 'Lancer la partie'}
+                      {view.busy
+                        ? translate('Préparation du plateau…')
+                        : translate('Lancer la partie')}
                     </button>
                   </>
                 )}
@@ -475,37 +490,39 @@ export default function OnlineLobby({
                       onClose();
                     }}
                   >
-                    Retour au plateau
+                    {translate('Retour au plateau')}
                   </button>
                 )}
                 <details className="advanced">
-                  <summary>État de la connexion</summary>
+                  <summary>{translate('État de la connexion')}</summary>
                   <p>
-                    Époque {view.epoch} · état {view.hash.slice(0, 12)}
+                    {translate('Époque ')}
+                    {view.epoch}
+                    {translate(' · état ')}
+                    {translate(view.hash.slice(0, 12))}
                   </p>
                   <ul>
                     {view.incidents.map((incident, i) => (
-                      <li key={i}>{incident}</li>
+                      <li key={i}>{translate(incident)}</li>
                     ))}
                   </ul>
                 </details>
               </>
             )}
             <button className="text-button" onClick={leave}>
-              Quitter ce salon
+              {translate('Quitter ce salon')}
             </button>
           </>
         )}
         {error && (
           <p role="alert" className="network-error">
-            {error}
+            {translate(error)}
           </p>
         )}
         <p className="setup-note">
-          Vous pouvez reprendre votre siège sur cet appareil pendant 24 h. Après une coupure, la
-          partie attend jusqu’à 90 secondes avant de confier votre siège à un bot. Une coupure de
-          l’hôte déclenche une relève après 15 secondes. Certains réseaux nécessitent un TURN.
-          Partagez le lien uniquement avec vos invités.
+          {translate(
+            'Vous pouvez reprendre votre siège sur cet appareil pendant 24 h. Après une coupure, la partie attend jusqu’à 90 secondes avant de confier votre siège à un bot. Une coupure de l’hôte déclenche une relève après 15 secondes. Certains réseaux nécessitent un TURN. Partagez le lien uniquement avec vos invités.',
+          )}
         </p>
       </div>
     </dialog>

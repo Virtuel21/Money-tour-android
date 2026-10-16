@@ -1,3 +1,4 @@
+import { translate, formatText } from '../i18n/translate';
 import { useState, type FormEvent } from 'react';
 import type { GameConfig } from '@money-tour/engine';
 import { type LocalSave, money, phaseText } from './local';
@@ -97,13 +98,15 @@ export function DebugPanel({
   return (
     <div className="debug-panel">
       <p className="debug-intro">
-        Bac à sable local · Les changements sont gratuits et immédiats. Votre partie normale reste
-        conservée.
+        {translate(
+          'Bac à sable local · Les changements sont gratuits et immédiats. Votre partie normale reste conservée.',
+        )}
       </p>
       <div className="debug-summary">
         <strong>{state.players[state.currentPlayer]!.name}</strong>
         <span>
-          Tour {state.turn} · {phaseText[state.phase]}
+          {translate('Tour ')}
+          {state.turn} · {translate(phaseText[state.phase])}
         </span>
       </div>
       <div className="debug-options">
@@ -115,7 +118,7 @@ export function DebugPanel({
               command({ type: 'options', ...save.debug!, freezeTime: e.target.checked })
             }
           />{' '}
-          Geler le chrono
+          {translate('Geler le chrono')}
         </label>
         <label>
           <input
@@ -125,20 +128,22 @@ export function DebugPanel({
               command({ type: 'options', ...save.debug!, freezeBots: e.target.checked })
             }
           />{' '}
-          Geler les bots
+          {translate('Geler les bots')}
         </label>
         <button
           className="secondary"
           disabled={!canUndo}
           onClick={() => attempt(onUndo, 'Situation précédente restaurée.')}
         >
-          Annuler la dernière action
+          {translate('Annuler la dernière action')}
         </button>
       </div>
       <p className="debug-hint">
-        Le jeu attend pendant que ce panneau est ouvert. Fermez-le pour jouer. Raccourci : F2.
+        {translate(
+          'Le jeu attend pendant que ce panneau est ouvert. Fermez-le pour jouer. Raccourci : F2.',
+        )}
       </p>
-      <nav className="debug-tabs" aria-label="Outils debug">
+      <nav className="debug-tabs" aria-label={translate('Outils debug')}>
         {['Joueurs', 'Cases et dés', 'Règles', 'Scénario'].map((name) => (
           <button
             key={name}
@@ -155,26 +160,26 @@ export function DebugPanel({
       </nav>
       {error && (
         <p role="alert" className="debug-error">
-          {error}
+          {translate(error)}
         </p>
       )}
       {feedback && (
         <p role="status" className="debug-success">
-          {feedback}
+          {translate(feedback)}
         </p>
       )}
       {['Joueurs', 'Cases et dés'].includes(tab) && (
         <label className="debug-player">
-          Joueur à modifier
+          {translate('Joueur à modifier')}
           <select
-            aria-label="Joueur à modifier"
+            aria-label={translate('Joueur à modifier')}
             value={player.id}
             onChange={(e) => setPlayerId(e.target.value)}
           >
             {state.players.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
-                {p.eliminated ? ' · éliminé' : ''}
+                {p.eliminated ? translate(' · éliminé') : ''}
               </option>
             ))}
           </select>
@@ -182,7 +187,7 @@ export function DebugPanel({
       )}
       {tab === 'Joueurs' && (
         <section>
-          <h3>Argent et contrôle</h3>
+          <h3>{translate('Argent et contrôle')}</h3>
           <form
             key={`${player.id}:${state.seq}`}
             onSubmit={(e) => {
@@ -198,7 +203,7 @@ export function DebugPanel({
           >
             <div className="debug-grid">
               <label>
-                Solde
+                {translate('Solde')}
                 <input
                   name="cash"
                   type="number"
@@ -210,7 +215,7 @@ export function DebugPanel({
                 />
               </label>
               <label>
-                Tours de plateau terminés
+                {translate('Tours de plateau terminés')}
                 <input
                   name="laps"
                   type="number"
@@ -221,10 +226,11 @@ export function DebugPanel({
                 />
               </label>
               <label className="debug-check">
-                <input name="bot" type="checkbox" defaultChecked={player.bot} /> Piloté par un bot
+                <input name="bot" type="checkbox" defaultChecked={player.bot} />
+                {translate(' Piloté par un bot')}
               </label>
             </div>
-            <button className="primary">Appliquer au joueur</button>
+            <button className="primary">{translate('Appliquer au joueur')}</button>
           </form>
           <div className="debug-actions">
             {[-100, 100, 1000].map((amount) => (
@@ -243,7 +249,7 @@ export function DebugPanel({
                 }
               >
                 {amount > 0 ? '+' : ''}
-                {money(amount, true)}
+                {translate(money(amount, true))}
               </button>
             ))}
           </div>
@@ -251,11 +257,13 @@ export function DebugPanel({
             className="secondary"
             onClick={() => command({ type: 'turn', playerId: player.id })}
           >
-            Reprendre le tour avec {player.name}
+            {translate('Reprendre le tour avec ')}
+            {player.name}
           </button>
           <p className="debug-hint">
-            Remet ce joueur en jeu, libère l’île et annule la décision en cours. Les mises d’un duel
-            interrompu sont remboursées.
+            {translate(
+              'Remet ce joueur en jeu, libère l’île et annule la décision en cours. Les mises d’un duel interrompu sont remboursées.',
+            )}
           </p>
           <form
             key={`clock:${state.seq}`}
@@ -268,10 +276,10 @@ export function DebugPanel({
               });
             }}
           >
-            <h3>Horloge</h3>
+            <h3>{translate('Horloge')}</h3>
             <div className="debug-grid">
               <label>
-                Minutes écoulées
+                {translate('Minutes écoulées')}
                 <input
                   name="elapsed"
                   type="number"
@@ -282,7 +290,7 @@ export function DebugPanel({
                 />
               </label>
               <label>
-                Durée totale en minutes
+                {translate('Durée totale en minutes')}
                 <input
                   name="duration"
                   type="number"
@@ -293,23 +301,23 @@ export function DebugPanel({
                 />
               </label>
             </div>
-            <button className="secondary">Appliquer l’horloge</button>
+            <button className="secondary">{translate('Appliquer l’horloge')}</button>
           </form>
         </section>
       )}
       {tab === 'Cases et dés' && (
         <section>
-          <h3>Se déplacer ou modifier une propriété</h3>
+          <h3>{translate('Se déplacer ou modifier une propriété')}</h3>
           <label>
-            Case
+            {translate('Case')}
             <select
-              aria-label="Case"
+              aria-label={translate('Case')}
               value={tileId}
               onChange={(e) => setTileId(Number(e.target.value))}
             >
               {state.config.board.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.id} · {t.name}
+                  {t.id} · {translate(t.name)}
                 </option>
               ))}
             </select>
@@ -321,7 +329,7 @@ export function DebugPanel({
                 command({ type: 'move', playerId: player.id, tile: tileId, resolve: false })
               }
             >
-              Déplacer sans effet
+              {translate('Déplacer sans effet')}
             </button>
             <button
               className="primary"
@@ -329,12 +337,13 @@ export function DebugPanel({
                 command({ type: 'move', playerId: player.id, tile: tileId, resolve: true })
               }
             >
-              Aller et déclencher la case
+              {translate('Aller et déclencher la case')}
             </button>
           </div>
           <p className="debug-hint">
-            Le joueur choisi prend la main. Le déplacement direct ne donne pas de prime de départ ;
-            utilisez les dés pour tester un passage par Départ.
+            {translate(
+              'Le joueur choisi prend la main. Le déplacement direct ne donne pas de prime de départ ; utilisez les dés pour tester un passage par Départ.',
+            )}
           </p>
           {property && (
             <form
@@ -352,13 +361,13 @@ export function DebugPanel({
             >
               <div className="debug-grid">
                 <label>
-                  Propriétaire
+                  {translate('Propriétaire')}
                   <select
-                    aria-label="Propriétaire"
+                    aria-label={translate('Propriétaire')}
                     name="owner"
                     defaultValue={property.ownerId ?? ''}
                   >
-                    <option value="">Banque · libre</option>
+                    <option value="">{translate('Banque · libre')}</option>
                     {state.players
                       .filter((p) => !p.eliminated)
                       .map((p) => (
@@ -370,12 +379,16 @@ export function DebugPanel({
                 </label>
                 {tile.type === 'city' && (
                   <label>
-                    Bâtiments
-                    <select aria-label="Bâtiments" name="level" defaultValue={property.level}>
+                    {translate('Bâtiments')}
+                    <select
+                      aria-label={translate('Bâtiments')}
+                      name="level"
+                      defaultValue={property.level}
+                    >
                       {['Terrain', '1 maison', '2 maisons', '3 maisons', 'Hôtel'].map(
                         (label, index) => (
                           <option key={index} value={index}>
-                            {label}
+                            {translate(label)}
                           </option>
                         ),
                       )}
@@ -388,10 +401,10 @@ export function DebugPanel({
                     type="checkbox"
                     defaultChecked={!!property.championships}
                   />{' '}
-                  Festival sur cette propriété
+                  {translate('Festival sur cette propriété')}
                 </label>
               </div>
-              <button className="secondary">Appliquer la propriété</button>
+              <button className="secondary">{translate('Appliquer la propriété')}</button>
             </form>
           )}
           <form
@@ -403,16 +416,18 @@ export function DebugPanel({
               });
             }}
           >
-            <h3>Forcer le prochain lancer</h3>
+            <h3>{translate('Forcer le prochain lancer')}</h3>
             <p className="debug-hint">
-              Joueur actif : {state.players[state.currentPlayer]!.name}. Le moteur applique les
-              doubles, déplacements et effets habituels.
+              {translate('Joueur actif : ')}
+              {state.players[state.currentPlayer]!.name}
+              {translate('. Le moteur applique les doubles, déplacements et effets habituels.')}
             </p>
             <div className="debug-grid">
               {[1, 2].map((n) => (
                 <label key={n}>
-                  Dé {n}
-                  <select aria-label={`Dé ${n}`} name={`die${n}`} defaultValue={1}>
+                  {translate('Dé ')}
+                  {n}
+                  <select aria-label={formatText('Dé {0}', n)} name={`die${n}`} defaultValue={1}>
                     {[1, 2, 3, 4, 5, 6].map((value) => (
                       <option key={value}>{value}</option>
                     ))}
@@ -420,7 +435,7 @@ export function DebugPanel({
                 </label>
               ))}
             </div>
-            <button className="primary">Lancer ces dés</button>
+            <button className="primary">{translate('Lancer ces dés')}</button>
           </form>
           <form
             onSubmit={(e) => {
@@ -428,28 +443,29 @@ export function DebugPanel({
               command({ type: 'card', cardId: String(data.get('card')) });
             }}
           >
-            <h3>Préparer une carte Chance</h3>
+            <h3>{translate('Préparer une carte Chance')}</h3>
             <label>
-              Prochaine carte
-              <select aria-label="Prochaine carte" name="card">
+              {translate('Prochaine carte')}
+              <select aria-label={translate('Prochaine carte')} name="card">
                 {state.config.cards.map((card) => (
                   <option key={card.id} value={card.id}>
-                    {card.title}
+                    {translate(card.title)}
                   </option>
                 ))}
               </select>
             </label>
-            <button className="secondary">Préparer cette carte</button>
+            <button className="secondary">{translate('Préparer cette carte')}</button>
             <p className="debug-hint">
-              La carte est reprise à son détenteur si nécessaire. Déclenchez ensuite une case
-              Chance.
+              {translate(
+                'La carte est reprise à son détenteur si nécessaire. Déclenchez ensuite une case Chance.',
+              )}
             </p>
           </form>
         </section>
       )}
       {tab === 'Règles' && (
         <section>
-          <h3>Règles de cette partie de test</h3>
+          <h3>{translate('Règles de cette partie de test')}</h3>
           <form
             key={`rules:${state.seq}`}
             onSubmit={(e) => {
@@ -467,7 +483,7 @@ export function DebugPanel({
                 .filter(([key]) => state.config[key] !== undefined)
                 .map(([key, label]) => (
                   <label key={key}>
-                    {label}
+                    {translate(label)}
                     <input
                       type="number"
                       name={key}
@@ -482,18 +498,18 @@ export function DebugPanel({
               {switches.map(([key, label]) => (
                 <label key={key}>
                   <input type="checkbox" name={key} defaultChecked={state.config[key] ?? false} />{' '}
-                  {label}
+                  {translate(label)}
                 </label>
               ))}
             </div>
-            <button className="primary">Appliquer les règles</button>
+            <button className="primary">{translate('Appliquer les règles')}</button>
           </form>
           <details>
-            <summary>Éditeur complet des règles · JSON</summary>
+            <summary>{translate('Éditeur complet des règles · JSON')}</summary>
             <p>
-              Modifiez aussi les prix, loyers et coûts de construction dans « board », les loyers
-              des îles dans « resortRents » et les montants des cartes. Conservez la structure du
-              plateau et les types de cartes.
+              {translate(
+                'Modifiez aussi les prix, loyers et coûts de construction dans « board », les loyers des îles dans « resortRents » et les montants des cartes. Conservez la structure du plateau et les types de cartes.',
+              )}
             </p>
             <form
               key={`raw:${state.seq}`}
@@ -508,33 +524,33 @@ export function DebugPanel({
               }}
             >
               <label>
-                Règles JSON
+                {translate('Règles JSON')}
                 <textarea
-                  aria-label="Règles JSON"
+                  aria-label={translate('Règles JSON')}
                   name="rules"
                   rows={14}
                   defaultValue={JSON.stringify(state.config, null, 2)}
                   spellCheck={false}
                 />
               </label>
-              <button className="secondary">Valider les règles JSON</button>
+              <button className="secondary">{translate('Valider les règles JSON')}</button>
             </form>
           </details>
         </section>
       )}
       {tab === 'Scénario' && (
         <section>
-          <h3>Conserver et reproduire un bug</h3>
+          <h3>{translate('Conserver et reproduire un bug')}</h3>
           <p>
-            Exportez la situation juste avant le bug. Le fichier contient les positions, comptes,
-            propriétés, règles, cartes, graine aléatoire et historique. Vous pouvez le réimporter ou
-            modifier son état JSON.
+            {translate(
+              'Exportez la situation juste avant le bug. Le fichier contient les positions, comptes, propriétés, règles, cartes, graine aléatoire et historique. Vous pouvez le réimporter ou modifier son état JSON.',
+            )}
           </p>
           <button className="primary" onClick={exportScenario}>
-            Exporter le scénario JSON
+            {translate('Exporter le scénario JSON')}
           </button>
           <label>
-            Charger un fichier JSON
+            {translate('Charger un fichier JSON')}
             <input
               type="file"
               accept=".json,application/json"
@@ -556,14 +572,14 @@ export function DebugPanel({
             />
           </label>
           <label>
-            Scénario JSON
+            {translate('Scénario JSON')}
             <textarea
-              aria-label="Scénario JSON"
+              aria-label={translate('Scénario JSON')}
               rows={12}
               value={json}
               onChange={(e) => setJson(e.target.value)}
               spellCheck={false}
-              placeholder="Collez ici un export du mode debug…"
+              placeholder={translate('Collez ici un export du mode debug…')}
             />
           </label>
           <button
@@ -571,13 +587,13 @@ export function DebugPanel({
             disabled={!json.trim()}
             onClick={() => attempt(() => onImport(parseDebug(json)), 'Scénario restauré.')}
           >
-            Importer le scénario
+            {translate('Importer le scénario')}
           </button>
           <details>
-            <summary>Historique récent</summary>
+            <summary>{translate('Historique récent')}</summary>
             <ol>
               {save.history?.slice(0, 30).map((entry, i) => (
-                <li key={i}>{entry}</li>
+                <li key={i}>{translate(entry)}</li>
               ))}
             </ol>
           </details>

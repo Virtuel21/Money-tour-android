@@ -1,3 +1,5 @@
+import { translate } from '../i18n/translate';
+import { LanguagePicker } from '../i18n/LanguagePicker';
 import type { Dispatch, SetStateAction } from 'react';
 import type { AudioPreferences } from '../audio/synth';
 import { MIN_BOARD_ZOOM, MAX_BOARD_ZOOM, normalizeBoardZoom } from '../board/camera';
@@ -27,13 +29,26 @@ export function SettingsPanel({
 }) {
   return (
     <div className="settings-sections">
+      <section
+        className="settings-card settings-language"
+        aria-labelledby="settings-language-title"
+      >
+        <h3 id="settings-language-title">{translate('Langue')}</h3>
+        <LanguagePicker />
+        <p className="settings-hint">
+          {translate(
+            'Votre choix de langue est conservé sur cet appareil. Il s’applique uniquement à votre écran, y compris en ligne.',
+          )}
+        </p>
+      </section>
       <section className="settings-card" aria-labelledby="settings-board-title">
         <h3 id="settings-board-title">
-          <GameIcon name="map" /> Plateau et lisibilité
+          <GameIcon name="map" />
+          {translate(' Plateau et lisibilité')}
         </h3>
         <div className="board-zoom-setting">
           <div className="board-zoom-heading">
-            <label htmlFor="board-zoom">Zoom du plateau</label>
+            <label htmlFor="board-zoom">{translate('Zoom du plateau')}</label>
             <output htmlFor="board-zoom" aria-live="polite">
               {comfort.boardZoom} %
             </output>
@@ -41,7 +56,7 @@ export function SettingsPanel({
           <div className="board-zoom-controls">
             <button
               type="button"
-              aria-label="Réduire le zoom"
+              aria-label={translate('Réduire le zoom')}
               disabled={comfort.boardZoom <= MIN_BOARD_ZOOM}
               onClick={() =>
                 setComfort((old) => ({ ...old, boardZoom: normalizeBoardZoom(old.boardZoom - 5) }))
@@ -56,7 +71,7 @@ export function SettingsPanel({
               max={MAX_BOARD_ZOOM}
               step="5"
               value={comfort.boardZoom}
-              aria-valuetext={`${comfort.boardZoom} %`}
+              aria-valuetext={translate(`${comfort.boardZoom} %`)}
               aria-describedby="board-zoom-help"
               onChange={(e) =>
                 setComfort((old) => ({
@@ -67,7 +82,7 @@ export function SettingsPanel({
             />
             <button
               type="button"
-              aria-label="Augmenter le zoom"
+              aria-label={translate('Augmenter le zoom')}
               disabled={comfort.boardZoom >= MAX_BOARD_ZOOM}
               onClick={() =>
                 setComfort((old) => ({ ...old, boardZoom: normalizeBoardZoom(old.boardZoom + 5) }))
@@ -82,11 +97,12 @@ export function SettingsPanel({
             disabled={comfort.boardZoom === 100}
             onClick={() => setComfort((old) => ({ ...old, boardZoom: 100 }))}
           >
-            Revenir à 100 %
+            {translate('Revenir à 100 %')}
           </button>
           <p id="board-zoom-help" className="settings-hint">
-            Sur mobile, pincez pour zoomer et glissez pour déplacer le plateau. « Vue globale »
-            montre toutes les cases ; « Recentrer mon pion » reprend le suivi.
+            {translate(
+              'Sur mobile, pincez pour zoomer et glissez pour déplacer le plateau. « Vue globale » montre toutes les cases ; « Recentrer mon pion » reprend le suivi.',
+            )}
           </p>
         </div>
         <label className="toggle">
@@ -96,13 +112,15 @@ export function SettingsPanel({
             onChange={(e) => setComfort((old) => ({ ...old, largeText: e.target.checked }))}
           />
           <span>
-            Textes agrandis<small>Plus de confort dans les menus et les informations du jeu.</small>
+            {translate('Textes agrandis')}
+            <small>{translate('Plus de confort dans les menus et les informations du jeu.')}</small>
           </span>
         </label>
       </section>
       <section className="settings-card" aria-labelledby="settings-sound-title">
         <h3 id="settings-sound-title">
-          <GameIcon name="music" /> Son
+          <GameIcon name="music" />
+          {translate(' Son')}
         </h3>
         <label className="toggle">
           <input
@@ -110,7 +128,7 @@ export function SettingsPanel({
             checked={audio.effects}
             onChange={(e) => setAudio((old) => ({ ...old, effects: e.target.checked }))}
           />
-          <span>Effets sonores</span>
+          <span>{translate('Effets sonores')}</span>
         </label>
         <label className="toggle">
           <input
@@ -118,31 +136,33 @@ export function SettingsPanel({
             checked={audio.music}
             onChange={(e) => setAudio((old) => ({ ...old, music: e.target.checked }))}
           />
-          <span>Musique de l’archipel</span>
+          <span>{translate('Musique de l’archipel')}</span>
         </label>
         <label className="field">
-          Volume <output>{Math.round(audio.volume * 100)} %</output>
+          {translate('Volume ')}
+          <output>{Math.round(audio.volume * 100)} %</output>
           <input
             type="range"
             min="0"
             max="1"
             step="0.05"
             value={audio.volume}
-            aria-label="Volume sonore"
-            aria-valuetext={`${Math.round(audio.volume * 100)} %`}
+            aria-label={translate('Volume sonore')}
+            aria-valuetext={translate(`${Math.round(audio.volume * 100)} %`)}
             onChange={(e) => setAudio((old) => ({ ...old, volume: Number(e.target.value) }))}
           />
         </label>
         <button className="secondary" onClick={onPreview}>
-          Écouter un aperçu
+          {translate('Écouter un aperçu')}
         </button>
       </section>
       <section className="settings-card" aria-labelledby="settings-animation-title">
         <h3 id="settings-animation-title">
-          <GameIcon name="speed" /> Animations et rythme
+          <GameIcon name="speed" />
+          {translate(' Animations et rythme')}
         </h3>
         <label className="field">
-          Rythme des animations
+          {translate('Rythme des animations')}
           <select
             value={sharedPace ?? comfort.pace}
             disabled={sharedPace !== undefined}
@@ -150,35 +170,38 @@ export function SettingsPanel({
               setComfort((old) => ({ ...old, pace: e.target.value === 'fast' ? 'fast' : 'normal' }))
             }
           >
-            <option value="normal">Normal · prendre le temps de voir</option>
-            <option value="fast">Rapide · aller à l’essentiel</option>
+            <option value="normal">{translate('Normal · prendre le temps de voir')}</option>
+            <option value="fast">{translate('Rapide · aller à l’essentiel')}</option>
           </select>
         </label>
         <p className="settings-hint">
           {sharedPace !== undefined
-            ? 'En ligne, le rythme est choisi par l’hôte et partagé par tous.'
-            : 'Le mode rapide raccourcit les animations. Le temps pour décider reste identique.'}
+            ? translate('En ligne, le rythme est choisi par l’hôte et partagé par tous.')
+            : translate(
+                'Le mode rapide raccourcit les animations. Le temps pour décider reste identique.',
+              )}
         </p>
         <label className="toggle">
           <input type="checkbox" checked={reduced} onChange={(e) => setReduced(e.target.checked)} />
           <span>
-            Réduire les animations
-            <small>Des transitions plus discrètes, sans changer les règles.</small>
+            {translate('Réduire les animations')}
+            <small>{translate('Des transitions plus discrètes, sans changer les règles.')}</small>
           </span>
         </label>
       </section>
       {onTest && (
         <details className="settings-advanced">
-          <summary>Outils de test</summary>
-          <p>Explorez une copie de la partie sans modifier votre sauvegarde.</p>
+          <summary>{translate('Outils de test')}</summary>
+          <p>{translate('Explorez une copie de la partie sans modifier votre sauvegarde.')}</p>
           <button className="secondary" onClick={onTest}>
-            Tester une copie en mode debug
+            {translate('Tester une copie en mode debug')}
           </button>
         </details>
       )}
       <p className="settings-hint">
-        Vos réglages sont sauvegardés automatiquement sur cet appareil. Revenir à l’accueil met la
-        partie locale en pause.
+        {translate(
+          'Vos réglages sont sauvegardés automatiquement sur cet appareil. Revenir à l’accueil met la partie locale en pause.',
+        )}
       </p>
     </div>
   );

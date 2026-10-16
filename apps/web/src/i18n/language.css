@@ -1,0 +1,72 @@
+.language-picker {
+  display: inline-flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid #a2b6af;
+  border-radius: 12px;
+  background: #fff9ed;
+  max-width: 100%;
+}
+.language-picker button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 8px;
+  color: #173e49;
+  background: transparent;
+  white-space: nowrap;
+}
+.language-picker button[aria-pressed='true'] {
+  background: #173e49;
+  color: #fff9ed;
+}
+.topbar nav .language-picker-compact button {
+  display: block;
+  padding: 8px;
+  min-width: 44px;
+}
+.settings-language p {
+  margin-bottom: 0;
+}
+html[lang='en'] .setup-heading {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+html[lang='en'] .mode-tabs button {
+  white-space: normal;
+}
+html[lang='en'] .setup-options {
+  display: grid;
+  grid-template-columns: minmax(114px, 1fr) minmax(0, 1.4fr);
+}
+html[lang='en'] .modal button,
+html[lang='en'] .settings-card label,
+html[lang='en'] .tutorial-header button {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 560px) {
+  .app > .topbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    height: auto;
+    min-height: 104px;
+    padding-block: 12px;
+  }
+  .app > .topbar nav {
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    gap: 4px;
+  }
+  .app > .topbar nav > button {
+    padding-inline: 4px;
+  }
+}
+@media (max-width: 380px) {
+  html[lang='en'] .setup-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

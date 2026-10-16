@@ -1,3 +1,4 @@
+import { translate, formatText } from '../i18n/translate';
 import { useId, useState } from 'react';
 import { getPropertyValue, type GameState } from '@money-tour/engine';
 import { ActionClock } from './ActionClock';
@@ -29,7 +30,9 @@ export function MobileTiles({
       .toLocaleLowerCase('fr');
   const query = normalize(search.trim());
   const tiles = available.filter((tile) =>
-    normalize(`${tile.name} ${collectionLabel(tile)}`).includes(query),
+    normalize(
+      `${tile.name} ${translate(tile.name)} ${collectionLabel(tile)} ${translate(collectionLabel(tile))}`,
+    ).includes(query),
   );
   const selling = state.phase === 'debt';
   const size = selling ? 4 : 6;
@@ -38,11 +41,11 @@ export function MobileTiles({
   return (
     <>
       <label className="field tile-search">
-        Rechercher une escale
+        {translate('Rechercher une escale')}
         <input
           type="search"
           value={search}
-          placeholder="Ville, île ou rue…"
+          placeholder={translate('Ville, île ou rue…')}
           autoComplete="off"
           aria-controls={listId}
           onChange={(event) => {
@@ -52,28 +55,43 @@ export function MobileTiles({
         />
       </label>
       <p className="tile-results" role="status">
-        {tiles.length} escale{tiles.length > 1 ? 's' : ''}
-        {search && ` pour « ${search} »`}
+        {tiles.length}
+        {translate(' escale')}
+        {tiles.length > 1 ? translate('s') : ''}
+        {translate(search && ` pour « ${search} »`)}
       </p>
-      {choices.length > 0 && !selling && <p>Choisissez une des cases disponibles.</p>}
-      {!tiles.length && <p>Aucune escale trouvée. Essayez un autre nom ou effacez la recherche.</p>}
+      {choices.length > 0 && !selling && (
+        <p>{translate('Choisissez une des cases disponibles.')}</p>
+      )}
+      {!tiles.length && (
+        <p>{translate('Aucune escale trouvée. Essayez un autre nom ou effacez la recherche.')}</p>
+      )}
       <div id={listId} className="tile-list mobile-tile-list">
         {tiles.slice(index * size, index * size + size).map((t) => (
           <button key={t.id} onClick={() => onTile(t.id)}>
             <i style={{ background: t.color ?? '#e6b94a' }} />
-            {tileTitle(t)}
+            {translate(tileTitle(t))}
             {(t.type === 'city' || t.type === 'resort') && (
-              <span className="tile-collection-label">{collectionLabel(t)}</span>
+              <span className="tile-collection-label">{translate(collectionLabel(t))}</span>
             )}
             <small>
               {selling
-                ? 'Vendre · ' +
-                  money(Math.floor(getPropertyValue(state, t.id) * state.config.resaleRate), true)
+                ? translate(
+                    translate('Vendre · ') +
+                      translate(
+                        money(
+                          Math.floor(getPropertyValue(state, t.id) * state.config.resaleRate),
+                          true,
+                        ),
+                      ),
+                  )
                 : state.phase === 'travel' && choices.length > 0
-                  ? 'Voyage · ' + money(state.config.travelFee, true)
+                  ? translate(
+                      translate('Voyage · ') + translate(money(state.config.travelFee, true)),
+                    )
                   : t.price
-                    ? money(t.price, true)
-                    : 'Escale spéciale'}
+                    ? translate(money(t.price, true))
+                    : translate('Escale spéciale')}
             </small>
             {selling && <ActionClock />}
           </button>
@@ -83,23 +101,24 @@ export function MobileTiles({
         <div className="pocket-pages">
           <button
             disabled={!index}
-            aria-label="Cases précédentes"
+            aria-label={translate('Cases précédentes')}
             aria-controls={listId}
             onClick={() => setPage(index - 1)}
           >
             <GameIcon name="arrowLeft" />
-            Précédent
+            {translate('Précédent')}
           </button>
-          <span role="status" aria-label={`Page ${index + 1} sur ${pages}`}>
+          <span role="status" aria-label={formatText('Page {0} sur {1}', index + 1, pages)}>
             {index + 1} / {pages}
           </span>
           <button
             disabled={index === pages - 1}
-            aria-label="Cases suivantes"
+            aria-label={translate('Cases suivantes')}
             aria-controls={listId}
             onClick={() => setPage(index + 1)}
           >
-            Suivant <GameIcon name="arrowRight" />
+            {translate('Suivant ')}
+            <GameIcon name="arrowRight" />
           </button>
         </div>
       )}

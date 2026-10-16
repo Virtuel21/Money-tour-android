@@ -1,3 +1,4 @@
+import { translate, formatText } from '../i18n/translate';
 import { useAuctionReveal } from './useAuctionReveal';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import {
@@ -40,7 +41,7 @@ export default function GuidedTutorial({ onClose }: { onClose: () => void }) {
     <dialog
       className="guided-tutorial"
       ref={dialog}
-      aria-label="Partie guidée"
+      aria-label={translate('Partie guidée')}
       onCancel={(e) => {
         e.preventDefault();
         onClose();
@@ -48,7 +49,8 @@ export default function GuidedTutorial({ onClose }: { onClose: () => void }) {
     >
       <header className="tutorial-header">
         <strong>
-          MONEY TOUR <span>· PARTIE GUIDÉE</span>
+          {translate('MONEY TOUR ')}
+          <span>{translate('· PARTIE GUIDÉE')}</span>
         </strong>
         <button
           aria-pressed={!quick}
@@ -57,23 +59,23 @@ export default function GuidedTutorial({ onClose }: { onClose: () => void }) {
             setIndex(0);
           }}
         >
-          {quick ? 'Toutes les leçons (27)' : 'Découverte en 5 actions'}
+          {quick ? translate('Toutes les leçons (27)') : translate('Découverte en 5 actions')}
         </button>
         <label>
-          Escales{' '}
+          {translate('Escales')}{' '}
           <select
-            aria-label="Choisir une leçon"
+            aria-label={translate('Choisir une leçon')}
             value={index}
             onChange={(e) => setIndex(Number(e.target.value))}
           >
             {course.map((lesson, i) => (
               <option value={i} key={lesson.id}>
-                {i + 1}. {lesson.title}
+                {i + 1}. {translate(lesson.title)}
               </option>
             ))}
           </select>
         </label>
-        <button onClick={onClose}>Quitter le tutoriel</button>
+        <button onClick={onClose}>{translate('Quitter le tutoriel')}</button>
       </header>
       <Lesson
         key={`${quick}:${index}:${attempt}`}
@@ -103,6 +105,7 @@ function Lesson({
   const lesson = course[index]!;
   const [state, setState] = useState(() => {
     const scene = tutorialScene(lesson.id);
+    scene.players[0]!.name = translate('Vous');
     if (scene.auction) scene.auction.id += '-' + crypto.randomUUID();
     if (scene.duel) scene.duel.id += '-' + crypto.randomUUID();
     return scene;
@@ -235,10 +238,13 @@ function Lesson({
           >
             <span>
               {player.name}
-              {lesson.id === 'teams' ? ` · Équipe ${(i % 2) + 1}` : ''}
+              {lesson.id === 'teams' ? formatText(' · Équipe {0}', (i % 2) + 1) : ''}
             </span>
-            <strong>{money(player.cash, true)}</strong>
-            <small>Patrimoine {money(getNetWorth(shown, player.id), true)}</small>
+            <strong>{translate(money(player.cash, true))}</strong>
+            <small>
+              {translate('Patrimoine ')}
+              {translate(money(getNetWorth(shown, player.id), true))}
+            </small>
           </button>
         ))}
       </div>
@@ -246,9 +252,9 @@ function Lesson({
         <section
           className={'tutorial-board' + spot('board')}
           inert={lesson.target !== 'board' && !showResult}
-          aria-label="Plateau d’entraînement"
+          aria-label={translate('Plateau d’entraînement')}
         >
-          <Suspense fallback={<p>Chargement du plateau…</p>}>
+          <Suspense fallback={<p>{translate('Chargement du plateau…')}</p>}>
             <Board
               state={shown}
               cue={cinema.frame.cue}
@@ -263,10 +269,14 @@ function Lesson({
             />
           </Suspense>
           {lesson.target === 'board' && !done && (
-            <div className="tutorial-destinations" role="group" aria-label="Cases disponibles">
+            <div
+              className="tutorial-destinations"
+              role="group"
+              aria-label={translate('Cases disponibles')}
+            >
               {targetActions.map((a) => (
                 <button key={a.tile} disabled={cinema.busy} onClick={() => act(a)}>
-                  {state.config.board[a.tile]!.name}
+                  {translate(state.config.board[a.tile]!.name)}
                 </button>
               ))}
             </div>
@@ -275,26 +285,33 @@ function Lesson({
         <section
           className={'tutorial-action' + spot('action')}
           inert={lesson.target !== 'action'}
-          aria-label="Commandes d’entraînement"
+          aria-label={translate('Commandes d’entraînement')}
         >
           <p className="eyebrow">
             {shown.players[shown.currentPlayer]!.name} ·{' '}
-            {cinema.busy ? 'EN ACTION' : 'À VOUS DE JOUER'}
+            {cinema.busy ? translate('EN ACTION') : translate('À VOUS DE JOUER')}
           </p>
           {reading ? (
             <div className="chance-reveal">
               <h3>
                 {cinema.frame.cue.kind === 'tax'
-                  ? 'Le trésor public vous attend'
-                  : state.config.cards.find((c) => c.id === cinema.frame.cue.cardId)?.title}
+                  ? translate('Le trésor public vous attend')
+                  : translate(
+                      state.config.cards.find((c) => c.id === cinema.frame.cue.cardId)?.title,
+                    )}
               </h3>
               <p>
                 {cinema.frame.cue.kind === 'tax'
-                  ? `Prélèvement annoncé : ${money(cinema.frame.cue.amount ?? 0, true)}.`
-                  : state.config.cards.find((c) => c.id === cinema.frame.cue.cardId)?.description}
+                  ? formatText(
+                      'Prélèvement annoncé : {0}.',
+                      translate(money(cinema.frame.cue.amount ?? 0, true)),
+                    )
+                  : translate(
+                      state.config.cards.find((c) => c.id === cinema.frame.cue.cardId)?.description,
+                    )}
               </p>
               <button className="primary" onClick={cinema.advance}>
-                J’ai lu · continuer
+                {translate('J’ai lu · continuer')}
               </button>
             </div>
           ) : !done && !cinema.busy && ['buy', 'resorts', 'fraud', 'build'].includes(lesson.id) ? (
@@ -322,7 +339,7 @@ function Lesson({
               disabled={!action || cinema.busy}
               onClick={() => action && act(action)}
             >
-              {primary[1]}
+              {translate(primary[1])}
             </button>
           ) : null}
           {lesson.id === 'carnet' && (
@@ -342,7 +359,7 @@ function Lesson({
                 className="primary"
                 onClick={() => complete('Pensez à relire cette règle au début de chaque partie.')}
               >
-                J’ai lu la règle spéciale
+                {translate('J’ai lu la règle spéciale')}
               </button>
             </>
           )}
@@ -355,7 +372,7 @@ function Lesson({
                   complete('Le plateau entier est visible.');
                 }}
               >
-                Vue globale
+                {translate('Vue globale')}
               </button>
               <button
                 onClick={() => {
@@ -363,54 +380,58 @@ function Lesson({
                   complete('Chaque case est consultable dans cette liste.');
                 }}
               >
-                Explorer les cases
+                {translate('Explorer les cases')}
               </button>
               {exploring && <MobileTiles state={state} choices={[]} onTile={clickTile} />}
             </>
           )}
           {selected !== null && (
             <p>
-              {state.config.board[selected]!.name} ·{' '}
-              {money(state.config.board[selected]!.price ?? 0, true)}
+              {translate(state.config.board[selected]!.name)} ·{' '}
+              {translate(money(state.config.board[selected]!.price ?? 0, true))}
             </p>
           )}
           {done && !reading && (
             <p role="status">
               {cinema.busy
-                ? (cinema.frame.cue.message ?? 'Observez le déplacement et les comptes…')
-                : feedback}
+                ? translate(cinema.frame.cue.message ?? 'Observez le déplacement et les comptes…')
+                : translate(feedback)}
             </p>
           )}
-          {lesson.target !== 'action' && <p>{lesson.task}</p>}
+          {lesson.target !== 'action' && <p>{translate(lesson.task)}</p>}
         </section>
       </div>
-      <section className="tutorial-coach" aria-label="Guide de la partie">
+      <section className="tutorial-coach" aria-label={translate('Guide de la partie')}>
         <div className="tutorial-progress">
           <span style={{ width: `${((index + 1) / course.length) * 100}%` }} />
         </div>
         <small>
-          ESCALE {index + 1} / {course.length} · À VOTRE RYTHME
+          {translate('ESCALE ')}
+          {index + 1} / {course.length}
+          {translate(' · À VOTRE RYTHME')}
         </small>
         <h2 ref={heading} tabIndex={-1}>
-          {lesson.title}
+          {translate(lesson.title)}
         </h2>
-        <p>{lesson.text}</p>
+        <p>{translate(lesson.text)}</p>
         <strong className="tutorial-task">
-          {done && !cinema.busy ? '✓ ' + (feedback || 'Étape terminée') : '☝ ' + lesson.task}
+          {done && !cinema.busy
+            ? translate('✓ ' + translate(feedback || 'Étape terminée'))
+            : translate('☝ ' + translate(lesson.task))}
         </strong>
         <div className="tutorial-navigation">
           <button onClick={onBack} disabled={index === 0}>
-            Précédent
+            {translate('Précédent')}
           </button>
-          {done && !cinema.busy && <button onClick={onReplay}>Rejouer</button>}
+          {done && !cinema.busy && <button onClick={onReplay}>{translate('Rejouer')}</button>}
           <button className="primary" onClick={onNext} disabled={cinema.busy}>
             {cinema.busy
-              ? 'Observez le plateau…'
+              ? translate('Observez le plateau…')
               : index === course.length - 1
-                ? 'Terminer le tutoriel'
+                ? translate('Terminer le tutoriel')
                 : done && !cinema.busy
-                  ? 'Continuer →'
-                  : 'Passer cette étape →'}
+                  ? translate('Continuer →')
+                  : translate('Passer cette étape →')}
           </button>
         </div>
       </section>

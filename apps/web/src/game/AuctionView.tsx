@@ -1,3 +1,4 @@
+import { translate, formatText } from '../i18n/translate';
 import { scaledAmount } from '@money-tour/engine';
 import { useEffect, useState, useId } from 'react';
 import {
@@ -70,33 +71,40 @@ export function AuctionView({
     <div className="auction-view">
       <div className="auction-property" style={{ borderTopColor: tile.color }}>
         <span>⌂</span>
-        <h3>{tile.name}</h3>
+        <h3>{translate(tile.name)}</h3>
         <p>
-          Prix habituel {money(tile.price!, true)} · Loyer {money(tile.rents![0]!, true)}
+          {translate('Prix habituel ')}
+          {translate(money(tile.price!, true))}
+          {translate(' · Loyer ')}
+          {translate(money(tile.rents![0]!, true))}
         </p>
       </div>
       <p>
-        Une seule offre par joueur. Seul le gagnant paie. En cas d’égalité, tirage au sort entre les
-        meilleurs enchérisseurs.
+        {translate(
+          'Une seule offre par joueur. Seul le gagnant paie. En cas d’égalité, tirage au sort entre les meilleurs enchérisseurs.',
+        )}
       </p>
-      <div className="auction-seals" role="group" aria-label="Offres déposées">
+      <div className="auction-seals" role="group" aria-label={translate('Offres déposées')}>
         {a.participants.map((id) => (
           <span key={id}>
             {state.players.find((p) => p.id === id)!.name}{' '}
-            {a.passed.includes(id) ? '—' : a.commitments[id] ? '✉ Scellée' : '…'}
+            {a.passed.includes(id) ? '—' : a.commitments[id] ? translate('✉ Scellée') : '…'}
           </span>
         ))}
       </div>
       {!canPlay ? (
         <div>
-          <p role="status">{actor.name} prépare son enveloppe. Les montants restent cachés.</p>
+          <p role="status">
+            {actor.name}
+            {translate(' prépare son enveloppe. Les montants restent cachés.')}
+          </p>
           {self === actor.id && actor.bot && (
             <button
               className="primary"
               disabled={disabled}
               onClick={() => act({ type: 'set_control', playerId: actor.id, bot: false })}
             >
-              Reprendre mon siège
+              {translate('Reprendre mon siège')}
             </button>
           )}
         </div>
@@ -104,14 +112,18 @@ export function AuctionView({
         <>
           {!self && !opened ? (
             <button className="primary" onClick={() => setOpened(true)}>
-              Je suis {actor.name} · préparer mon offre <ActionClock />
+              {translate('Je suis ')}
+              {actor.name}
+              {translate(' · préparer mon offre ')}
+              <ActionClock />
             </button>
           ) : (
             <>
               <label>
-                Votre offre secrète (maximum {money(actor.cash, true)})
+                {translate('Votre offre secrète (maximum ')}
+                {translate(money(actor.cash, true))})
                 <input
-                  aria-label="Votre offre secrète"
+                  aria-label={translate('Votre offre secrète')}
                   type="number"
                   inputMode="numeric"
                   readOnly={submitted}
@@ -135,11 +147,16 @@ export function AuctionView({
                 {!Number.isSafeInteger(Number(amount)) ||
                 Number(amount) < 1 ||
                 Number(amount) > actor.cash
-                  ? `Saisissez un montant entier entre 1 et ${money(actor.cash, true)}.`
-                  : 'Montant entier, sans décimales.'}
+                  ? formatText(
+                      'Saisissez un montant entier entre 1 et {0}.',
+                      translate(money(actor.cash, true)),
+                    )
+                  : translate('Montant entier, sans décimales.')}
               </p>
               {submitted && (
-                <p role="status">Offre envoyée. Un nouvel envoi conserve le même montant.</p>
+                <p role="status">
+                  {translate('Offre envoyée. Un nouvel envoi conserve le même montant.')}
+                </p>
               )}
               <button
                 className="primary"
@@ -151,7 +168,8 @@ export function AuctionView({
                 }
                 onClick={bid}
               >
-                Envoyer mon offre <ActionClock />
+                {translate('Envoyer mon offre ')}
+                <ActionClock />
               </button>
             </>
           )}
@@ -159,21 +177,25 @@ export function AuctionView({
             disabled={disabled}
             onClick={() => act({ type: 'auction_pass', playerId: actor.id })}
           >
-            Ne pas participer <ActionClock />
+            {translate('Ne pas participer ')}
+            <ActionClock />
           </button>
         </>
       ) : (
         <>
           <p role="status">
-            Toutes les offres sont verrouillées. Dépouillement automatique en cours…
+            {translate('Toutes les offres sont verrouillées. Dépouillement automatique en cours…')}
           </p>
-          {!secret() && <p>Cette enveloppe n’est plus disponible sur cet appareil.</p>}
+          {!secret() && (
+            <p>{translate('Cette enveloppe n’est plus disponible sur cet appareil.')}</p>
+          )}
           {!secret() && (
             <button
               disabled={disabled}
               onClick={() => act({ type: 'auction_pass', playerId: actor.id })}
             >
-              Continuer sans cette offre <ActionClock />
+              {translate('Continuer sans cette offre ')}
+              <ActionClock />
             </button>
           )}
         </>

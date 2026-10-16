@@ -1,3 +1,4 @@
+import { translate } from '../i18n/translate';
 import type { GameState } from '@money-tour/engine';
 import { taunts, tauntAsset, type TauntKind } from './taunts';
 export function TauntMenu({
@@ -20,8 +21,8 @@ export function TauntMenu({
     <div className="taunt-picker">
       <p>
         <b>{player.name}</b>
-        {targetId !== playerId ? ` → ${target?.name}` : ' → tout le monde'} · choisissez votre
-        réaction
+        {targetId !== playerId ? ` → ${target?.name}` : translate(' → tout le monde')}
+        {translate(' · choisissez votre réaction')}
       </p>
       <div className="taunt-options">
         {taunts.map((taunt) => (
@@ -29,17 +30,19 @@ export function TauntMenu({
             key={taunt.id}
             onClick={() => onSend(taunt.id)}
             disabled={cooling}
-            aria-label={taunt.label}
+            aria-label={translate(taunt.label)}
           >
             <img src={tauntAsset(seat, taunt.id)} alt="" width="160" height="160" />
-            <span>{taunt.label}</span>
+            <span>{translate(taunt.label)}</span>
           </button>
         ))}
       </div>
       <p className="taunt-hint" role="status">
         {cooling
-          ? 'Votre personnage reprend son souffle… quelques secondes avant le prochain taunt.'
-          : 'Visible par tous · une réaction toutes les 8 secondes.'}
+          ? translate(
+              'Votre personnage reprend son souffle… quelques secondes avant le prochain taunt.',
+            )
+          : translate('Visible par tous · une réaction toutes les 8 secondes.')}
       </p>
     </div>
   );
