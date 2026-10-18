@@ -272,6 +272,7 @@ export default function App() {
   const [tauntReadyAt, setTauntReadyAt] = useState(0);
   const seenTaunt = useRef('');
   const [createSalon, setCreateSalon] = useState(false);
+  const [setupTurn, setSetupTurn] = useState(false);
   const [online, setOnline] = useState<SessionView | null>(null);
   const [onlineResume, setOnlineResume] = useState(() => loadOnlineResume());
   const [resumeRequest, setResumeRequest] = useState<OnlineResume | undefined>(() => {
@@ -914,12 +915,25 @@ export default function App() {
                   className="secondary local-launch"
                   onClick={() => {
                     setResumeRequest(undefined);
+                    setSetupTurn(false);
                     setCreateSalon(true);
                     setModal('online');
                   }}
                   disabled={!!online || !validMinutes(minutes)}
                 >
                   {translate('Créer un salon en ligne')}
+                </button>
+                <button
+                  className="secondary local-launch"
+                  disabled={!!online || !validMinutes(minutes)}
+                  onClick={() => {
+                    setResumeRequest(undefined);
+                    setCreateSalon(false);
+                    setSetupTurn(true);
+                    setModal('online');
+                  }}
+                >
+                  {translate('Configurer le serveur TURN')}
                 </button>
                 {(online?.state || onlineResume) && (
                   <>
@@ -2514,6 +2528,7 @@ export default function App() {
             <OnlineLobby
               open={modal === 'online'}
               autoCreate={createSalon}
+              setupTurn={setupTurn}
               resume={resumeRequest}
               defaults={{
                 name: names[0]!,
@@ -2523,6 +2538,7 @@ export default function App() {
                 pace: comfort.pace,
               }}
               onClose={() => {
+                setSetupTurn(false);
                 setModal(null);
                 if (online?.state) setScreen('game');
               }}

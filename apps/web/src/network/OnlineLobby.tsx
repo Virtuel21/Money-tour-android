@@ -14,7 +14,15 @@ import {
 import { TrysteroTransport } from './trystero';
 import { invitationCode } from './invitation';
 import { DurationPicker, validMinutes } from '../game/DurationPicker';
-import { loadTurnServers } from './ice';
+import { loadTurnServers, manualTurnServers, probeTurn } from './ice';
+import { TurnPanel } from './TurnPanel';
+import {
+  invitationLink,
+  invitationTurn,
+  rememberTurn,
+  savedTurn,
+  type TurnSettings,
+} from './turnSettings';
 
 export default function OnlineLobby({
   open,
@@ -23,6 +31,7 @@ export default function OnlineLobby({
   onView,
   onLeave,
   autoCreate = false,
+  setupTurn = false,
   resume,
   defaults,
 }: {
@@ -32,6 +41,7 @@ export default function OnlineLobby({
   onView: (view: SessionView) => void;
   onLeave: () => void;
   autoCreate?: boolean;
+  setupTurn?: boolean;
   resume?: OnlineResume;
   defaults?: {
     name: string;
@@ -50,7 +60,22 @@ export default function OnlineLobby({
     resume?.name ?? (defaults?.name && defaults.name !== 'Vous' ? defaults.name : ''),
   );
   const [view, setView] = useState<SessionView | null>(null);
-  const [error, setError] = useState(''),
+  const [initialTurn] = useState(() => {
+    try {
+      return {
+        settings: invitationTurn(location.hash) ?? savedTurn(resume?.code ?? code),
+        error: '',
+      };
+    } catch (error) {
+      return {
+        settings: null,
+        error: error instanceof Error ? error.message : 'Configuration du relais réseau invalide.',
+      };
+    }
+  });
+  const [configurationError, setConfigurationError] = useState(initialTurn.error);
+  const errorElement = useRef<HTMLParagraphElement>(null);
+  const [error, setError] = useState(initialTurn.error),
     [working, setWorking] = useState(false),
     [copied, setCopied] = useState(false);
   const [count, setCount] = useState(defaults?.count ?? 4),
@@ -59,6 +84,14 @@ export default function OnlineLobby({
   const [turnUrl, setTurnUrl] = useState(''),
     [turnUser, setTurnUser] = useState(''),
     [turnPassword, setTurnPassword] = useState('');
+  const [requiredTurn, setRequiredTurn] = useState(initialTurn.settings?.manual ?? false);
+  const [relayOnly, setRelayOnly] = useState(initialTurn.settings?.relayOnly ?? setupTurn);
+  const [networkSettings, setNetworkSettings] = useState<TurnSettings>({
+    relayOnly: false,
+    manual: false,
+  });
+  const [testing, setTesting] = useState(false);
+  const [testStatus, setTestStatus] = useState('');
   const [pace, setPace] = useState<'normal' | 'fast'>(defaults?.pace ?? 'normal');
   const session = useRef<Session | null>(null),
     dialog = useRef<HTMLDialogElement>(null);
@@ -92,8 +125,113 @@ export default function OnlineLobby({
       void connect(!resume);
     }
   }, [autoCreate, resume]);
+  useEffect(() => {
+    if (error && !view) errorElement.current?.focus();
+  }, [error, view]);
+  function selectedTurn(): TurnSettings {
+    if (configurationError) throw new Error(configurationError);
+    const configured = !!turnUrl.trim() || !!turnUser || !!turnPassword;
+    if (!configured && (relayOnly || setupTurn || requiredTurn))
+      throw new Error('Configurez un serveur TURN avant d’activer le relais obligatoire.');
+    return {
+      relayOnly,
+      manual: configured,
+    };
+  }
+  async function resolveTurn(settings: TurnSettings, controller: AbortController) {
+    if (settings.manual) return manualTurnServers(turnUrl, turnUser, turnPassword);
+    const endpoint = import.meta.env.VITE_TURN_CREDENTIALS_URL;
+    if (!endpoint) return [];
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    try {
+      return await loadTurnServers(endpoint, controller.signal);
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  async function testTurn() {
+    if (testing || connecting.current) return;
+    abort.current?.abort();
+    const controller = new AbortController();
+    abort.current = controller;
+    setTesting(true);
+    setTestStatus('');
+    setError('');
+    try {
+      const servers = await resolveTurn(selectedTurn(), controller);
+      if (!servers.length) throw new Error('Renseignez les paramètres de votre serveur TURN.');
+      await probeTurn(servers, controller.signal);
+      setTestStatus(
+        'Relais TURN joignable. Allocation réussie ; la connexion entre joueurs sera établie dans le salon.',
+      );
+    } catch (error) {
+      setError(
+        controller.signal.aborted
+          ? 'Le relais met trop de temps à répondre. Réessayez.'
+          : error instanceof Error
+            ? error.message
+            : 'Connexion impossible.',
+      );
+    } finally {
+      setTesting(false);
+    }
+  }
+  function changeTurn(update: () => void) {
+    setConfigurationError('');
+    setTestStatus('');
+    setError('');
+    update();
+  }
+  function changeCode(value: string) {
+    setCode(value);
+    try {
+      const enteredRoom = invitationCode(value);
+      const settings = invitationTurn(value) ?? (enteredRoom ? savedTurn(enteredRoom) : null);
+      if (settings) {
+        setRequiredTurn(settings.manual);
+        setRelayOnly(settings.relayOnly);
+      }
+      setError('');
+      setConfigurationError('');
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Configuration du relais réseau invalide.';
+      setConfigurationError(message);
+      setError(message);
+    }
+  }
+  const link = invitationLink(location.href, code, networkSettings);
+  const turnPanel = (
+    <TurnPanel
+      open={setupTurn || requiredTurn}
+      url={turnUrl}
+      onUrl={(value) =>
+        changeTurn(() => {
+          setTurnUrl(value);
+        })
+      }
+      username={turnUser}
+      onUsername={(value) =>
+        changeTurn(() => {
+          setTurnUser(value);
+        })
+      }
+      password={turnPassword}
+      onPassword={(value) =>
+        changeTurn(() => {
+          setTurnPassword(value);
+        })
+      }
+      relayOnly={relayOnly}
+      onRelayOnly={(value) => changeTurn(() => setRelayOnly(value))}
+      disabled={working}
+      testing={testing}
+      status={testStatus}
+      onTest={() => void testTurn()}
+    />
+  );
   async function connect(create: boolean) {
-    if (connecting.current) return;
+    if (connecting.current || testing) return;
     connecting.current = true;
     const request = ++attempt.current;
     abort.current?.abort();
@@ -115,28 +253,12 @@ export default function OnlineLobby({
       let user: Identity | undefined = loadOnlineIdentity(roomCode);
       user ??= await identity();
       const saved = loadOnlineSession(roomCode);
-      let servers: RTCIceServer[] = [];
-      if (turnUrl.trim()) {
-        const urls = turnUrl
-          .split(',')
-          .map((url) => url.trim())
-          .filter(Boolean);
-        if (urls.some((url) => !/^turns?:[^\s]+$/i.test(url)))
-          throw new Error('Utilisez une adresse turn: ou turns: pour le relais.');
-        servers = [{ urls, username: turnUser, credential: turnPassword }];
-      } else if (import.meta.env.VITE_TURN_CREDENTIALS_URL) {
-        const timeout = setTimeout(() => controller.abort(), 10000);
-        try {
-          servers = await loadTurnServers(
-            import.meta.env.VITE_TURN_CREDENTIALS_URL,
-            controller.signal,
-          );
-        } finally {
-          clearTimeout(timeout);
-        }
-      }
+      const settings = selectedTurn();
+      const servers = await resolveTurn(settings, controller);
       if (request !== attempt.current) return;
-      const transport = new TrysteroTransport(servers);
+      const transport = new TrysteroTransport(servers, settings.relayOnly);
+      setNetworkSettings(settings);
+      rememberTurn(settings, roomCode);
       const chosenName = name.trim().slice(0, 20);
       const publicName =
         !chosenName || ['vous', 'voyageur'].includes(chosenName.toLowerCase())
@@ -161,11 +283,7 @@ export default function OnlineLobby({
       };
       session.current = next;
       setCode(roomCode);
-      history.replaceState(
-        history.state,
-        '',
-        `${location.pathname}${location.search}#room=${roomCode}`,
-      );
+      history.replaceState(history.state, '', invitationLink(location.href, roomCode, settings));
       await next.join(roomCode, saved);
       if (request !== attempt.current) {
         next.close();
@@ -216,7 +334,7 @@ export default function OnlineLobby({
   }
   async function copy() {
     try {
-      await navigator.clipboard.writeText(`${location.origin}${location.pathname}#room=${code}`);
+      await navigator.clipboard.writeText(link);
       setCopied(true);
     } catch {
       setError('Copiez le lien affiché ci-dessous.');
@@ -234,7 +352,9 @@ export default function OnlineLobby({
       }}
     >
       <div className="modal-heading">
-        <h2 id={titleId}>{translate('Le voyage entre amis')}</h2>
+        <h2 id={titleId}>
+          {translate(setupTurn ? 'Configurer le serveur TURN' : 'Le voyage entre amis')}
+        </h2>
         <button className="icon-button" aria-label={translate('Fermer le salon')} onClick={onClose}>
           <GameIcon name="close" />
         </button>
@@ -244,7 +364,7 @@ export default function OnlineLobby({
           <form
             onSubmit={(event) => {
               event.preventDefault();
-              if (name.trim()) void connect(false);
+              if (name.trim()) void connect(setupTurn);
             }}
           >
             <p>
@@ -267,63 +387,47 @@ export default function OnlineLobby({
                 onChange={(e) => setName(e.target.value)}
               />
             </label>
+            {setupTurn && turnPanel}
             {!invited && (
               <>
                 <button
                   type="button"
                   className="primary"
-                  disabled={working || !name.trim()}
+                  disabled={working || testing || !name.trim()}
                   onClick={() => void connect(true)}
                 >
-                  {translate('Créer un salon')}
+                  {working
+                    ? translate('Connexion…')
+                    : translate(setupTurn ? 'Créer le salon avec TURN' : 'Créer un salon')}
                 </button>
-                <div className="divider">{translate('OU REJOINDRE')}</div>
-                <label className="field">
-                  {translate('Code du salon')}
-                  <input
-                    value={code}
-                    onChange={(e) => setCode(e.target.value)}
-                    placeholder={translate('Code de 32 caractères')}
-                    autoComplete="off"
-                    autoCapitalize="none"
-                    spellCheck={false}
-                  />
-                </label>
+                {!setupTurn && (
+                  <>
+                    <div className="divider">{translate('OU REJOINDRE')}</div>
+                    <label className="field">
+                      {translate('Code du salon')}
+                      <input
+                        value={code}
+                        onChange={(e) => changeCode(e.target.value)}
+                        placeholder={translate('Code de 32 caractères')}
+                        autoComplete="off"
+                        autoCapitalize="none"
+                        spellCheck={false}
+                      />
+                    </label>
+                  </>
+                )}
               </>
             )}
-            <button type="submit" className="primary" disabled={working || !name.trim()}>
-              {working ? translate('Connexion…') : translate('Rejoindre le salon')}
-            </button>
-            {(!invited || error) && (
-              <details className="advanced">
-                <summary>{translate('Aide à la connexion · serveur TURN')}</summary>
-                <p>
-                  {translate(
-                    'Facultatif, pour les réseaux qui bloquent la connexion directe. Ces paramètres restent dans cet onglet.',
-                  )}
-                </p>
-                <label className="field">
-                  {translate('Adresse TURN')}
-                  <input
-                    value={turnUrl}
-                    onChange={(e) => setTurnUrl(e.target.value)}
-                    placeholder={translate('turn:serveur:3478')}
-                  />
-                </label>
-                <label className="field">
-                  {translate('Identifiant')}
-                  <input value={turnUser} onChange={(e) => setTurnUser(e.target.value)} />
-                </label>
-                <label className="field">
-                  {translate('Mot de passe TURN')}
-                  <input
-                    type="password"
-                    value={turnPassword}
-                    onChange={(e) => setTurnPassword(e.target.value)}
-                  />
-                </label>
-              </details>
+            {!setupTurn && (
+              <button
+                type="submit"
+                className="primary"
+                disabled={working || testing || !name.trim()}
+              >
+                {working ? translate('Connexion…') : translate('Rejoindre le salon')}
+              </button>
             )}
+            {!setupTurn && (!invited || error || requiredTurn) && turnPanel}
           </form>
         ) : (
           <>
@@ -365,17 +469,29 @@ export default function OnlineLobby({
                   {view.members.length}
                   {translate('/4 VOYAGEURS')}
                 </p>
+                <p className="network-status">
+                  {translate(
+                    networkSettings.relayOnly
+                      ? 'Mode réseau : TURN obligatoire'
+                      : import.meta.env.VITE_TURN_CREDENTIALS_URL || networkSettings.manual
+                        ? 'Mode réseau : direct avec secours TURN'
+                        : 'Mode réseau : connexion directe',
+                  )}
+                </p>
+                {networkSettings.manual && (
+                  <p className="setup-note">
+                    {translate(
+                      'Les invités devront saisir leurs paramètres TURN. Envoyez le lien complet pour conserver le mode réseau.',
+                    )}
+                  </p>
+                )}
                 <div className="invite-code">
                   <small>{translate('CODE D’INVITATION')}</small>
                   <code>{translate(code.match(/.{1,8}/g)?.join(' '))}</code>
                   <button className="secondary" onClick={() => void copy()}>
                     {copied ? translate('Lien copié ✓') : translate('Copier le lien d’invitation')}
                   </button>
-                  <input
-                    aria-label={translate('Lien d’invitation')}
-                    readOnly
-                    value={`${location.origin}${location.pathname}#room=${code}`}
-                  />
+                  <input aria-label={translate('Lien d’invitation')} readOnly value={link} />
                   <button
                     className="secondary"
                     onClick={() => {
@@ -515,7 +631,7 @@ export default function OnlineLobby({
           </>
         )}
         {error && (
-          <p role="alert" className="network-error">
+          <p ref={errorElement} tabIndex={-1} role="alert" className="network-error">
             {translate(error)}
           </p>
         )}

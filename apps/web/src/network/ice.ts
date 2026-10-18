@@ -34,3 +34,66 @@ export async function loadTurnServers(
     throw new Error('Configuration du relais réseau invalide.');
   return servers as RTCIceServer[];
 }
+
+export function manualTurnServers(
+  url: string,
+  username: string,
+  credential: string,
+): RTCIceServer[] {
+  const urls = url
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (!urls.length || urls.length > 10 || urls.some((item) => !/^turns?:[^\s]+$/i.test(item)))
+    throw new Error('Utilisez une adresse turn: ou turns: pour le relais.');
+  if (!username.trim() || !credential)
+    throw new Error('Renseignez l’identifiant et le mot de passe TURN.');
+  return [{ urls, username: username.trim(), credential }];
+}
+
+/** A relay candidate proves a TURN allocation, not a game across mobile networks. */
+export async function probeTurn(iceServers: RTCIceServer[], signal: AbortSignal): Promise<void> {
+  if (signal.aborted) throw new Error('Test annulé.');
+  const peer = new RTCPeerConnection({ iceServers, iceTransportPolicy: 'relay' });
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const finish = (error?: Error) => {
+        clearTimeout(timer);
+        signal.removeEventListener('abort', cancel);
+        peer.onicecandidate = null;
+        peer.onicegatheringstatechange = null;
+        if (error) reject(error);
+        else resolve();
+      };
+      const cancel = () => finish(new Error('Test annulé.'));
+      const timer = setTimeout(
+        () =>
+          finish(
+            new Error(
+              'Aucun relais TURN joignable. Vérifiez les paramètres, les ports et le pare-feu.',
+            ),
+          ),
+        12000,
+      );
+      signal.addEventListener('abort', cancel, { once: true });
+      peer.onicecandidate = ({ candidate }) => {
+        if (candidate?.type === 'relay') finish();
+      };
+      peer.onicegatheringstatechange = () => {
+        if (peer.iceGatheringState === 'complete')
+          finish(
+            new Error(
+              'Aucun relais TURN joignable. Vérifiez les paramètres, les ports et le pare-feu.',
+            ),
+          );
+      };
+      peer.createDataChannel('turn-check');
+      void peer
+        .createOffer()
+        .then((offer) => peer.setLocalDescription(offer))
+        .catch((error) => finish(error));
+    });
+  } finally {
+    peer.close();
+  }
+}

@@ -3580,3 +3580,42 @@ footer a {
   width: 100%;
   margin-top: 10px;
 }
+
+.turn-panel {
+  margin-block: 1rem;
+  overflow-wrap: anywhere;
+}
+.turn-panel fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.turn-panel legend {
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+.turn-panel input,
+.turn-panel select {
+  min-width: 0;
+  max-width: 100%;
+}
+.turn-panel .toggle {
+  align-items: center;
+  gap: 0.6rem;
+  margin-block: 1rem;
+}
+.turn-panel .secondary {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 44px;
+}
+.turn-test-status {
+  min-height: 1.5em;
+}
+
+.turn-panel summary {
+  min-height: 44px;
+  align-content: center;
+}

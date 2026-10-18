@@ -10,8 +10,13 @@ export class TrysteroTransport implements Transport {
   onError: Transport['onError'] = () => {};
   private room: Room | null = null;
   private dispatch: ((message: unknown, peer?: string) => void) | null = null;
-  constructor(private turn: RTCIceServer[] = []) {}
+  constructor(
+    private turn: RTCIceServer[] = [],
+    private relayOnly = false,
+  ) {}
   async join(code: string): Promise<void> {
+    if (this.relayOnly && !this.turn.length)
+      throw new Error('Configurez un serveur TURN avant d’activer le relais obligatoire.');
     const roomId = await hash({ domain: 'money-tour-room-v2', code });
     const password = await hash({ domain: 'money-tour-password-v2', code });
     this.room = joinRoom(
@@ -19,6 +24,7 @@ export class TrysteroTransport implements Transport {
         appId: 'virtuel21-money-tour-v19',
         password,
         ...(this.turn.length ? { turnConfig: this.turn } : {}),
+        ...(this.relayOnly ? { rtcConfig: { iceTransportPolicy: 'relay' as const } } : {}),
       },
       roomId,
       {
