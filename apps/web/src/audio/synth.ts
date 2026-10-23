@@ -34,6 +34,59 @@ const melodies: Record<string, number[]> = {
 };
 /** User-supplied music, CC0 interface samples and original synthesis for remaining effects. */
 export class Soundscape {
+  private closed = false;
+  private pageHidden = false;
+  private readonly onVisibilityChange = () => {
+    if (this.isForeground()) void this.resumeForeground();
+    else this.suspendBackground();
+  };
+  private readonly onPageHide = () => {
+    this.pageHidden = true;
+    this.suspendBackground();
+  };
+  private readonly onPageShow = () => {
+    this.pageHidden = false;
+    void this.resumeForeground();
+  };
+  private readonly onFocus = () => {
+    if (this.isForeground()) void this.resumeForeground();
+  };
+  constructor() {
+    if (typeof document !== 'undefined')
+      document.addEventListener('visibilitychange', this.onVisibilityChange);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('pagehide', this.onPageHide);
+      window.addEventListener('pageshow', this.onPageShow);
+      window.addEventListener('focus', this.onFocus);
+    }
+  }
+  private isForeground(): boolean {
+    return (
+      !this.closed &&
+      !this.pageHidden &&
+      (typeof document === 'undefined' || document.visibilityState !== 'hidden')
+    );
+  }
+  private suspendBackground(): void {
+    this.track?.pause();
+    this.stopEffects();
+    if (this.context?.state === 'running') void this.context.suspend().catch(() => {});
+  }
+  private async resumeForeground(): Promise<void> {
+    if (!this.isForeground() || !this.unlocked || (!this.prefs.effects && !this.prefs.music))
+      return;
+    try {
+      if (this.context?.state === 'suspended') await this.context.resume();
+      // Visibility can change again while the browser is resuming its audio device.
+      if (!this.isForeground()) {
+        this.suspendBackground();
+        return;
+      }
+      this.syncMusic();
+    } catch {
+      /* A fresh user interaction can unlock audio if automatic resumption is blocked. */
+    }
+  }
   private sources = new Set<AudioScheduledSourceNode>();
   stopEffects(): void {
     for (const source of this.sources) {
@@ -64,7 +117,7 @@ export class Soundscape {
   private musicBus: GainNode | null = null;
   private prefs: AudioPreferences = loadAudio();
   async unlock(): Promise<void> {
-    if (!this.prefs.effects && !this.prefs.music) return;
+    if (!this.isForeground() || (!this.prefs.effects && !this.prefs.music)) return;
     try {
       if (!this.context) {
         this.context = new AudioContext();
@@ -88,6 +141,10 @@ export class Soundscape {
         }
       }
       if (this.context.state === 'suspended') await this.context.resume();
+      if (!this.isForeground()) {
+        this.suspendBackground();
+        return;
+      }
       this.unlocked = true;
       this.configure(this.prefs);
     } catch {
@@ -105,6 +162,7 @@ export class Soundscape {
       this.master.gain.setTargetAtTime(prefs.volume, this.context.currentTime, 0.04);
     if (this.musicBus && this.context)
       this.musicBus.gain.setTargetAtTime(prefs.music ? 0.22 : 0, this.context.currentTime, 0.15);
+    if (!prefs.effects) this.stopEffects();
     this.syncMusic();
   }
   setScene(scene: 'menu' | 'game'): void {
@@ -120,12 +178,15 @@ export class Soundscape {
     this.syncMusic();
   }
   private syncMusic(): void {
-    if (!this.unlocked) return;
+    if (!this.unlocked || !this.isForeground() || !this.prefs.music) {
+      this.track?.pause();
+      return;
+    }
     if (!this.track) {
       this.track = new Audio(this.trackUrl());
       this.track.loop = this.scene === 'menu';
       this.track.onended = () => {
-        if (this.scene !== 'game' || !this.track) return;
+        if (!this.isForeground() || this.scene !== 'game' || !this.track) return;
         this.gameTrack = (this.gameTrack + 1) % this.gameTracks.length;
         this.track.src = this.trackUrl();
         this.syncMusic();
@@ -133,8 +194,13 @@ export class Soundscape {
       this.track.preload = 'none';
     }
     this.track.volume = this.prefs.volume * 0.45;
-    if (this.prefs.music) void this.track.play().catch(() => {});
-    else this.track.pause();
+    const track = this.track;
+    void track
+      .play()
+      .then(() => {
+        if (!this.isForeground() || !this.prefs.music || track !== this.track) track.pause();
+      })
+      .catch(() => {});
   }
   private tone(
     frequency: number,
@@ -165,7 +231,14 @@ export class Soundscape {
     };
   }
   effect(type: string): void {
-    if (!this.prefs.effects || !this.context || !this.master) return;
+    if (
+      !this.isForeground() ||
+      !this.prefs.effects ||
+      !this.context ||
+      this.context.state !== 'running' ||
+      !this.master
+    )
+      return;
     const now = this.context.currentTime;
     if (type === 'earthquake') {
       // Layered low-frequency impacts: original procedural rumble, no downloaded asset.
@@ -242,11 +315,22 @@ export class Soundscape {
     if (type) this.effect(type);
   }
   close(): void {
+    this.closed = true;
+    this.unlocked = false;
+    if (typeof document !== 'undefined')
+      document.removeEventListener('visibilitychange', this.onVisibilityChange);
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('pagehide', this.onPageHide);
+      window.removeEventListener('pageshow', this.onPageShow);
+      window.removeEventListener('focus', this.onFocus);
+    }
     this.stopEffects();
     this.track?.pause();
     if (this.track) this.track.onended = null;
     this.track = null;
     void this.context?.close();
     this.context = null;
+    this.master = null;
+    this.musicBus = null;
   }
 }

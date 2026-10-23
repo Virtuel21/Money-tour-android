@@ -264,7 +264,7 @@ export default function OnlineLobby({
     setError('');
     const roomCode = resume?.code ?? (create ? secret().slice(0, 32) : invitationCode(code));
     if (!roomCode) {
-      setError('Le code doit contenir 32 caractères. Copiez le code complet de votre ami.');
+      setError('Collez le lien d’invitation complet envoyé par votre ami.');
       setWorking(false);
       connecting.current = false;
       return;
@@ -306,6 +306,7 @@ export default function OnlineLobby({
       };
       session.current = next;
       setCode(roomCode);
+      setCopied(false);
       history.replaceState(history.state, '', invitationLink(location.href, roomCode, settings));
       await next.join(roomCode, saved);
       if (request !== attempt.current) {
@@ -396,7 +397,7 @@ export default function OnlineLobby({
                     'Vous êtes invité à une partie ! Choisissez votre nom pour rejoindre vos amis.',
                   )
                 : translate(
-                    'Rejoignez vos amis avec leur code ou créez un salon. Jusqu’à quatre voyageurs, chacun sur son écran.',
+                    'Rejoignez vos amis avec leur lien d’invitation ou créez un salon. Jusqu’à quatre voyageurs, chacun sur son écran.',
                   )}
             </p>
             <label className="field">
@@ -427,11 +428,11 @@ export default function OnlineLobby({
                   <>
                     <div className="divider">{translate('OU REJOINDRE')}</div>
                     <label className="field">
-                      {translate('Code du salon')}
+                      {translate('Lien d’invitation')}
                       <input
                         value={code}
                         onChange={(e) => changeCode(e.target.value)}
-                        placeholder={translate('Code de 32 caractères')}
+                        placeholder={translate('Collez le lien envoyé par votre ami')}
                         autoComplete="off"
                         autoCapitalize="none"
                         spellCheck={false}
@@ -509,23 +510,16 @@ export default function OnlineLobby({
                   </p>
                 )}
                 <div className="invite-code">
-                  <small>{translate('CODE D’INVITATION')}</small>
-                  <code>{translate(code.match(/.{1,8}/g)?.join(' '))}</code>
-                  <button className="secondary" onClick={() => void copy()}>
+                  <small>{translate('INVITEZ VOS AMIS')}</small>
+                  <p>
+                    {translate(
+                      'Partagez ce lien avec vos amis. Le salon reste ouvert tant que vous gardez cette fenêtre ouverte.',
+                    )}
+                  </p>
+                  <button className="primary" onClick={() => void copy()}>
                     {copied ? translate('Lien copié ✓') : translate('Copier le lien d’invitation')}
                   </button>
                   <input aria-label={translate('Lien d’invitation')} readOnly value={link} />
-                  <button
-                    className="secondary"
-                    onClick={() => {
-                      void navigator.clipboard
-                        .writeText(code)
-                        .then(() => setCopied(true))
-                        .catch(() => setError('Copiez le code affiché ci-dessus.'));
-                    }}
-                  >
-                    {translate('Copier le code du salon')}
-                  </button>
                 </div>
                 {!view.state && (
                   <form

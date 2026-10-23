@@ -13,7 +13,7 @@
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "three": "^0.186.1",
-    "trystero": "0.25.4",
+    "trystero": "0.26.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {

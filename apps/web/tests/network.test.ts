@@ -89,6 +89,32 @@ async function setup(count = 3, names?: string[]) {
   };
 }
 describe('network sessions', () => {
+  it('still accepts a new guest after the host has waited alone for thirty minutes', async () => {
+    const { network, sessions, flush, advance } = await setup(1);
+    const host = sessions[0]!;
+    for (let minute = 0; minute < 30; minute++) {
+      advance(60000);
+      await host.pulse();
+      await flush();
+    }
+    const guest = new Session(
+      new MemoryTransport('late-guest', network),
+      await identity(),
+      'Invité tardif',
+    );
+    sessions.push(guest);
+    await guest.join('test-code', undefined, false);
+    await flush();
+    expect(host.members.map((member) => member.name)).toEqual(['Joueur 0', 'Invité tardif']);
+    expect(guest.members).toEqual(host.members);
+    expect(guest.host).toBe(host.user.id);
+    await host.start(2, false, 60000);
+    await host.idle();
+    await flush();
+    expect(host.state).not.toBeNull();
+    expect(guest.head).toBe(host.head);
+    sessions.forEach((session) => session.close());
+  });
   it('stores distinct public names even when clients arrive with the old Vous default', async () => {
     const { sessions, flush } = await setup(2, ['Vous', 'Vous']);
     await sessions[0]!.start(2, false, 60000);

@@ -282,5 +282,79 @@ it('asks an invited player only for their name, joins the invitation, and can re
     }),
   );
   expect(element.textContent).toContain('Camille');
-  expect(element.textContent).toContain('CODE D’INVITATION');
+  expect(element.textContent).toContain('INVITEZ VOS AMIS');
+  expect(element.textContent).not.toContain('Copier le code du salon');
+  expect(element.querySelector('.invite-code code')).toBeNull();
+});
+
+it('accepts an invitation link instead of exposing a room code field', async () => {
+  const code = 'e'.repeat(32);
+  history.replaceState(null, '', '/');
+  const element = await mountTurnLobby({ setupTurn: false });
+  expect(element.textContent).not.toContain('Code du salon');
+  const input = element.querySelector<HTMLInputElement>(
+    'input[placeholder="Collez le lien envoyé par votre ami"]',
+  )!;
+  await inputValue(input, `https://example.test/money-tour/#room=${code}`);
+  await act(() =>
+    element
+      .querySelector('form')!
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })),
+  );
+  expect(mocked.joins).toHaveBeenCalledWith(code, 'Camille', false);
+});
+
+it('shares only the complete invitation link and keeps the room alive while its dialog is closed', async () => {
+  const code = 'f'.repeat(32);
+  history.replaceState(null, '', '/');
+  const onSession = vi.fn();
+  const props = {
+    open: true,
+    autoCreate: true,
+    defaults: { name: 'Camille', count: 2, teams: false, minutes: 20 },
+    onClose: vi.fn(),
+    onSession,
+    onView: vi.fn(),
+    onLeave: vi.fn(),
+  };
+  const element = document.body.appendChild(document.createElement('div'));
+  root = createRoot(element);
+  await act(() => root.render(createElement(OnlineLobby, props)));
+  const host = {
+    state: null,
+    members: [{ id: 'guest-id', name: 'Camille', key: {}, order: 0 }],
+    host: 'guest-id',
+    self: 'guest-id',
+    connected: ['guest-id'],
+    busy: false,
+    status: 'Salon prêt : invitez vos amis.',
+    incidents: [],
+    hash: '',
+    epoch: 0,
+    events: [],
+    blocked: false,
+  };
+  await act(() => mocked.instances[0]!.onChange(host));
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: { writeText },
+  });
+  await act(() =>
+    [...element.querySelectorAll('button')]
+      .find((button) => button.textContent === 'Copier le lien d’invitation')!
+      .click(),
+  );
+  expect(writeText).toHaveBeenCalledWith(expect.stringContaining(`#room=${code}`));
+  expect(writeText).not.toHaveBeenCalledWith(code);
+  expect(element.textContent).toContain('Lien copié');
+  expect(element.querySelector('.invite-code code')).toBeNull();
+  await act(() => root.render(createElement(OnlineLobby, { ...props, open: false })));
+  expect(mocked.closes).not.toHaveBeenCalled();
+  expect(mocked.joins).toHaveBeenCalledTimes(1);
+  await act(() => root.render(createElement(OnlineLobby, props)));
+  expect(element.textContent).toContain('INVITEZ VOS AMIS');
+  expect(onSession).toHaveBeenCalledTimes(1);
+  await act(() => root.unmount());
+  expect(mocked.closes).toHaveBeenCalledTimes(1);
 });

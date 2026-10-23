@@ -1172,5 +1172,12 @@
   "Paramètres TURN effacés de cet appareil.": "TURN settings cleared from this device.",
   "Le navigateur ne permet pas d’enregistrer les paramètres TURN. Gardez cet onglet ouvert.": "This browser cannot save TURN settings. Keep this tab open.",
   "Le navigateur ne permet pas d’effacer les paramètres TURN enregistrés.": "This browser cannot clear the saved TURN settings.",
-  "Effacer les paramètres TURN enregistrés": "Clear saved TURN settings"
+  "Effacer les paramètres TURN enregistrés": "Clear saved TURN settings",
+  "Invitez vos amis avec le lien du salon, chacun sur son écran.": "Invite your friends with the room link, each on their own screen.",
+  "Collez le lien d’invitation complet envoyé par votre ami.": "Paste the complete invitation link your friend sent you.",
+  "Rejoignez vos amis avec leur lien d’invitation ou créez un salon. Jusqu’à quatre voyageurs, chacun sur son écran.": "Join your friends with their invitation link or create a room. Up to four travelers, each on their own screen.",
+  "Collez le lien envoyé par votre ami": "Paste the link your friend sent you",
+  "INVITEZ VOS AMIS": "INVITE YOUR FRIENDS",
+  "Partagez ce lien avec vos amis. Le salon reste ouvert tant que vous gardez cette fenêtre ouverte.": "Share this link with your friends. The room stays open while you keep this window open.",
+  "Avis de taxe": "Tax notice"
 }

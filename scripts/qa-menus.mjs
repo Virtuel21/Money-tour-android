@@ -244,6 +244,40 @@ async function keyboard(page, name) {
       assert(visible, `${name}: keyboard focus escaped or was hidden`);
     }
 }
+async function homeModes(page, browser) {
+  const modes = page.getByRole('group', { name: 'Mode de jeu', exact: true });
+  const travellers = page.getByLabel('Voyageurs', { exact: true });
+  const initialCount = await travellers.inputValue();
+  assert.deepEqual(await modes.getByRole('button').allTextContents(), [
+    'Entre amis',
+    '2v2',
+    'Solo & bots',
+  ]);
+  assert.equal(
+    await modes
+      .getByRole('button', { name: 'Entre amis', exact: true })
+      .getAttribute('aria-pressed'),
+    'true',
+    `${browser}: Entre amis must be selected on a fresh home page`,
+  );
+  for (const mode of ['Entre amis', '2v2', 'Solo & bots', 'Entre amis']) {
+    await modes.getByRole('button', { name: mode, exact: true }).click();
+    const actions = page.locator('.setup > button');
+    assert.equal(await actions.first().getAttribute('class'), 'primary launch');
+    assert.match(
+      await actions.nth(0).innerText(),
+      mode === 'Solo & bots' ? /Jouer sur cet appareil/ : /Créer un salon en ligne/,
+      `${browser}/${mode}: wrong primary action`,
+    );
+    assert.equal(await actions.nth(1).getAttribute('class'), 'secondary local-launch');
+    assert.match(
+      await actions.nth(1).innerText(),
+      mode === 'Solo & bots' ? /Créer un salon en ligne/ : /Jouer sur cet appareil/,
+      `${browser}/${mode}: wrong secondary action`,
+    );
+  }
+  await travellers.selectOption(initialCount);
+}
 async function menus(browser, name, width, height, large = false) {
   const context = await browser.newContext({
     viewport: { width, height },
@@ -256,7 +290,8 @@ async function menus(browser, name, width, height, large = false) {
     const audit = width === 390 || large;
     const home = await context.newPage();
     await home.goto(server.url + '/');
-    await home.getByRole('button', { name: /Jouer sur cet appareil/ }).waitFor();
+    await home.getByRole('button', { name: /Créer un salon en ligne/ }).waitFor();
+    await homeModes(home, name);
     if (large) await home.addStyleTag({ content: 'html { font-size: 200% !important; }' });
     await capture(home, name, large ? 'accueil-200' : 'accueil', audit && !large);
     for (const [key, label] of [
@@ -282,9 +317,13 @@ async function menus(browser, name, width, height, large = false) {
           'Salon opens the phone keyboard without an explicit choice',
         );
         await home.getByLabel('Votre nom', { exact: true }).fill('Voyageur test');
-        await home.getByLabel('Code du salon', { exact: true }).fill('12');
+        assert.equal(await home.getByLabel('Code du salon', { exact: true }).count(), 0);
+        await home.getByLabel('Lien d’invitation', { exact: true }).fill('12');
         await home.getByRole('button', { name: 'Rejoindre le salon', exact: true }).click();
-        await home.getByRole('alert').waitFor();
+        await home
+          .getByRole('alert')
+          .filter({ hasText: 'Collez le lien d’invitation complet envoyé par votre ami.' })
+          .waitFor();
         await capture(home, name, 'salon-erreur', audit);
       }
       await close(home, opener);
@@ -382,7 +421,7 @@ async function menus(browser, name, width, height, large = false) {
       width,
       height,
       largeText200: large,
-      test: 'named dialogs, visible close, touch targets, focus return, navigation state, forms and scroll',
+      test: 'home modes and primary actions, invitation link validation, named dialogs, visible close, touch targets, focus return, navigation state, forms and scroll',
       pass: true,
     });
   } finally {

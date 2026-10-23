@@ -21,7 +21,9 @@ export class TrysteroTransport implements Transport {
     const password = await hash({ domain: 'money-tour-password-v2', code });
     this.room = joinRoom(
       {
-        appId: 'virtuel21-money-tour-v19',
+        // Trystero 0.26 fixes expired idle offers and changes its action wire format.
+        // Keep cached clients on the old format out of newly created rooms.
+        appId: 'virtuel21-money-tour-v20',
         password,
         ...(this.turn.length ? { turnConfig: this.turn } : {}),
         ...(this.relayOnly ? { rtcConfig: { iceTransportPolicy: 'relay' as const } } : {}),

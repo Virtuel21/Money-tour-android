@@ -23,7 +23,9 @@
     "qa:board": "node scripts/qa-board.mjs",
     "qa:menus": "node scripts/qa-menus.mjs",
     "qa:language": "node scripts/qa-language.mjs",
-    "qa:turn": "node scripts/qa-turn-form.mjs"
+    "qa:turn": "node scripts/qa-turn-form.mjs",
+    "qa:social": "node scripts/qa-social-cards.mjs",
+    "qa:lobby": "node scripts/qa-lobby-delay.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",

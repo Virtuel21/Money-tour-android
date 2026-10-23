@@ -15,7 +15,11 @@ it('passes TURN and mandatory relay to Trystero without removing its default STU
   const transport = new TrysteroTransport(turn, true);
   await transport.join('a'.repeat(32));
   expect(joinRoom).toHaveBeenLastCalledWith(
-    expect.objectContaining({ turnConfig: turn, rtcConfig: { iceTransportPolicy: 'relay' } }),
+    expect.objectContaining({
+      appId: 'virtuel21-money-tour-v20',
+      turnConfig: turn,
+      rtcConfig: { iceTransportPolicy: 'relay' },
+    }),
     expect.any(String),
     expect.any(Object),
   );

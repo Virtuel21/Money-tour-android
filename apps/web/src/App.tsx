@@ -74,6 +74,7 @@ import {
 import { MoneyFlight, TurnBanner } from './game/GameFeedback';
 import { purchaseOffer, PurchaseDetails } from './game/PurchaseOffer';
 import { DuelView } from './game/DuelView';
+import { DrawnCard } from './game/DrawnCard';
 import { CasinoView } from './game/CasinoView';
 import credits from '../../../CREDITS.md?raw';
 import creditsEnglish from '../../../CREDITS.en.md?raw';
@@ -283,14 +284,14 @@ export default function App() {
   const [buyoutOfferKey, setBuyoutOfferKey] = useState('');
   const [selected, setSelected] = useState<number | null>(null);
   const [count, setCount] = useState(4),
-    [mode, setMode] = useState<'solo' | 'local' | 'teams'>('solo');
+    [mode, setMode] = useState<'solo' | 'local' | 'teams'>('local');
   const [minutes, setMinutes] = useState(20),
     [names, setNames] = useState(() => [translate('Vous'), 'Sacha', 'Lou', 'Noa']);
   const firstNameEdited = useRef(false);
   useEffect(() => {
     if (!firstNameEdited.current) setNames((old) => [translate('Vous'), ...old.slice(1)]);
   }, [language]);
-  const [bots, setBots] = useState([false, true, true, true]);
+  const [bots, setBots] = useState([false, false, false, false]);
   const tutorialPause = useRef(false);
   const [paused, setPaused] = useState(false);
   const [reduced, setReduced] = useState(
@@ -307,6 +308,21 @@ export default function App() {
     paused,
   );
   const rolling = cinema.busy;
+  const presentedFrame = useRef(cinema.frame);
+  presentedFrame.current = cinema.frame;
+  const shownFrame = cinema.frame;
+  const drawnCardKey = [
+    save?.seed ?? journey,
+    shownFrame.state.seq,
+    shownFrame.state.turn,
+    shownFrame.cue.kind,
+    shownFrame.cue.cardId ?? shownFrame.cue.tile,
+    shownFrame.cue.playerId,
+  ].join(':');
+  const dismissDrawnCard = () => {
+    // A late animation callback must never dismiss the next shared presentation.
+    if (presentedFrame.current === shownFrame) cinema.dismiss();
+  };
   const turnKey = (online?.state ?? save?.state)?.turn;
   useEffect(() => {
     setOverview(false);
@@ -479,7 +495,7 @@ export default function App() {
   const chooseMode = (value: 'solo' | 'local' | 'teams') => {
     setMode(value);
     if (value === 'teams') setCount(4);
-    setBots(value === 'local' ? [false, false, false, false] : [false, true, true, true]);
+    setBots(value === 'solo' ? [false, true, true, true] : [false, false, false, false]);
   };
   const actionLabel = (action: GameAction): string => {
     const tile = current.config.board[active.position]!;
@@ -710,9 +726,9 @@ export default function App() {
                 <div className="mode-tabs" role="group" aria-label={translate('Mode de jeu')}>
                   {(
                     [
-                      ['solo', 'Solo & bots'],
                       ['local', 'Entre amis'],
-                      ['teams', 'Équipes 2v2'],
+                      ['teams', '2v2'],
+                      ['solo', 'Solo & bots'],
                     ] as const
                   ).map(([value, label]) => (
                     <button
@@ -775,28 +791,33 @@ export default function App() {
                     </div>
                   ))}
                 </div>
-                <button
-                  className="primary launch"
-                  onClick={() => (save && !save.state.winner ? setModal('new-game') : start())}
-                  disabled={!!online || !validMinutes(minutes)}
-                >
-                  {save && !save.state.winner
-                    ? translate('Nouvelle partie sur cet appareil')
-                    : translate('Jouer sur cet appareil')}{' '}
-                  <span>→</span>
-                </button>
-                <button
-                  className="secondary local-launch"
-                  onClick={() => {
-                    setResumeRequest(undefined);
-                    setSetupTurn(false);
-                    setCreateSalon(true);
-                    setModal('online');
-                  }}
-                  disabled={!!online || !validMinutes(minutes)}
-                >
-                  {translate('Créer un salon en ligne')}
-                </button>
+                {(mode === 'solo' ? ['local', 'online'] : ['online', 'local']).map(
+                  (target, index) => (
+                    <button
+                      key={target}
+                      className={index === 0 ? 'primary launch' : 'secondary local-launch'}
+                      onClick={() => {
+                        if (target === 'local') {
+                          if (save && !save.state.winner) setModal('new-game');
+                          else start();
+                        } else {
+                          setResumeRequest(undefined);
+                          setSetupTurn(false);
+                          setCreateSalon(true);
+                          setModal('online');
+                        }
+                      }}
+                      disabled={!!online || !validMinutes(minutes)}
+                    >
+                      {target === 'online'
+                        ? translate('Créer un salon en ligne')
+                        : save && !save.state.winner
+                          ? translate('Nouvelle partie sur cet appareil')
+                          : translate('Jouer sur cet appareil')}
+                      {index === 0 && <span aria-hidden="true"> →</span>}
+                    </button>
+                  ),
+                )}
                 <button
                   className="secondary local-launch"
                   disabled={!!online || !validMinutes(minutes)}
@@ -857,9 +878,11 @@ export default function App() {
                   </>
                 )}
                 <p className="setup-note">
-                  {mode === 'local'
-                    ? translate('Passez l’écran au joueur suivant.')
-                    : translate('Changez les sièges en bots pour observer une partie.')}{' '}
+                  {mode === 'solo'
+                    ? translate('Changez les sièges en bots pour observer une partie.')
+                    : translate(
+                        'Invitez vos amis avec le lien du salon, chacun sur son écran.',
+                      )}{' '}
                   {translate('Sauvegarde sur cet appareil.')}
                 </p>
               </div>
@@ -2309,76 +2332,69 @@ export default function App() {
           </Modal>
         )}
         {screen === 'game' && !cinema.dismissed && cinema.frame.cue.kind === 'tax' && (
-          <Modal title={translate('Aïe… passage à la caisse !')} onClose={cinema.dismiss}>
-            <div className="tax-reveal">
-              <div className="tax-illustration" aria-hidden="true" />
-              <small>{translate('LES ACTUALITÉS DÉCALÉES DE L’ARCHIPEL')}</small>
-              <h3>
-                {translate(
-                  [
-                    'Le président augmente encore le prix de l’essence. Même votre pion fait le plein !',
-                    'Oups, dissolution de l’assemblée ! L’inflation explose… votre portefeuille demande des vacances.',
-                    'Le président américain augmente les droits de douane. Vos souvenirs passent à la caisse !',
-                  ][(current.turn + (cinema.frame.cue.tile ?? 0)) % 3],
-                )}
-              </h3>
-              <p>
-                {current.players.find((p) => p.id === cinema.frame.cue.playerId)?.name}
-                {translate(' · somme à régler')}
-              </p>
-              <strong className="tax-amount">
-                {translate(money(cinema.frame.cue.amount ?? 0))}
-              </strong>
-              <p>
-                {cinema.frame.cue.reason === 'fraud' ? (
-                  'Contrôle fiscal ! Votre achat à prix réduit entraîne une taxe égale à deux fois le prix normal de la propriété. Le contrôle clôt ce risque.'
-                ) : (
-                  <>
-                    {translate('Taxe : ')}
-                    {translate(money(current.config.taxBase ?? 0, true))} +{' '}
-                    {current.config.taxRate * 100}
-                    {translate(' % de votre patrimoine immobilier.')}
-                  </>
-                )}
-              </p>
-              <button className="primary" onClick={cinema.dismiss}>
-                {translate('Aïe, j’ai compris !')}
-              </button>
-            </div>
-          </Modal>
-        )}
-        {screen === 'game' && !cinema.dismissed && cinema.frame.cue.kind === 'card' && (
-          <Modal
-            title={
+          <DrawnCard
+            cardKey={drawnCardKey}
+            tone="tax"
+            reducedMotion={reduced}
+            ownerLabel={
               translate('Carte de ') +
               (current.players.find((p) => p.id === cinema.frame.cue.playerId)?.name ?? active.name)
             }
-            onClose={cinema.dismiss}
+            title={translate('Avis de taxe')}
+            artwork={import.meta.env.BASE_URL + 'textures/tax-tile-v2.webp'}
+            actionLabel={translate('Aïe, j’ai compris !')}
+            onDismiss={dismissDrawnCard}
           >
-            <div className="chance-reveal">
-              <img
-                src={import.meta.env.BASE_URL + 'textures/chance.webp'}
-                alt={translate('Une enveloppe pleine de surprises')}
-              />
-              <h2>
-                {translate(
-                  festivalText(
-                    current.config.cards.find((c) => c.id === cinema.frame.cue.cardId)?.title,
-                  ),
-                )}
-              </h2>
-              <p>
-                {translate(
-                  propertyRulesText(
-                    current.config.cards.find((c) => c.id === cinema.frame.cue.cardId)?.description,
-                  ),
-                )}
-              </p>
-              <button className="primary" onClick={cinema.dismiss}>
-                {translate('J’ai lu · continuer')}
-              </button>
-            </div>
-          </Modal>
+            <p>
+              {current.players.find((p) => p.id === cinema.frame.cue.playerId)?.name}
+              {translate(' · somme à régler')}
+            </p>
+            <strong className="tax-amount">{translate(money(cinema.frame.cue.amount ?? 0))}</strong>
+            <p className="drawn-card-news">
+              {translate(
+                [
+                  'Le président augmente encore le prix de l’essence. Même votre pion fait le plein !',
+                  'Oups, dissolution de l’assemblée ! L’inflation explose… votre portefeuille demande des vacances.',
+                  'Le président américain augmente les droits de douane. Vos souvenirs passent à la caisse !',
+                ][(current.turn + (cinema.frame.cue.tile ?? 0)) % 3],
+              )}
+            </p>
+            <p>
+              {cinema.frame.cue.reason === 'fraud' ? (
+                'Contrôle fiscal ! Votre achat à prix réduit entraîne une taxe égale à deux fois le prix normal de la propriété. Le contrôle clôt ce risque.'
+              ) : (
+                <>
+                  {translate('Taxe : ')}
+                  {translate(money(current.config.taxBase ?? 0, true))} +{' '}
+                  {current.config.taxRate * 100}
+                  {translate(' % de votre patrimoine immobilier.')}
+                </>
+              )}
+            </p>
+          </DrawnCard>
+        )}
+        {screen === 'game' && !cinema.dismissed && cinema.frame.cue.kind === 'card' && (
+          <DrawnCard
+            cardKey={drawnCardKey}
+            reducedMotion={reduced}
+            ownerLabel={
+              translate('Carte de ') +
+              (current.players.find((p) => p.id === cinema.frame.cue.playerId)?.name ?? active.name)
+            }
+            title={translate(
+              festivalText(
+                current.config.cards.find((c) => c.id === cinema.frame.cue.cardId)?.title,
+              ),
+            )}
+            description={translate(
+              propertyRulesText(
+                current.config.cards.find((c) => c.id === cinema.frame.cue.cardId)?.description,
+              ),
+            )}
+            artworkAlt={translate('Une enveloppe pleine de surprises')}
+            actionLabel={translate('J’ai lu · continuer')}
+            onDismiss={dismissDrawnCard}
+          />
         )}
         <Suspense fallback={<div className="notice">{translate('Ouverture du salon…')}</div>}>
           {(modal === 'online' || online) && (

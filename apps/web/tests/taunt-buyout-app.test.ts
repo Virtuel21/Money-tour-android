@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { config, createGame, type GameState } from '@money-tour/engine';
 import type { Taunt } from '../src/game/taunts';
 import type { Cue } from '../src/game/presentation';
+import { DRAWN_CARD_EXIT_MS } from '../src/game/DrawnCard';
 import App from '../src/App';
 const scene = vi.hoisted(() => ({
   state: null as GameState | null,
@@ -103,10 +104,19 @@ it.each(['notice', 'card', 'tax', 'casino', 'money'] as const)(
     const before = structuredClone(scene.state);
     const host = await mount();
     const close = host.querySelector<HTMLButtonElement>(
-      kind === 'money' ? '.money-close' : '.modal-heading [aria-label="Fermer"]',
+      kind === 'money'
+        ? '.money-close'
+        : kind === 'card' || kind === 'tax'
+          ? '.drawn-card-continue'
+          : '.modal-heading [aria-label="Fermer"]',
     );
     expect(close).not.toBeNull();
     await act(() => close!.click());
+    if (kind === 'card' || kind === 'tax') {
+      expect(scene.dismiss).not.toHaveBeenCalled();
+      expect(close!.disabled).toBe(true);
+      await act(() => vi.advanceTimersByTime(DRAWN_CARD_EXIT_MS));
+    }
     expect(scene.dismiss).toHaveBeenCalledOnce();
     expect(scene.state).toEqual(before);
   },
