@@ -3,7 +3,7 @@ export interface TurnSettings {
   manual: boolean;
 }
 
-/** Invitations share only the requested mode. TURN credentials stay in memory. */
+/** Invitations share only the requested mode, never TURN credentials. */
 export function invitationTurn(value: string): TurnSettings | null {
   const hash = value.includes('#') ? value.slice(value.indexOf('#') + 1) : '';
   const params = new URLSearchParams(hash);
@@ -49,5 +49,56 @@ export function rememberTurn(settings: TurnSettings, room = ''): void {
     );
   } catch {
     /* Private browsing may disable optional preferences. */
+  }
+}
+
+export interface TurnPreferences {
+  url: string;
+  username: string;
+  password: string;
+  relayOnly: boolean;
+}
+
+const preferencesKey = 'money-tour.turn-settings.v1';
+
+/** Manual settings belong to this browser and have no room or 24-hour expiry. */
+export function loadTurnPreferences(): TurnPreferences | null {
+  try {
+    const data = JSON.parse(localStorage.getItem(preferencesKey) ?? 'null');
+    if (
+      !data ||
+      typeof data.url !== 'string' ||
+      typeof data.username !== 'string' ||
+      typeof data.password !== 'string' ||
+      typeof data.relayOnly !== 'boolean'
+    )
+      return null;
+    return {
+      url: data.url,
+      username: data.username,
+      password: data.password,
+      relayOnly: data.relayOnly,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function saveTurnPreferences(preferences: TurnPreferences): boolean {
+  try {
+    const { url, username, password, relayOnly } = preferences;
+    localStorage.setItem(preferencesKey, JSON.stringify({ url, username, password, relayOnly }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function forgetTurnPreferences(): boolean {
+  try {
+    localStorage.removeItem(preferencesKey);
+    return true;
+  } catch {
+    return false;
   }
 }

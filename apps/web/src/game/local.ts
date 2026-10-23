@@ -27,7 +27,6 @@ import {
 } from '@money-tour/engine';
 
 export interface LocalSave {
-  debug?: { freezeTime: boolean; freezeBots: boolean };
   stats?: GameStats;
   history?: string[];
   version: 1;
@@ -119,7 +118,6 @@ export function loadLocal(): LocalSave | null {
   }
 }
 export function persistLocal(save: LocalSave): boolean {
-  if (save.debug) return false;
   try {
     localStorage.setItem(key, JSON.stringify(save));
     return true;

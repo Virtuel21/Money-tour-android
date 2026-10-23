@@ -11,6 +11,8 @@ export function TurnPanel({
   onPassword,
   relayOnly,
   onRelayOnly,
+  onForget,
+  saveStatus,
   disabled,
   testing,
   status,
@@ -25,6 +27,8 @@ export function TurnPanel({
   onPassword: (value: string) => void;
   relayOnly: boolean;
   onRelayOnly: (value: boolean) => void;
+  onForget: () => void;
+  saveStatus: string;
   disabled: boolean;
   testing: boolean;
   status: string;
@@ -79,7 +83,7 @@ export function TurnPanel({
         </label>
         <p className="setup-note">
           {translate(
-            'Les identifiants restent dans cet onglet et ne sont pas inclus dans l’invitation. Les invités devront saisir leurs paramètres TURN. Après fermeture, renseignez-les à nouveau.',
+            'Les paramètres, y compris le mot de passe, sont enregistrés automatiquement dans ce navigateur pour les prochains lancements. Ils ne sont pas inclus dans l’invitation. Chaque invité utilise ses propres paramètres.',
           )}
         </p>
         <label className="toggle">
@@ -93,7 +97,13 @@ export function TurnPanel({
         <button type="button" className="secondary" onClick={onTest}>
           {translate('Tester le serveur TURN')}
         </button>
+        <button type="button" className="secondary" onClick={onForget}>
+          {translate('Effacer les paramètres TURN enregistrés')}
+        </button>
       </fieldset>
+      <p role="status" aria-live="polite" className="setup-note">
+        {translate(saveStatus)}
+      </p>
       <p role="status" aria-live="polite" className="turn-test-status">
         {testing ? translate('Test du relais…') : translate(status)}
       </p>

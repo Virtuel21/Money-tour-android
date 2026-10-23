@@ -19,8 +19,12 @@ import { TurnPanel } from './TurnPanel';
 import {
   invitationLink,
   invitationTurn,
+  loadTurnPreferences,
+  saveTurnPreferences,
+  forgetTurnPreferences,
   rememberTurn,
   savedTurn,
+  type TurnPreferences,
   type TurnSettings,
 } from './turnSettings';
 
@@ -81,11 +85,17 @@ export default function OnlineLobby({
   const [count, setCount] = useState(defaults?.count ?? 4),
     [teams, setTeams] = useState(defaults?.teams ?? false),
     [minutes, setMinutes] = useState(defaults?.minutes ?? 20);
-  const [turnUrl, setTurnUrl] = useState(''),
-    [turnUser, setTurnUser] = useState(''),
-    [turnPassword, setTurnPassword] = useState('');
+  const [initialPreferences] = useState(loadTurnPreferences);
+  const [turnUrl, setTurnUrl] = useState(initialPreferences?.url ?? ''),
+    [turnUser, setTurnUser] = useState(initialPreferences?.username ?? ''),
+    [turnPassword, setTurnPassword] = useState(initialPreferences?.password ?? '');
   const [requiredTurn, setRequiredTurn] = useState(initialTurn.settings?.manual ?? false);
-  const [relayOnly, setRelayOnly] = useState(initialTurn.settings?.relayOnly ?? setupTurn);
+  const [relayOnly, setRelayOnly] = useState(
+    initialTurn.settings?.relayOnly ?? initialPreferences?.relayOnly ?? setupTurn,
+  );
+  const [saveStatus, setSaveStatus] = useState(
+    initialPreferences ? 'Paramètres TURN enregistrés sur cet appareil.' : '',
+  );
   const [networkSettings, setNetworkSettings] = useState<TurnSettings>({
     relayOnly: false,
     manual: false,
@@ -176,11 +186,34 @@ export default function OnlineLobby({
       setTesting(false);
     }
   }
-  function changeTurn(update: () => void) {
+  function changeTurn(update: Partial<TurnPreferences>) {
     setConfigurationError('');
     setTestStatus('');
     setError('');
-    update();
+    const next = { url: turnUrl, username: turnUser, password: turnPassword, relayOnly, ...update };
+    setTurnUrl(next.url);
+    setTurnUser(next.username);
+    setTurnPassword(next.password);
+    setRelayOnly(next.relayOnly);
+    setSaveStatus(
+      saveTurnPreferences(next)
+        ? 'Paramètres TURN enregistrés sur cet appareil.'
+        : 'Le navigateur ne permet pas d’enregistrer les paramètres TURN. Gardez cet onglet ouvert.',
+    );
+  }
+  function forgetTurn() {
+    setConfigurationError('');
+    setTestStatus('');
+    setError('');
+    setTurnUrl('');
+    setTurnUser('');
+    setTurnPassword('');
+    setRelayOnly(false);
+    setSaveStatus(
+      forgetTurnPreferences()
+        ? 'Paramètres TURN effacés de cet appareil.'
+        : 'Le navigateur ne permet pas d’effacer les paramètres TURN enregistrés.',
+    );
   }
   function changeCode(value: string) {
     setCode(value);
@@ -205,25 +238,15 @@ export default function OnlineLobby({
     <TurnPanel
       open={setupTurn || requiredTurn}
       url={turnUrl}
-      onUrl={(value) =>
-        changeTurn(() => {
-          setTurnUrl(value);
-        })
-      }
+      onUrl={(url) => changeTurn({ url })}
       username={turnUser}
-      onUsername={(value) =>
-        changeTurn(() => {
-          setTurnUser(value);
-        })
-      }
+      onUsername={(username) => changeTurn({ username })}
       password={turnPassword}
-      onPassword={(value) =>
-        changeTurn(() => {
-          setTurnPassword(value);
-        })
-      }
+      onPassword={(password) => changeTurn({ password })}
       relayOnly={relayOnly}
-      onRelayOnly={(value) => changeTurn(() => setRelayOnly(value))}
+      onRelayOnly={(relayOnly) => changeTurn({ relayOnly })}
+      onForget={forgetTurn}
+      saveStatus={saveStatus}
       disabled={working}
       testing={testing}
       status={testStatus}

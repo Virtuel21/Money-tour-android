@@ -6,7 +6,7 @@ Le plateau est désormais chargé depuis `models/board-layout.glb`, créé dans 
 
 Les coordonnées, dimensions, hauteurs et orientations reprennent les fonctions `boardShape`, `tileFrame`, `tileLabelRegions` et la disposition de la lagune. Les quatre formats 26/28/30/32 cases sont exportés. Dix-huit motifs de sol sont capturés sans perte depuis les canvas d’origine et embarqués en PNG dans le GLB. Les illustrations existantes sont réutilisées, avec conversion des conventions UV verticales et conservation de leurs espaces colorimétriques.
 
-Le moteur attribue les textures selon la partie, y compris les rues mélangées. Les palettes personnalisées du mode debug et des sauvegardes anciennes ont un repli vers leur motif canvas. Les noms, loyers, commandes accessibles, pions et constructions variables restent des éléments dynamiques du jeu. Les dioramas centraux conservent leur illustration d’origine sur des plans 3D : ce changement ne transforme pas ces illustrations en sculptures volumétriques.
+Le moteur attribue les textures selon la partie, y compris les rues mélangées. Les palettes des sauvegardes anciennes ont un repli vers leur motif canvas. Les noms, loyers, commandes accessibles, pions et constructions variables restent des éléments dynamiques du jeu. Les dioramas centraux conservent leur illustration d’origine sur des plans 3D : ce changement ne transforme pas ces illustrations en sculptures volumétriques.
 
 Le GLB de jeu contient les quatre variantes et les références de matériaux. Il est destiné au chargeur du jeu. Le GLB de présentation livré séparément montre une seule variante 32 cases, avec ses illustrations déjà affectées. Le `.blend` conserve une scène d’inspection et une scène source.
 

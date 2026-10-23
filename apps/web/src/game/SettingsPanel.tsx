@@ -15,7 +15,6 @@ export function SettingsPanel({
   setReduced,
   sharedPace,
   onPreview,
-  onTest,
 }: {
   comfort: ComfortPreferences;
   setComfort: Dispatch<SetStateAction<ComfortPreferences>>;
@@ -25,7 +24,6 @@ export function SettingsPanel({
   setReduced: (value: boolean) => void;
   sharedPace?: 'normal' | 'fast';
   onPreview: () => void;
-  onTest?: () => void;
 }) {
   return (
     <div className="settings-sections">
@@ -189,15 +187,6 @@ export function SettingsPanel({
           </span>
         </label>
       </section>
-      {onTest && (
-        <details className="settings-advanced">
-          <summary>{translate('Outils de test')}</summary>
-          <p>{translate('Explorez une copie de la partie sans modifier votre sauvegarde.')}</p>
-          <button className="secondary" onClick={onTest}>
-            {translate('Tester une copie en mode debug')}
-          </button>
-        </details>
-      )}
       <p className="settings-hint">
         {translate(
           'Vos réglages sont sauvegardés automatiquement sur cet appareil. Revenir à l’accueil met la partie locale en pause.',

@@ -29,7 +29,7 @@ export function boardModel(source: THREE.Group, tiles: Tile[], anisotropy: numbe
     mesh(extra ? 'surface' : 'icon', tile.id).visible = false;
     const key = `${tile.type}:${tile.group ?? ''}:${tile.color ?? ''}`;
     const baked = surfaces.get(key);
-    // Custom debug rules and old saves may carry colors outside the authored palette.
+    // Old saves may carry colors outside the authored palette.
     if (baked) surface.material = baked;
     else {
       const map = streetSurface(tile);

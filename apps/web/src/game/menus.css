@@ -264,10 +264,6 @@
 .app .modal .settings-hint {
   margin-block: 12px;
 }
-.settings-advanced {
-  border-top: 1px solid #d5cfba;
-  padding-top: 8px;
-}
 .app .modal summary {
   align-content: center;
   font-size: 1em;

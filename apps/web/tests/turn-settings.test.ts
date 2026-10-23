@@ -5,13 +5,65 @@ import {
   invitationTurn,
   rememberTurn,
   savedTurn,
+  loadTurnPreferences,
+  saveTurnPreferences,
+  forgetTurnPreferences,
 } from '../src/network/turnSettings';
 import { manualTurnServers, probeTurn } from '../src/network/ice';
 
 afterEach(() => {
+  vi.restoreAllMocks();
   localStorage.clear();
   vi.useRealTimers();
   vi.unstubAllGlobals();
+});
+
+const preferences = {
+  url: 'turn:relay.example:3478, turns:relay.example:5349?transport=tcp',
+  username: 'qa-user',
+  password: 'qa-only-password',
+  relayOnly: true,
+};
+
+it('keeps all manual settings beyond room expiry without sharing credentials in invitations', () => {
+  expect(saveTurnPreferences(preferences)).toBe(true);
+  vi.useFakeTimers();
+  vi.setSystemTime(Date.now() + 30 * 86400000);
+  expect(loadTurnPreferences()).toEqual(preferences);
+  const link = invitationLink('https://example.test', 'a'.repeat(32), {
+    ...preferences,
+    manual: true,
+  });
+  for (const value of [preferences.url, preferences.username, preferences.password])
+    expect(link).not.toContain(value);
+  expect(invitationTurn(link)).toEqual({ manual: true, relayOnly: true });
+  expect(forgetTurnPreferences()).toBe(true);
+  expect(loadTurnPreferences()).toBeNull();
+});
+
+it.each([
+  '{broken',
+  '{}',
+  'null',
+  '{"url":1}',
+  JSON.stringify({ ...preferences, relayOnly: 'true' }),
+])('ignores malformed saved manual settings: %s', (raw) => {
+  localStorage.setItem('money-tour.turn-settings.v1', raw);
+  expect(loadTurnPreferences()).toBeNull();
+});
+
+it('handles unavailable browser storage without losing the current visit', () => {
+  const unavailable = () => {
+    throw new Error('Storage disabled');
+  };
+  vi.spyOn(window, 'localStorage', 'get').mockReturnValue({
+    getItem: unavailable,
+    setItem: unavailable,
+    removeItem: unavailable,
+  } as unknown as Storage);
+  expect(loadTurnPreferences()).toBeNull();
+  expect(saveTurnPreferences(preferences)).toBe(false);
+  expect(forgetTurnPreferences()).toBe(false);
 });
 const code = 'a'.repeat(32);
 it('shares the manual mode in the invitation without any TURN credentials', () => {

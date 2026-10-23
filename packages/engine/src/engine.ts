@@ -1593,19 +1593,6 @@ export function reduceGame(
   return { state: next, events };
 }
 
-/** Local sandbox entry point. Intentionally absent from GameAction and the network protocol. */
-export function resolveDebugLanding(state: GameState, rng: Rng): GameResult {
-  const next = clone(state);
-  const events: GameEvent[] = [];
-  next.seq += 1;
-  resolveTile(next, rng, events);
-  if (next.auction) advanceAuction(next, rng, events);
-  trackQuests(next, events);
-  checkVictory(next, events);
-  if (!next.winner && !next.auction && activePlayer(next).eliminated) nextTurn(next, events, rng);
-  return { state: next, events };
-}
-
 export function chooseBotAction(state: GameState): GameAction {
   const player = owner(state, getDecisionPlayerId(state))!;
   const legal = getLegalActions(state).filter((action) => action.type !== 'quit');
