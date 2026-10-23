@@ -1,0 +1,496 @@
+.action-card-dialog {
+  inline-size: min(640px, calc(100vw - 32px));
+  block-size: min(720px, calc(100dvh - 40px));
+}
+
+.action-card-front {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.action-card-owner {
+  min-block-size: 52px;
+}
+
+.action-card-owner:has(.action-card-close) {
+  padding-block: 5px;
+}
+
+.action-card-close {
+  display: grid;
+  place-items: center;
+  flex: 0 0 44px;
+  inline-size: 44px;
+  block-size: 44px;
+  margin-inline-end: -8px;
+  border: 1px solid #142d3d24;
+  border-radius: 50%;
+  color: var(--card-ink);
+  background: #142d3d0a;
+}
+
+.action-card-close .game-icon {
+  inline-size: 20px;
+  block-size: 20px;
+}
+
+.action-card-status {
+  min-inline-size: 0;
+  padding: 8px 24px 0;
+}
+
+.action-card-status:empty {
+  display: none;
+}
+
+.action-card-status .modal-countdown {
+  margin: 0;
+}
+
+.action-card-fieldset {
+  grid-row: 3;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-inline-size: 0;
+  min-block-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.action-card-fieldset:disabled {
+  pointer-events: none;
+}
+
+.action-card-content {
+  min-inline-size: 0;
+  min-block-size: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #42677270 transparent;
+  padding: 20px 26px 24px;
+  overflow-wrap: anywhere;
+}
+
+.action-card-content:focus {
+  outline: 0;
+}
+
+.action-card-content:focus-visible {
+  outline: 2px solid var(--card-accent);
+  outline-offset: -5px;
+}
+
+.action-card-content > h2 {
+  margin: 0 0 20px;
+  font-family: 'Trebuchet MS', Arial, sans-serif;
+  font-size: clamp(25px, calc(30px * var(--ui-text-scale, 1)), 38px);
+  font-weight: 800;
+  line-height: 1.12;
+  letter-spacing: -0.8px;
+  text-wrap: balance;
+}
+
+.action-card-content > h2:focus {
+  outline: 0;
+}
+
+.action-card-content > h2::after {
+  content: '';
+  display: block;
+  inline-size: 44px;
+  block-size: 3px;
+  margin-block-start: 16px;
+  border-radius: 2px;
+  background: var(--card-accent);
+}
+
+.action-card-content p {
+  line-height: 1.5;
+}
+
+.action-card-content .primary,
+.action-card-content > .secondary,
+.action-card-content :is(.duel-view, .casino-view) > .secondary,
+.action-card-footer .primary,
+.action-card-footer > .secondary {
+  inline-size: 100%;
+  margin-block-start: 12px;
+}
+
+.action-card-content .duel-view,
+.action-card-content .casino-view {
+  min-inline-size: 0;
+}
+
+.action-card-content input,
+.action-card-content select {
+  max-inline-size: 100%;
+}
+
+.action-card-content .tile-search {
+  margin: 0 0 12px;
+}
+
+.action-card-content .tile-results {
+  margin: 0 0 12px;
+  color: #3f6068;
+}
+
+.action-card-content .mobile-tile-list {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 10px;
+}
+
+.action-card-content .mobile-tile-list button {
+  min-block-size: 88px;
+  padding: 12px;
+  font-size: calc(15px * var(--ui-text-scale, 1));
+  line-height: 1.35;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+
+.action-card-content .mobile-tile-list small {
+  display: block;
+  margin-block-start: 4px;
+  font-size: calc(12px * var(--ui-text-scale, 1));
+  color: #425860;
+}
+
+.action-card-content .pocket-pages {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-block-start: 16px;
+}
+
+.action-card-content .pocket-pages button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-block-size: 44px;
+  padding: 8px 12px;
+}
+
+.action-card-content .pocket-pages span {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.action-card-content .duel-view > label {
+  display: grid;
+  gap: 8px;
+  min-inline-size: 0;
+  font-weight: 700;
+}
+
+.action-card-content .duel-view input {
+  inline-size: 100%;
+  min-inline-size: 0;
+  min-block-size: 44px;
+  font-size: max(16px, 1em);
+}
+
+.action-card-footer {
+  display: grid;
+  gap: 10px;
+  padding: 14px 26px 22px;
+  border-top: 1px solid #142d3d24;
+  background: var(--card-paper);
+}
+
+.action-card-footer > :first-child {
+  margin-block-start: 0;
+}
+
+.action-card-footer:empty {
+  display: none;
+}
+
+.action-card-actions {
+  display: grid;
+  gap: 8px;
+  min-inline-size: 0;
+}
+
+.action-card-footer :is(.primary, .secondary) {
+  inline-size: 100%;
+  min-inline-size: 0;
+  min-block-size: 44px;
+  margin: 0;
+  padding: 10px 12px;
+  font-size: calc(14px * var(--ui-text-scale, 1));
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.action-card-footer :is(.decision-actions, .casino-actions, .duel-choices) {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  min-inline-size: 0;
+}
+
+.action-card-footer :is(.duel-offer-actions, .duel-choices) {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.action-card-footer :is(.duel-accept-actions, .casino-actions) {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.action-card-footer .decision-actions button {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 6px;
+}
+
+.action-card-footer .duel-offer-actions button > small {
+  flex-basis: 100%;
+  font-size: calc(11px * var(--ui-text-scale, 1));
+}
+
+.action-card-footer .duel-choices button {
+  min-block-size: 68px;
+  gap: 4px;
+  padding: 8px;
+}
+
+.action-card-footer .duel-choices button > span:first-child {
+  font-size: 24px;
+}
+
+.action-card-footer .casino-actions button {
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 8px;
+}
+
+.action-card-footer .cta-clock {
+  padding: 4px 6px;
+  font-size: 11px;
+}
+
+@media (max-width: 400px) {
+  .action-card-dialog {
+    inline-size: calc(100vw - 20px);
+    block-size: calc(100dvh - 24px);
+  }
+
+  .action-card-owner {
+    min-block-size: 45px;
+  }
+
+  .action-card-status {
+    padding-inline: 17px;
+  }
+
+  .action-card-content {
+    padding: 16px 17px 20px;
+  }
+
+  .action-card-content > h2 {
+    margin-block-end: 16px;
+  }
+
+  .action-card-footer {
+    padding: 12px 17px 18px;
+  }
+
+  .action-card-content .duel-balances {
+    gap: 6px;
+  }
+
+  .action-card-content .duel-balances > div {
+    padding: 9px;
+  }
+
+  .action-card-content .duel-view .duel-hands {
+    font-size: 38px;
+  }
+
+  .action-card-content .casino-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .action-card-content .roulette-stage {
+    inline-size: 140px;
+    block-size: 140px;
+  }
+
+  .action-card-content .roulette-wheel::after {
+    inset: 36px;
+  }
+
+  .action-card-content .slot-reels {
+    padding: 12px;
+    gap: 6px;
+  }
+
+  .action-card-content .slot-reels :is(.reel-window, b) {
+    block-size: 66px;
+  }
+
+  .action-card-content .slot-reels .reel-window {
+    font-size: 34px;
+  }
+}
+
+@media (max-height: 520px) and (min-width: 540px) {
+  .action-card-dialog {
+    inline-size: min(720px, calc(100vw - 32px));
+    block-size: calc(100dvh - 24px);
+  }
+
+  .action-card-owner {
+    min-block-size: 40px;
+    padding-block: 8px;
+  }
+
+  .action-card-status {
+    padding-block-start: 5px;
+  }
+
+  .action-card-content {
+    padding-block: 12px 16px;
+  }
+
+  .action-card-content > h2 {
+    margin-block-end: 14px;
+    font-size: calc(26px * var(--ui-text-scale, 1));
+  }
+
+  .action-card-content > h2::after {
+    margin-block-start: 10px;
+  }
+
+  .action-card-footer {
+    padding-block: 10px 14px;
+  }
+
+  .action-card-content .casino-view {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr);
+    gap: 4px 16px;
+    text-align: start;
+  }
+
+  .action-card-content .casino-view > :is(.roulette-stage, .slot-reels) {
+    grid-column: 1;
+    grid-row: 1 / span 6;
+    align-self: center;
+  }
+
+  .action-card-content .casino-view > :not(.roulette-stage):not(.slot-reels) {
+    grid-column: 2;
+    margin-block: 4px;
+  }
+
+  .action-card-content .roulette-stage {
+    inline-size: 130px;
+    block-size: 130px;
+  }
+
+  .action-card-content .roulette-wheel::after {
+    inset: 32px;
+  }
+
+  .action-card-content .slot-reels {
+    max-inline-size: 150px;
+    padding: 8px;
+    gap: 4px;
+  }
+
+  .action-card-content .slot-reels :is(.reel-window, b) {
+    block-size: 60px;
+  }
+
+  .action-card-content .slot-reels .reel-window {
+    font-size: 28px;
+  }
+
+  .action-card-content .duel-view .duel-hands {
+    display: none;
+  }
+
+  .action-card-content .duel-balances {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin-block: 8px;
+  }
+
+  .action-card-content .duel-view .decision-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .action-card-footer {
+    gap: 8px;
+  }
+
+  .action-card-footer :is(.primary, .secondary) {
+    padding-block: 8px;
+  }
+
+  .action-card-footer .duel-choices button {
+    min-block-size: 60px;
+  }
+
+  .action-card-content .debt-card-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+    align-items: start;
+    gap: 16px;
+  }
+
+  .action-card-content :is(.debt-card-summary, .debt-card-choices) {
+    min-inline-size: 0;
+  }
+
+  .action-card-content .debt-card-summary p {
+    margin: 0 0 8px;
+    font-size: calc(13px * var(--ui-text-scale, 1));
+    line-height: 1.4;
+  }
+
+  .action-card-content .debt-card-choices .decision-actions {
+    margin: 0;
+  }
+
+  .action-card-content .debt-card-choices .tile-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 6px;
+    font-size: calc(12px * var(--ui-text-scale, 1));
+  }
+
+  .action-card-content .debt-card-choices .tile-search input {
+    flex: 1;
+    min-inline-size: 0;
+    min-block-size: 44px;
+    padding: 8px;
+  }
+
+  .action-card-content .debt-card-choices .tile-results {
+    margin: 0 0 6px;
+    font-size: calc(12px * var(--ui-text-scale, 1));
+  }
+
+  .action-card-content .debt-card-choices .mobile-tile-list {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .action-card-content .debt-card-choices .mobile-tile-list button {
+    min-block-size: 64px;
+    padding: 8px 10px;
+    font-size: calc(13px * var(--ui-text-scale, 1));
+  }
+}

@@ -1,7 +1,13 @@
 import type { GameEvent, GameState } from '@money-tour/engine';
 import { eventCelebrations, type Celebration } from './celebrations';
+import { CARD_ARRIVE_MS } from './cardMotion';
 
 export type PresentationPace = 'normal' | 'fast';
+
+// Animated cards spend 1.5 seconds arriving before their front is fully readable.
+// Shared online budgets include that time even if one viewer disables motion.
+const FAST_CARD_NOTICE_MS = CARD_ARRIVE_MS + 4000;
+const routineNotices = ['insured_tile', 'alliance_expired', 'crisis_expired', 'roaches_expired'];
 
 /** One debit for a purchase/construction batch; keep the original events for the journal. */
 function propertyPayment(events: GameEvent[], index: number): number | undefined {
@@ -27,7 +33,7 @@ function propertyPayment(events: GameEvent[], index: number): number | undefined
 }
 
 /** Reading time and auction orientation are independent from animation speed. */
-function pacedDuration(cue: Cue, pace: PresentationPace): number {
+function pacedDuration(cue: Cue, pace: PresentationPace, reduced: boolean): number {
   if (pace === 'normal' || ['card', 'tax'].includes(cue.kind) || cue.reason === 'auction_started')
     return cue.duration;
   const caps: Record<Cue['kind'], number> = {
@@ -39,8 +45,8 @@ function pacedDuration(cue: Cue, pace: PresentationPace): number {
     money: 650,
     turn: 650,
     settle: 150,
-    casino: 1600,
-    notice: 2200,
+    casino: 5000,
+    notice: routineNotices.includes(cue.reason ?? '') ? 2200 : reduced ? 4000 : FAST_CARD_NOTICE_MS,
   };
   return Math.min(cue.duration, caps[cue.kind]);
 }
@@ -84,7 +90,7 @@ export function presentation(
   const add = (cue: Cue) =>
     frames.push({
       state: structuredClone(visual),
-      cue: { ...cue, duration: pacedDuration(cue, pace) },
+      cue: { ...cue, duration: pacedDuration(cue, pace, reduced) },
     });
   const celebrations = eventCelebrations(previous, next, events);
   const money = (event: GameEvent, duration = 1500) => {
@@ -129,7 +135,7 @@ export function presentation(
     if (event.type === 'casino_result')
       add({
         kind: 'casino',
-        duration: reduced ? 1200 : 3600,
+        duration: reduced ? 3500 : 5500,
         playerId: event.playerId,
         amount: event.amount,
         casinoGame: event.game as 'roulette' | 'slots',
@@ -146,7 +152,7 @@ export function presentation(
         playerId: event.playerId,
         message: String(event.message),
         sound: 'earthquake',
-        duration: reduced ? 1800 : 3200,
+        duration: reduced ? 4000 : FAST_CARD_NOTICE_MS,
       });
       visual.properties[event.tile] = { ...next.properties[event.tile]! };
       add({ kind: 'settle', duration: 500 });
@@ -245,10 +251,15 @@ export function presentation(
         tile: event.tile,
         amount: event.amount,
         sound: 'card',
-        duration: 5000,
+        duration: 5000 + (reduced ? 0 : CARD_ARRIVE_MS),
       });
     if (event.type === 'card')
-      add({ kind: 'card', playerId: event.playerId, cardId: event.cardId, duration: 5500 });
+      add({
+        kind: 'card',
+        playerId: event.playerId,
+        cardId: event.cardId,
+        duration: 5500 + (reduced ? 0 : CARD_ARRIVE_MS),
+      });
     if (['payment', 'income', 'start_bonus', 'sale'].includes(event.type)) money(event);
     if (event.type === 'turn' || event.type === 'extra_roll') {
       Object.assign(visual, structuredClone(next));
@@ -299,13 +310,13 @@ export function presentationMs(events: GameEvent[], pace: PresentationPace = 'no
       const durations: Record<string, number> = {
         dice: 750,
         auction_started: 1800,
-        earthquake: 2350,
-        casino_result: 1600,
+        earthquake: FAST_CARD_NOTICE_MS + 150,
+        casino_result: 5000,
         insured: 150,
         turn: 650,
         extra_roll: 650,
-        tax_notice: 5000,
-        card: 5500,
+        tax_notice: 5000 + CARD_ARRIVE_MS,
+        card: 5500 + CARD_ARRIVE_MS,
         buyout: 150,
         championship: 650,
         victory: 150,
@@ -315,7 +326,13 @@ export function presentationMs(events: GameEvent[], pace: PresentationPace = 'no
       if (['payment', 'income', 'start_bonus', 'sale'].includes(event.type))
         return ms + ((event.amount ?? 0) > 0 ? 650 : 0) + (event.type === 'sale' ? 150 : 0);
       // All remaining public notices retain readable time; unknown events keep their normal budget.
-      return ms + Math.min(2200, presentationMs([event]));
+      return (
+        ms +
+        Math.min(
+          routineNotices.includes(event.type) ? 2200 : FAST_CARD_NOTICE_MS,
+          presentationMs([event]),
+        )
+      );
     }, 0);
   return events.reduce((ms, e, index) => {
     const propertyAmount = propertyPayment(events, index);
@@ -330,9 +347,9 @@ export function presentationMs(events: GameEvent[], pace: PresentationPace = 'no
           : e.type === 'auction_started'
             ? 1800
             : e.type === 'earthquake'
-              ? 3700
+              ? FAST_CARD_NOTICE_MS + 500
               : e.type === 'casino_result'
-                ? 3600
+                ? 5500
                 : [
                       'auction_started',
                       'auction_result',
@@ -363,9 +380,9 @@ export function presentationMs(events: GameEvent[], pace: PresentationPace = 'no
                       : e.type === 'move'
                         ? Math.abs(Number(e.steps ?? 0)) * 270
                         : e.type === 'tax_notice'
-                          ? 5000
+                          ? 5000 + CARD_ARRIVE_MS
                           : e.type === 'card'
-                            ? 5500
+                            ? 5500 + CARD_ARRIVE_MS
                             : ['build', 'purchase', 'buyout'].includes(e.type)
                               ? 2200
                               : e.type === 'championship'

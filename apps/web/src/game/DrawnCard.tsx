@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { restoreDialogFocus, trapDialogFocus } from './dialogFocus';
 import { GameIcon } from './GameIcon';
+import { CARD_EXIT_MS, CARD_MOTION_STYLE } from './cardMotion';
 import './drawn-card.css';
 
-export const DRAWN_CARD_EXIT_MS = 420;
+export const DRAWN_CARD_EXIT_MS = CARD_EXIT_MS;
 
 export interface DrawnCardProps {
   /** Identity of this draw, including successive draws of the same card. */
@@ -25,7 +26,7 @@ export function DrawnCard(props: DrawnCardProps) {
   return <DrawnCardDialog key={props.cardKey} {...props} />;
 }
 
-function CardBack() {
+export function CardBack() {
   return (
     <div className="drawn-card-back" aria-hidden="true">
       <span className="drawn-card-back-brand">
@@ -116,6 +117,7 @@ function DrawnCardDialog({
   return (
     <dialog
       ref={dialogRef}
+      style={CARD_MOTION_STYLE}
       className={`drawn-card-dialog drawn-card-${tone}${reducedMotion ? ' motion-reduced' : ''}${leaving ? ' is-leaving' : ''}`}
       aria-labelledby={titleId}
       aria-describedby={description ? descriptionId : undefined}

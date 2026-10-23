@@ -127,7 +127,7 @@ try {
       await dialog.locator('.drawn-card-motion').evaluate((element) => {
         const animation = element.getAnimations()[0];
         animation.pause();
-        animation.currentTime = 180;
+        animation.currentTime = 450;
       });
       if (width === 390) await capture(page, `${kind}-${language}-${width}x${height}-back`);
       await dialog

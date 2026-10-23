@@ -28,8 +28,8 @@ it('requires shared random proof for casino spins and replays exactly the same r
   const result = execute(state, command, 'both-peers');
   const frames = presentation(state, result.state, result.events);
   expect(frames[0]!.cue.kind).toBe('casino');
-  expect(frames[0]!.cue.duration).toBe(3600);
-  expect(presentationMs(result.events)).toBeGreaterThanOrEqual(3600);
+  expect(frames[0]!.cue.duration).toBe(5500);
+  expect(presentationMs(result.events)).toBeGreaterThanOrEqual(5500);
 });
 it('validates expanded board targets while refusing unknown properties and forged actions', () => {
   expect(actionSchema.safeParse({ type: 'sell', playerId: 'a', tile: 31 }).success).toBe(true);

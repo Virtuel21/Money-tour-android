@@ -3,6 +3,7 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { config, createGame, reduceGame, type GameState } from '@money-tour/engine';
+import { DRAWN_CARD_EXIT_MS } from '../src/game/DrawnCard';
 import App from '../src/App';
 
 const scene = vi.hoisted(() => ({
@@ -90,10 +91,12 @@ it.each([false, true])(
     expect(document.querySelector('.tile-list small')!.textContent).toContain('Voyage · 50');
     // Closing the picker must not consume the right or force the extra roll.
     await act(() => document.querySelector<HTMLButtonElement>('[aria-label="Fermer"]')!.click());
+    await act(() => vi.advanceTimersByTime(DRAWN_CARD_EXIT_MS));
     expect(scene.visible!.phase).toBe('travel');
     expect(scene.visible!.players[0]!.cash).toBe(cash);
     await click('Choisir ma destination');
     await click('Départ');
+    await act(() => vi.advanceTimersByTime(DRAWN_CARD_EXIT_MS));
     await settle();
     expect(document.querySelector('dialog')).toBeNull();
     expect(scene.visible!.players[0]!.position).toBe(0);

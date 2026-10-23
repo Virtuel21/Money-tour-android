@@ -31,7 +31,8 @@
   block-size: 100%;
   transform-style: preserve-3d;
   transform-origin: 50% 62%;
-  animation: drawn-card-arrive 840ms cubic-bezier(0.2, 0.68, 0.23, 1) both;
+  animation: drawn-card-arrive var(--card-arrive-duration, 1500ms) cubic-bezier(0.2, 0.68, 0.23, 1)
+    both;
 }
 
 .drawn-card-front,
@@ -315,7 +316,7 @@
 
 .drawn-card-dialog.is-leaving .drawn-card-motion {
   pointer-events: none;
-  animation: drawn-card-depart 420ms cubic-bezier(0.4, 0, 0.8, 0.45) both;
+  animation: drawn-card-depart var(--card-exit-duration, 800ms) cubic-bezier(0.4, 0, 0.8, 0.45) both;
 }
 
 @keyframes drawn-card-arrive {
@@ -324,11 +325,14 @@
     transform: translate3d(-8vw, 36vh, -380px) rotateX(15deg) rotateY(180deg) rotateZ(-18deg)
       scale(0.72);
   }
-  22% {
-    transform: translate3d(0, 8vh, -80px) rotateX(4deg) rotateY(180deg) rotateZ(-6deg) scale(0.96);
+  18% {
+    transform: translate3d(0, 5vh, -120px) rotateX(4deg) rotateY(180deg) rotateZ(-6deg) scale(0.92);
   }
-  66% {
-    transform: translate3d(0, -8px, 0) rotateX(0) rotateY(18deg) rotateZ(2deg) scale(1.02);
+  35% {
+    transform: translate3d(0, 0, -30px) rotateX(0) rotateY(180deg) rotateZ(-4deg) scale(0.98);
+  }
+  80% {
+    transform: translate3d(0, -8px, 0) rotateX(0) rotateY(14deg) rotateZ(2deg) scale(1.02);
   }
   100% {
     transform: translate3d(0, 0, 0) rotateX(0) rotateY(0) rotateZ(0) scale(1);
@@ -337,11 +341,12 @@
 
 @keyframes drawn-card-depart {
   0% {
-    opacity: 1;
     transform: translate3d(0, 0, 0) rotateZ(0);
   }
+  20% {
+    transform: translate3d(6vw, -10dvh, 0) rotateY(-10deg) rotateZ(8deg) scale(1.02);
+  }
   100% {
-    opacity: 0;
     transform: translate3d(85vw, -120dvh, -120px) rotateY(-35deg) rotateZ(32deg) scale(0.72);
   }
 }

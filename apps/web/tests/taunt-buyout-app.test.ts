@@ -108,11 +108,11 @@ it.each(['notice', 'card', 'tax', 'casino', 'money'] as const)(
         ? '.money-close'
         : kind === 'card' || kind === 'tax'
           ? '.drawn-card-continue'
-          : '.modal-heading [aria-label="Fermer"]',
+          : '.action-card-close',
     );
     expect(close).not.toBeNull();
     await act(() => close!.click());
-    if (kind === 'card' || kind === 'tax') {
+    if (kind !== 'money') {
       expect(scene.dismiss).not.toHaveBeenCalled();
       expect(close!.disabled).toBe(true);
       await act(() => vi.advanceTimersByTime(DRAWN_CARD_EXIT_MS));
@@ -130,6 +130,38 @@ it('lets Escape dismiss an announcement', async () => {
   await act(() =>
     host.querySelector('dialog')!.dispatchEvent(new Event('cancel', { cancelable: true })),
   );
+  expect(scene.dismiss).not.toHaveBeenCalled();
+  await act(() => vi.advanceTimersByTime(DRAWN_CARD_EXIT_MS));
+  expect(scene.dismiss).toHaveBeenCalledOnce();
+});
+it('cancels the old departure when a consecutive announcement replaces it', async () => {
+  scene.state = game();
+  scene.busy = true;
+  scene.cue = {
+    kind: 'notice',
+    duration: 7600,
+    reason: 'insurance',
+    message: 'Première information',
+  };
+  const host = await mount();
+  const first = host.querySelector('.action-card-dialog')!;
+  await act(() => first.querySelector<HTMLButtonElement>('.action-card-close')!.click());
+  await act(() => vi.advanceTimersByTime(100));
+  scene.cue = {
+    kind: 'notice',
+    duration: 7600,
+    reason: 'crisis',
+    message: 'Deuxième information',
+  };
+  await act(() => root.render(createElement(App)));
+  const second = host.querySelector('.action-card-dialog')!;
+  expect(second).not.toBe(first);
+  expect(second.classList.contains('is-leaving')).toBe(false);
+  expect(second.textContent).toContain('Deuxième information');
+  await act(() => vi.advanceTimersByTime(DRAWN_CARD_EXIT_MS));
+  expect(scene.dismiss).not.toHaveBeenCalled();
+  await act(() => second.querySelector<HTMLButtonElement>('.action-card-close')!.click());
+  await act(() => vi.advanceTimersByTime(DRAWN_CARD_EXIT_MS));
   expect(scene.dismiss).toHaveBeenCalledOnce();
 });
 it('opens the buyout picker from the game CTA without transferring the property first', async () => {
@@ -162,6 +194,7 @@ it('opens while a bot animates, keeps the sender across turn changes and display
   await act(() =>
     host.querySelector<HTMLButtonElement>('[aria-label="Merci pour le loyer !"]')!.click(),
   );
+  await act(() => vi.advanceTimersByTime(DRAWN_CARD_EXIT_MS));
   expect(host.querySelector('.taunt-picker')).toBeNull();
   expect(host.querySelectorAll('.pawn-taunt')).toHaveLength(1);
   expect(host.querySelector('.taunt-toast')).toBeNull();

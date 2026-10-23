@@ -38,11 +38,11 @@ it('shows quake damage after the shake, with a bounded network clock and reduced
   expect(frames[0]!.cue).toMatchObject({
     reason: 'earthquake',
     sound: 'earthquake',
-    duration: 3200,
+    duration: 5500,
   });
   expect(frames[1]!.state.properties[1]!.level).toBe(3);
-  expect(presentationMs(events)).toBe(3700);
-  expect(presentation(before, after, events, true)[0]!.cue.duration).toBeLessThan(3200);
+  expect(presentationMs(events)).toBe(6000);
+  expect(presentation(before, after, events, true)[0]!.cue.duration).toBeLessThan(5500);
 });
 it.each(['slots', 'roulette'])(
   'uses the dedicated %s sound during the casino animation',

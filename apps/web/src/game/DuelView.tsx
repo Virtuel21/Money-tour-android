@@ -12,6 +12,7 @@ import {
   type GameState,
 } from '@money-tour/engine';
 import { ActionClock } from './ActionClock';
+import { ActionCardActions } from './ActionCard';
 import { money } from './local';
 
 const hands = { rock: '✊', paper: '✋', scissors: '✌️' };
@@ -145,51 +146,58 @@ export function DuelView({
                     )
                   : translate('Montant entier, sans décimales.')}
               </p>
-              <div className="decision-actions">
-                {getLegalActions(state)
-                  .filter((a) => a.type === 'duel_offer')
-                  .map(
-                    (a) =>
-                      a.type === 'duel_offer' && (
-                        <button
-                          className="primary"
-                          key={a.targetId}
-                          disabled={
-                            !Number.isSafeInteger(Number(amount)) ||
-                            Number(amount) <= 0 ||
-                            Number(amount) >
-                              Math.min(
-                                actor.cash,
-                                state.players.find((p) => p.id === a.targetId)!.cash,
-                              )
-                          }
-                          onClick={() => act({ ...a, amount: Number(amount) })}
-                        >
-                          {translate('Défier ')}
-                          {state.players.find((p) => p.id === a.targetId)!.name}
-                          <small>
-                            {translate('Maximum :')}{' '}
-                            {translate(
-                              money(
+              <ActionCardActions className="duel-card-actions">
+                <div className="decision-actions duel-offer-actions">
+                  {getLegalActions(state)
+                    .filter((a) => a.type === 'duel_offer')
+                    .map(
+                      (a) =>
+                        a.type === 'duel_offer' && (
+                          <button
+                            className="primary"
+                            key={a.targetId}
+                            disabled={
+                              !Number.isSafeInteger(Number(amount)) ||
+                              Number(amount) <= 0 ||
+                              Number(amount) >
                                 Math.min(
                                   actor.cash,
                                   state.players.find((p) => p.id === a.targetId)!.cash,
+                                )
+                            }
+                            onClick={() => act({ ...a, amount: Number(amount) })}
+                          >
+                            {translate('Défier ')}
+                            {state.players.find((p) => p.id === a.targetId)!.name}
+                            <small>
+                              {translate('Mise : ')}
+                              {Number.isSafeInteger(Number(amount)) && Number(amount) > 0
+                                ? translate(money(Number(amount), true))
+                                : '—'}
+                              {' · '}
+                              {translate('Maximum :')}{' '}
+                              {translate(
+                                money(
+                                  Math.min(
+                                    actor.cash,
+                                    state.players.find((p) => p.id === a.targetId)!.cash,
+                                  ),
                                 ),
-                              ),
-                            )}
-                          </small>
-                          <ActionClock />
-                        </button>
-                      ),
-                  )}
-              </div>
-              <button
-                className="secondary"
-                onClick={() => act({ type: 'duel_cancel', playerId: actor.id })}
-              >
-                {translate('Passer ce duel ')}
-                <ActionClock />
-              </button>
+                              )}
+                            </small>
+                            <ActionClock />
+                          </button>
+                        ),
+                    )}
+                </div>
+                <button
+                  className="secondary"
+                  onClick={() => act({ type: 'duel_cancel', playerId: actor.id })}
+                >
+                  {translate('Passer ce duel ')}
+                  <ActionClock />
+                </button>
+              </ActionCardActions>
             </>
           )}
         </>
@@ -217,22 +225,24 @@ export function DuelView({
                     )}
               </p>
               {canPlay && (
-                <div className="decision-actions">
-                  <button
-                    className="primary"
-                    onClick={() => act({ type: 'duel_accept', playerId: actor.id })}
-                  >
-                    {translate('Accepter et miser ')}
-                    {translate(money(d.amount))} <ActionClock />
-                  </button>
-                  <button
-                    className="secondary"
-                    onClick={() => act({ type: 'duel_decline', playerId: actor.id })}
-                  >
-                    {translate('Refuser le duel ')}
-                    <ActionClock />
-                  </button>
-                </div>
+                <ActionCardActions className="duel-card-actions">
+                  <div className="decision-actions duel-accept-actions">
+                    <button
+                      className="primary"
+                      onClick={() => act({ type: 'duel_accept', playerId: actor.id })}
+                    >
+                      {translate('Accepter et miser ')}
+                      {translate(money(d.amount))} <ActionClock />
+                    </button>
+                    <button
+                      className="secondary"
+                      onClick={() => act({ type: 'duel_decline', playerId: actor.id })}
+                    >
+                      {translate('Refuser le duel ')}
+                      <ActionClock />
+                    </button>
+                  </div>
+                </ActionCardActions>
               )}
             </>
           )}
@@ -245,15 +255,17 @@ export function DuelView({
                 {translate(!self && ' Passez l’écran au joueur indiqué avant de choisir.')}
               </p>
               {canPlay && (
-                <div className="duel-choices">
-                  {duelChoices.map((choice) => (
-                    <button className="primary" key={choice} onClick={() => choose(choice)}>
-                      <span aria-hidden="true">{translate(hands[choice])}</span>
-                      {translate(labels[choice])}
-                      <ActionClock />
-                    </button>
-                  ))}
-                </div>
+                <ActionCardActions className="duel-card-actions">
+                  <div className="duel-choices">
+                    {duelChoices.map((choice) => (
+                      <button className="primary" key={choice} onClick={() => choose(choice)}>
+                        <span aria-hidden="true">{translate(hands[choice])}</span>
+                        {translate(labels[choice])}
+                        <ActionClock />
+                      </button>
+                    ))}
+                  </div>
+                </ActionCardActions>
               )}
             </>
           )}
@@ -272,12 +284,14 @@ export function DuelView({
           {error && (
             <>
               <p role="alert">{translate(error)}</p>
-              <button
-                className="secondary"
-                onClick={() => act({ type: 'duel_cancel', playerId: actor.id })}
-              >
-                {translate('Abandonner ce duel')}
-              </button>
+              <ActionCardActions className="duel-card-actions">
+                <button
+                  className="secondary"
+                  onClick={() => act({ type: 'duel_cancel', playerId: actor.id })}
+                >
+                  {translate('Abandonner ce duel')}
+                </button>
+              </ActionCardActions>
             </>
           )}
         </>

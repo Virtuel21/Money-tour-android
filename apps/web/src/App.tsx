@@ -75,6 +75,7 @@ import { MoneyFlight, TurnBanner } from './game/GameFeedback';
 import { purchaseOffer, PurchaseDetails } from './game/PurchaseOffer';
 import { DuelView } from './game/DuelView';
 import { DrawnCard } from './game/DrawnCard';
+import { ActionCard } from './game/ActionCard';
 import { CasinoView } from './game/CasinoView';
 import credits from '../../../CREDITS.md?raw';
 import creditsEnglish from '../../../CREDITS.en.md?raw';
@@ -158,6 +159,37 @@ function Modal({
     </dialog>
   );
 }
+function TileDetailsDialog({
+  property,
+  cardKey,
+  title,
+  onClose,
+  reducedMotion,
+  children,
+}: {
+  property: boolean;
+  cardKey: string;
+  title: string;
+  onClose: () => void;
+  reducedMotion: boolean;
+  children: (close: () => void) => React.ReactNode;
+}) {
+  return property ? (
+    <Modal title={title} onClose={onClose}>
+      {children(onClose)}
+    </Modal>
+  ) : (
+    <ActionCard
+      cardKey={cardKey}
+      title={title}
+      icon="map"
+      onClose={onClose}
+      reducedMotion={reducedMotion}
+    >
+      {(card) => children(() => card.run(onClose))}
+    </ActionCard>
+  );
+}
 const demo = createGame({
   config: { ...config, shuffleStreets: false },
   players: [
@@ -211,6 +243,8 @@ export default function App() {
   const [inspectedOwner, setInspectedOwner] = useState<string | null>(null);
   const [collapsedPlayers, setCollapsedPlayers] = useState<Record<string, boolean>>({});
   const [save, setSave] = useState<LocalSave | null>(() => previewScenario() ?? loadLocal());
+  const localSaveRef = useRef(save);
+  localSaveRef.current = save;
   const [screen, setScreen] = useState<'menu' | 'game'>(() =>
     previewScenario() ? 'game' : 'menu',
   );
@@ -220,6 +254,7 @@ export default function App() {
     | 'credits'
     | 'settings'
     | 'tiles'
+    | 'insurance'
     | 'leave'
     | 'new-game'
     | 'online'
@@ -231,6 +266,7 @@ export default function App() {
     | null
   >(location.hash.includes('room=') ? 'online' : null);
   const [selectedBonus, setSelectedBonus] = useState<BonusInfo | null>(null);
+  const [insuranceDecision, setInsuranceDecision] = useState('');
   const showBonus = (bonus: BonusInfo) => {
     setSelectedBonus(bonus);
     setModal('bonus');
@@ -316,6 +352,8 @@ export default function App() {
     shownFrame.state.seq,
     shownFrame.state.turn,
     shownFrame.cue.kind,
+    shownFrame.cue.reason,
+    shownFrame.cue.message,
     shownFrame.cue.cardId ?? shownFrame.cue.tile,
     shownFrame.cue.playerId,
   ].join(':');
@@ -428,19 +466,44 @@ export default function App() {
       void onlineSession.current.intent(action);
       return;
     }
-    if (!save) return;
-    const { save: next, result } = applyLocal(save, action);
+    const previous = localSaveRef.current;
+    if (!previous) return;
+    const { save: next, result } = applyLocal(previous, action);
     if (result.error) {
       setNotice('Cette action n’est plus disponible.');
       return;
     }
+    // Timers can dispatch in the same React batch as the end of a card's flight.
+    // Advance synchronously so the next tick cannot overwrite the chosen action.
+    localSaveRef.current = next;
     cinema.present(next.state, result.events);
     const messages = result.events.map((e) => eventText(e, next.state)).filter(Boolean);
-    next.history = [...messages.slice().reverse(), ...history];
+    next.history = [...messages.slice().reverse(), ...(previous.history ?? history)];
     setSave(next);
     if (messages.length) setHistory((old) => [...messages.reverse(), ...old]);
   };
   dispatchRef.current = act;
+  // Countdown ticks may replace state while a card leaves. Dispatch against the
+  // latest state, but never carry a choice into a different player's decision.
+  const decisionKey = [
+    save?.seed ?? journey,
+    current.turn,
+    current.phase,
+    decisionPlayer.id,
+    current.duel?.id,
+    current.duel?.stage,
+    current.phase === 'debt'
+      ? `${active.cash}:${Object.entries(current.properties)
+          .filter(([, property]) => property.ownerId === active.id)
+          .map(([id]) => id)
+          .join(',')}`
+      : '',
+  ].join(':');
+  const currentDecision = useRef(decisionKey);
+  currentDecision.current = decisionKey;
+  const dispatchDecision = (action: GameAction) => {
+    if (currentDecision.current === decisionKey) dispatchRef.current(action);
+  };
   useEffect(() => {
     if (save && !previewScenario() && !persistLocal(save))
       setNotice('Le navigateur ne permet pas la sauvegarde locale. Gardez cet onglet ouvert.');
@@ -595,6 +658,11 @@ export default function App() {
   const options = legal.filter((a): a is Extract<GameAction, { tile: number }> =>
     ['travel', 'place_championship', 'insure', 'attack', 'sell'].includes(a.type),
   );
+  const insuranceAvailable = !interactionDisabled && options.some((a) => a.type === 'insure');
+  useEffect(() => {
+    if (modal === 'insurance' && (!insuranceAvailable || insuranceDecision !== decisionKey))
+      setModal(null);
+  }, [modal, insuranceAvailable, insuranceDecision, decisionKey]);
   const browseTile = (id: number) => {
     const actionable = !interactionDisabled && options.some((action) => action.tile === id);
     if (
@@ -1506,6 +1574,19 @@ export default function App() {
                     </p>
                   )}
                 <div className="actions">
+                  {options.some((a) => a.type === 'insure') && !interactionDisabled && (
+                    <button
+                      className="secondary"
+                      onClick={() => {
+                        setInsuranceDecision(decisionKey);
+                        setModal('insurance');
+                      }}
+                    >
+                      <GameIcon name="shield" />
+                      {translate('Choisir un bien à assurer')}
+                    </button>
+                  )}
+
                   {current.phase === 'travel' &&
                     !active.bot &&
                     (!online || online.self === active.id) && (
@@ -1645,12 +1726,20 @@ export default function App() {
           </div>
         )}
         {modal === 'bonus' && selectedBonus && (
-          <Modal title={translate(selectedBonus.title)} onClose={() => setModal(null)}>
+          <ActionCard
+            cardKey={`bonus:${selectedBonus.title}`}
+            title={translate(selectedBonus.title)}
+            icon={selectedBonus.icon ?? 'card'}
+            reducedMotion={reduced}
+            onClose={() => setModal(null)}
+            footer={(card) => (
+              <button className="primary" onClick={() => card.run(() => setModal(null))}>
+                {translate('Compris')}
+              </button>
+            )}
+          >
             <p className="bonus-description">{translate(selectedBonus.description)}</p>
-            <button className="primary" onClick={() => setModal(null)}>
-              {translate('Compris')}
-            </button>
-          </Modal>
+          </ActionCard>
         )}
         {modal === 'journal' && (
           <Modal title={translate('Journal des actions')} onClose={() => setModal(null)}>
@@ -1834,7 +1923,46 @@ export default function App() {
             />
           </Modal>
         )}
-        {modal === 'tiles' && (
+        {((modal === 'insurance' && insuranceAvailable && insuranceDecision === decisionKey) ||
+          (modal === 'tiles' && current.phase === 'travel' && !interactionDisabled)) && (
+          <ActionCard
+            cardKey={`${decisionKey}:${modal}`}
+            title={translate(
+              modal === 'insurance' ? 'Choisir un bien à assurer' : 'Choisir ma destination',
+            )}
+            ownerLabel={active.name}
+            icon={modal === 'insurance' ? 'shield' : 'map'}
+            status={<ActionClock full />}
+            reducedMotion={reduced}
+            onClose={() => setModal(null)}
+            footer={(card) => (
+              <button className="secondary" onClick={() => card.run(() => setModal(null))}>
+                {translate('Retour au plateau')}
+              </button>
+            )}
+          >
+            {(card) => (
+              <MobileTiles
+                state={current}
+                choices={options
+                  .filter((a) => a.type === (modal === 'insurance' ? 'insure' : 'travel'))
+                  .map((a) => a.tile)}
+                onTile={(id) => {
+                  const action = options.find(
+                    (a) =>
+                      a.tile === id && a.type === (modal === 'insurance' ? 'insure' : 'travel'),
+                  );
+                  if (action && !interactionDisabled)
+                    card.run(() => {
+                      dispatchDecision(action);
+                      setModal(null);
+                    });
+                }}
+              />
+            )}
+          </ActionCard>
+        )}
+        {modal === 'tiles' && (current.phase !== 'travel' || interactionDisabled) && (
           <Modal
             title={
               current.phase === 'travel' && !interactionDisabled
@@ -1977,46 +2105,150 @@ export default function App() {
           current.phase === 'duel' &&
           !sharedDialog.hidden &&
           current.duel && (
-            <Modal title={translate('Le grand duel')} onClose={sharedDialog.onClose}>
-              <DuelView
-                key={current.duel.id}
-                state={current}
-                self={online?.self}
-                act={act}
-                disabled={Boolean(online?.busy || online?.blocked)}
-              />
-            </Modal>
-          )}
-        {screen === 'game' && !interactionDisabled && !modal && current.phase === 'alliance' && (
-          <Modal title={translate('Choisissez votre alliance')}>
-            <p>
-              {translate(
-                'Recevez 50 % des gains du joueur choisi jusqu’à la fin de son prochain tour. Cette part est prélevée sur ses gains.',
-              )}
-            </p>
-            <div className="decision-actions">
-              {legal
-                .filter((a) => a.type === 'alliance')
-                .map(
-                  (a) =>
-                    a.type === 'alliance' && (
-                      <button className="primary" key={a.targetId} onClick={() => act(a)}>
-                        {translate('Choisir ')}
-                        {current.players.find((p) => p.id === a.targetId)!.name}
-                        <ActionClock />
-                      </button>
-                    ),
-                )}
-            </div>
-            <button
-              className="secondary"
-              onClick={() => act({ type: 'finish', playerId: active.id })}
+            <ActionCard
+              cardKey={decisionKey}
+              reducedMotion={reduced}
+              ownerLabel={decisionPlayer.name}
+              icon="target"
+              status={<ActionClock full />}
+              title={translate('Le grand duel')}
+              onClose={sharedDialog.onClose}
             >
-              {translate('Passer ')}
-              <ActionClock />
-            </button>
-          </Modal>
-        )}
+              {(card) => (
+                <>
+                  <DuelView
+                    key={current.duel!.id}
+                    state={current}
+                    self={online?.self}
+                    act={(action) =>
+                      action.type === 'duel_reveal'
+                        ? act(action)
+                        : card.run(() => dispatchDecision(action))
+                    }
+                    disabled={Boolean(online?.busy || online?.blocked)}
+                  />
+                </>
+              )}
+            </ActionCard>
+          )}
+        {screen === 'game' &&
+          !interactionDisabled &&
+          !modal &&
+          !tile &&
+          ['championship', 'island', 'attack'].includes(current.phase) && (
+            <ActionCard
+              cardKey={decisionKey}
+              title={translate(
+                current.phase === 'championship'
+                  ? '🎸 Où accueillir le Festival ?'
+                  : current.phase === 'island'
+                    ? 'Île perdue'
+                    : 'Choisir une propriété adverse',
+              )}
+              ownerLabel={active.name}
+              icon={
+                current.phase === 'championship'
+                  ? 'music'
+                  : current.phase === 'island'
+                    ? 'island'
+                    : 'target'
+              }
+              status={<ActionClock full />}
+              reducedMotion={reduced}
+              footer={(card) => {
+                const skip = legal.find((a) => a.type === 'finish');
+                return skip ? (
+                  <button
+                    className="secondary"
+                    onClick={() => card.run(() => dispatchDecision(skip))}
+                  >
+                    {translate(actionLabel(skip))}
+                  </button>
+                ) : null;
+              }}
+            >
+              {(card) => (
+                <>
+                  <p>{translate(actionDescription)}</p>
+                  <div className="decision-actions">
+                    {legal
+                      .filter((a) =>
+                        [
+                          'place_championship',
+                          'attack',
+                          'pay_bail',
+                          'use_escape',
+                          'attempt_escape',
+                        ].includes(a.type),
+                      )
+                      .map((action, i) => (
+                        <button
+                          className={i === 0 ? 'primary' : 'secondary'}
+                          key={`${action.type}:${'tile' in action ? action.tile : ''}`}
+                          onClick={() => card.run(() => dispatchDecision(action))}
+                        >
+                          {translate(actionLabel(action))}
+                          {action.type === 'place_championship' && (
+                            <> · {translate(money(current.config.championshipFee, true))}</>
+                          )}
+                        </button>
+                      ))}
+                  </div>
+                </>
+              )}
+            </ActionCard>
+          )}
+        {screen === 'game' &&
+          !tile &&
+          !interactionDisabled &&
+          !modal &&
+          current.phase === 'alliance' && (
+            <ActionCard
+              cardKey={decisionKey}
+              reducedMotion={reduced}
+              ownerLabel={decisionPlayer.name}
+              icon="people"
+              status={<ActionClock full />}
+              title={translate('Choisissez votre alliance')}
+            >
+              {(card) => (
+                <>
+                  <p>
+                    {translate(
+                      'Recevez 50 % des gains du joueur choisi jusqu’à la fin de son prochain tour. Cette part est prélevée sur ses gains.',
+                    )}
+                  </p>
+                  <div className="decision-actions">
+                    {legal
+                      .filter((a) => a.type === 'alliance')
+                      .map(
+                        (a) =>
+                          a.type === 'alliance' && (
+                            <button
+                              className="primary"
+                              key={a.targetId}
+                              onClick={() => card.run(() => dispatchDecision(a))}
+                            >
+                              {translate('Choisir ')}
+                              {current.players.find((p) => p.id === a.targetId)!.name}
+                              <ActionClock />
+                            </button>
+                          ),
+                      )}
+                  </div>
+                  <button
+                    className="secondary"
+                    onClick={() =>
+                      card.run(() => dispatchDecision({ type: 'finish', playerId: active.id }))
+                    }
+                  >
+                    {translate('Passer ')}
+                    <ActionClock />
+                  </button>
+                </>
+              )}
+            </ActionCard>
+          )}
         {screen === 'game' &&
           !rolling &&
           !paused &&
@@ -2042,28 +2274,53 @@ export default function App() {
               />
             </Modal>
           )}
-        {screen === 'game' && !interactionDisabled && !modal && current.phase === 'casino' && (
-          <Modal title={translate('Bienvenue au casino')}>
-            <CasinoView state={current} act={act} />
-          </Modal>
-        )}
         {screen === 'game' &&
+          !tile &&
+          !interactionDisabled &&
+          !modal &&
+          current.phase === 'casino' && (
+            <ActionCard
+              cardKey={decisionKey}
+              reducedMotion={reduced}
+              ownerLabel={decisionPlayer.name}
+              icon="dice"
+              status={<ActionClock full />}
+              title={translate('Bienvenue au casino')}
+            >
+              {(card) => (
+                <>
+                  <CasinoView
+                    state={current}
+                    act={(action) => card.run(() => dispatchDecision(action))}
+                  />
+                </>
+              )}
+            </ActionCard>
+          )}
+        {screen === 'game' &&
+          !modal &&
+          !tile &&
           !paused &&
           !cinema.dismissed &&
           cinema.frame.cue.kind === 'casino' && (
-            <Modal title={translate('Le casino joue pour vous')} onClose={cinema.dismiss}>
-              <CasinoView
-                key={current.seq + '-casino'}
-                state={current}
-                cue={cinema.frame.cue}
-                act={act}
-              />
-              <button className="secondary" onClick={cinema.dismiss}>
-                {translate('Passer l’animation')}
-              </button>
-            </Modal>
+            <ActionCard
+              cardKey={drawnCardKey}
+              reducedMotion={reduced}
+              icon="dice"
+              title={translate('Le casino joue pour vous')}
+              onClose={dismissDrawnCard}
+              footer={(card) => (
+                <button className="secondary" onClick={() => card.run(dismissDrawnCard)}>
+                  {translate('Passer l’animation')}
+                </button>
+              )}
+            >
+              <CasinoView key={drawnCardKey} state={current} cue={cinema.frame.cue} act={act} />
+            </ActionCard>
           )}
         {screen === 'game' &&
+          !modal &&
+          !tile &&
           !paused &&
           !cinema.dismissed &&
           cinema.frame.cue.kind === 'notice' &&
@@ -2087,9 +2344,16 @@ export default function App() {
               </button>
             </div>
           ) : (
-            <Modal
-              onClose={cinema.dismiss}
-              className={cinema.frame.cue.reason === 'earthquake' ? 'earthquake-modal' : ''}
+            <ActionCard
+              cardKey={drawnCardKey}
+              reducedMotion={reduced}
+              icon={cinema.frame.cue.reason === 'insured' ? 'shield' : 'sparkles'}
+              onClose={dismissDrawnCard}
+              footer={(card) => (
+                <button className="primary" onClick={() => card.run(dismissDrawnCard)}>
+                  {translate('Continuer')}
+                </button>
+              )}
               title={
                 cinema.frame.cue.reason === 'victory_warning'
                   ? translate('Monopole en vue !')
@@ -2113,289 +2377,352 @@ export default function App() {
               }
             >
               <p className="event-notice">{translate(cinema.frame.cue.message)}</p>
-              <button className="primary" onClick={cinema.dismiss}>
-                {translate('Continuer')}
-              </button>
-            </Modal>
+            </ActionCard>
           ))}
-        {screen === 'game' && !interactionDisabled && !modal && current.phase === 'rent' && (
-          <Modal title={translate('Un loyer… ou votre carte Squatteur ?')}>
-            <p>
-              {translate('Vous arrivez à ')}
-              {translate(current.config.board[active.position]?.name)}
-              {translate('. Le loyer est de')} {translate(money(current.pendingRent?.amount ?? 0))}.
-            </p>
-            <p>{translate('La carte Squatteur annule ce paiement et sera défaussée.')}</p>
-            <div className="decision-actions">
-              {available
-                .filter((a) => ['use_squatter', 'pay_rent'].includes(a.type))
-                .map((a) => (
-                  <button
-                    className={a.type === 'use_squatter' ? 'primary' : 'secondary'}
-                    key={a.type}
-                    onClick={() => act(a)}
-                  >
-                    {translate(actionLabel(a))}
-                    <ActionClock />
-                  </button>
-                ))}
-            </div>
-          </Modal>
-        )}
-        {screen === 'game' && !interactionDisabled && !modal && current.phase === 'debt' && (
-          <Modal title={translate('Réglons cette dette ensemble')}>
-            <p>
-              {translate('À payer : ')}
-              <strong>{translate(money(current.debt!.amount))}</strong>
-              {translate(' · En banque :')} {translate(money(active.cash))}.
-            </p>
-            <p>
-              {translate('Il manque ')}
-              <strong>{translate(money(current.debt!.amount - active.cash))}</strong>
-              {translate(
-                '. Choisissez les biens à vendre. Le paiement se règle dès que le total suffit.',
-              )}
-            </p>
-            <p>
-              {translate('Valeur vendable totale :')}{' '}
-              <strong>
-                {translate(
-                  money(
-                    legal
-                      .filter((a) => a.type === 'sell')
-                      .reduce(
-                        (sum, a) =>
-                          sum +
-                          Math.floor(
-                            getPropertyValue(current, 'tile' in a ? a.tile : 0) *
-                              current.config.resaleRate,
-                          ),
-                        0,
-                      ),
-                  ),
-                )}
-              </strong>
-              .
-            </p>
-            {mobile ? (
-              <MobileTiles
-                state={current}
-                choices={options.map((a) => a.tile)}
-                onTile={chooseTile}
-              />
-            ) : (
-              <div className="decision-actions">
-                {available
-                  .filter((a) => a.type === 'sell')
-                  .map((a) => (
-                    <button
-                      className="secondary"
-                      key={'tile' in a ? a.tile : a.type}
-                      onClick={() => act(a)}
-                    >
-                      {translate(actionLabel(a))}
-                      <ActionClock />
-                    </button>
-                  ))}
-              </div>
-            )}
-          </Modal>
-        )}
-        {modal === 'taunt' && tauntSender && screen === 'game' && (
-          <Modal
-            title={translate('À vous de taquiner !')}
-            className="taunt-modal"
-            onClose={() => setModal(null)}
-          >
-            <TauntMenu
-              state={current}
-              playerId={tauntSender}
-              targetId={tauntTarget}
-              cooling={!!tauntReadyAt}
-              onSend={sendTaunt}
-            />
-          </Modal>
-        )}
-        {tile && !offer && (
-          <Modal title={translate(tileTitle(tile))} onClose={() => setSelected(null)}>
-            <div className="property-hero" style={{ background: tile.color ?? '#e6b94a' }}>
-              {tile.type === 'city' ? (
-                <BuildingIllustration level={property?.level || 1} cityName={tile.name} />
-              ) : (
-                <span>{tile.type === 'resort' ? '☀' : '✦'}</span>
-              )}
-              <p>
-                {property?.ownerId
-                  ? formatText(
-                      'Propriété de {0}',
-                      current.players.find((p) => p.id === property.ownerId)?.name,
-                    )
-                  : tile.price
-                    ? translate('Cette escale attend son propriétaire.')
-                    : translate('Une escale spéciale de votre voyage.')}
-              </p>
-            </div>
-            {tile.type === 'city' && (
-              <p className="architecture-name">
-                {translate(architectureLabels[architectureForCity(tile.name)])}
-              </p>
-            )}
-            {!!tile.price && (
-              <PropertyInsight
-                state={current}
-                tileId={tile.id}
-                playerId={online?.self ?? active.id}
-                onTile={setSelected}
-              />
-            )}
-            {!!property?.roachTurns && (
-              <p className="roach-warning">
-                {translate('🪳 Hôtel de ')}
-                {translate(tile.name)}
-                {translate(' infesté · loyer −50 % · encore ')}
-                {property.roachTurns}
-                {translate(' retours du tour de son propriétaire.')}
-              </p>
-            )}
-            {tile.price ? (
-              <>
-                <div className="property-stats">
-                  <div>
-                    <small>{translate('Terrain')}</small>
-                    <strong>{translate(money(tile.price))}</strong>
-                  </div>
-                </div>
-                {tile.type === 'resort' && (
-                  <p>
-                    {translate(
-                      'Collection d’îles : 1 → 50 · 2 → 100 · 3 → 200 · 4 → 500 de loyer.',
-                    )}
-                  </p>
-                )}
-                {tile.rents && (
-                  <div className="rent-table">
-                    {tile.rents.map((rent, level) => (
-                      <div
-                        key={level}
-                        className={property?.ownerId && property.level === level ? 'selected' : ''}
-                      >
-                        <span>
-                          {translate(
-                            ['Terrain', 'Maison 1', 'Maison 2', 'Maison 3', 'Hôtel'][level],
-                          )}
-                        </span>
-                        <b>{translate(money(rent, true))}</b>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <p>
-                  {reservedCity(current, tile.id)
-                    ? translate('Ville réservée au Marché flottant du tour de table 10. ')
-                    : ''}
-                </p>
-              </>
-            ) : (
-              <p>
-                {tile.type === 'start'
-                  ? translate('Chaque passage en avant rapporte 300.')
-                  : tile.type === 'island'
-                    ? translate(
-                        'Jusqu’à trois tours sur l’île. Sortez par un double, un billet ou 200.',
-                      )
-                    : tile.type === 'championship'
-                      ? translate(
-                          'Pour 50, doublez le loyer d’une de vos villes ou îles pendant 4 de vos tours. Un nouveau Festival renouvelle la durée, sans cumuler le bonus.',
-                        )
-                      : tile.type === 'travel'
-                        ? translate(
-                            'Au prochain tour, voyagez pour 50 vers une case libre ou alliée.',
-                          )
-                        : tile.type === 'tax'
-                          ? translate(
-                              'Vous payez 50 plus 10 % de la valeur foncière de vos propriétés.',
-                            )
-                          : translate(
-                              'Une des dix-huit cartes peut transformer votre voyage, y compris des attaques contre vos adversaires.',
-                            )}
-              </p>
-            )}
-            <button className="secondary" onClick={() => setSelected(null)}>
-              {modal === 'pocket'
-                ? translate('Retour au carnet')
-                : modal === 'tiles'
-                  ? translate('Retour aux escales')
-                  : modal === 'strategy'
-                    ? translate('Retour à ma stratégie')
-                    : translate('Retour au plateau')}
-            </button>
-          </Modal>
-        )}
-        {screen === 'game' && !cinema.dismissed && cinema.frame.cue.kind === 'tax' && (
-          <DrawnCard
-            cardKey={drawnCardKey}
-            tone="tax"
-            reducedMotion={reduced}
-            ownerLabel={
-              translate('Carte de ') +
-              (current.players.find((p) => p.id === cinema.frame.cue.playerId)?.name ?? active.name)
-            }
-            title={translate('Avis de taxe')}
-            artwork={import.meta.env.BASE_URL + 'textures/tax-tile-v2.webp'}
-            actionLabel={translate('Aïe, j’ai compris !')}
-            onDismiss={dismissDrawnCard}
-          >
-            <p>
-              {current.players.find((p) => p.id === cinema.frame.cue.playerId)?.name}
-              {translate(' · somme à régler')}
-            </p>
-            <strong className="tax-amount">{translate(money(cinema.frame.cue.amount ?? 0))}</strong>
-            <p className="drawn-card-news">
-              {translate(
-                [
-                  'Le président augmente encore le prix de l’essence. Même votre pion fait le plein !',
-                  'Oups, dissolution de l’assemblée ! L’inflation explose… votre portefeuille demande des vacances.',
-                  'Le président américain augmente les droits de douane. Vos souvenirs passent à la caisse !',
-                ][(current.turn + (cinema.frame.cue.tile ?? 0)) % 3],
-              )}
-            </p>
-            <p>
-              {cinema.frame.cue.reason === 'fraud' ? (
-                'Contrôle fiscal ! Votre achat à prix réduit entraîne une taxe égale à deux fois le prix normal de la propriété. Le contrôle clôt ce risque.'
-              ) : (
+        {screen === 'game' &&
+          !tile &&
+          !interactionDisabled &&
+          !modal &&
+          current.phase === 'rent' && (
+            <ActionCard
+              cardKey={decisionKey}
+              reducedMotion={reduced}
+              ownerLabel={decisionPlayer.name}
+              icon="card"
+              status={<ActionClock full />}
+              title={translate('Un loyer… ou votre carte Squatteur ?')}
+            >
+              {(card) => (
                 <>
-                  {translate('Taxe : ')}
-                  {translate(money(current.config.taxBase ?? 0, true))} +{' '}
-                  {current.config.taxRate * 100}
-                  {translate(' % de votre patrimoine immobilier.')}
+                  <p>
+                    {translate('Vous arrivez à ')}
+                    {translate(current.config.board[active.position]?.name)}
+                    {translate('. Le loyer est de')}{' '}
+                    {translate(money(current.pendingRent?.amount ?? 0))}.
+                  </p>
+                  <p>{translate('La carte Squatteur annule ce paiement et sera défaussée.')}</p>
+                  <div className="decision-actions">
+                    {available
+                      .filter((a) => ['use_squatter', 'pay_rent'].includes(a.type))
+                      .map((a) => (
+                        <button
+                          className={a.type === 'use_squatter' ? 'primary' : 'secondary'}
+                          key={a.type}
+                          onClick={() => card.run(() => dispatchDecision(a))}
+                        >
+                          {translate(actionLabel(a))}
+                          <ActionClock />
+                        </button>
+                      ))}
+                  </div>
                 </>
               )}
-            </p>
-          </DrawnCard>
-        )}
-        {screen === 'game' && !cinema.dismissed && cinema.frame.cue.kind === 'card' && (
-          <DrawnCard
-            cardKey={drawnCardKey}
+            </ActionCard>
+          )}
+        {screen === 'game' &&
+          !tile &&
+          !interactionDisabled &&
+          !modal &&
+          current.phase === 'debt' && (
+            <ActionCard
+              cardKey={decisionKey}
+              reducedMotion={reduced}
+              ownerLabel={decisionPlayer.name}
+              icon="coin"
+              status={<ActionClock full />}
+              title={translate('Réglons cette dette ensemble')}
+            >
+              {(card) => (
+                <div className="debt-card-layout">
+                  <div className="debt-card-summary">
+                    <p>
+                      {translate('À payer : ')}
+                      <strong>{translate(money(current.debt!.amount))}</strong>
+                      {translate(' · En banque :')} {translate(money(active.cash))}.
+                    </p>
+                    <p>
+                      {translate('Il manque ')}
+                      <strong>{translate(money(current.debt!.amount - active.cash))}</strong>
+                      {translate(
+                        '. Choisissez les biens à vendre. Le paiement se règle dès que le total suffit.',
+                      )}
+                    </p>
+                    <p>
+                      {translate('Valeur vendable totale :')}{' '}
+                      <strong>
+                        {translate(
+                          money(
+                            legal
+                              .filter((a) => a.type === 'sell')
+                              .reduce(
+                                (sum, a) =>
+                                  sum +
+                                  Math.floor(
+                                    getPropertyValue(current, 'tile' in a ? a.tile : 0) *
+                                      current.config.resaleRate,
+                                  ),
+                                0,
+                              ),
+                          ),
+                        )}
+                      </strong>
+                      .
+                    </p>
+                  </div>
+                  <div className="debt-card-choices">
+                    {mobile ? (
+                      <MobileTiles
+                        state={current}
+                        choices={options.map((a) => a.tile)}
+                        onTile={(id) => {
+                          const action = options.find((a) => a.tile === id);
+                          if (action) card.run(() => dispatchDecision(action));
+                        }}
+                      />
+                    ) : (
+                      <div className="decision-actions">
+                        {available
+                          .filter((a) => a.type === 'sell')
+                          .map((a) => (
+                            <button
+                              className="secondary"
+                              key={'tile' in a ? a.tile : a.type}
+                              onClick={() => card.run(() => dispatchDecision(a))}
+                            >
+                              {translate(actionLabel(a))}
+                              <ActionClock />
+                            </button>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </ActionCard>
+          )}
+        {modal === 'taunt' && tauntSender && screen === 'game' && (
+          <ActionCard
+            cardKey={`taunt:${tauntSender}:${tauntTarget}`}
             reducedMotion={reduced}
-            ownerLabel={
-              translate('Carte de ') +
-              (current.players.find((p) => p.id === cinema.frame.cue.playerId)?.name ?? active.name)
-            }
-            title={translate(
-              festivalText(
-                current.config.cards.find((c) => c.id === cinema.frame.cue.cardId)?.title,
-              ),
+            icon="people"
+            title={translate('À vous de taquiner !')}
+            onClose={() => setModal(null)}
+          >
+            {(card) => (
+              <TauntMenu
+                state={current}
+                playerId={tauntSender}
+                targetId={tauntTarget}
+                cooling={!!tauntReadyAt}
+                onSend={(kind) => card.run(() => sendTaunt(kind))}
+              />
             )}
-            description={translate(
-              propertyRulesText(
-                current.config.cards.find((c) => c.id === cinema.frame.cue.cardId)?.description,
-              ),
-            )}
-            artworkAlt={translate('Une enveloppe pleine de surprises')}
-            actionLabel={translate('J’ai lu · continuer')}
-            onDismiss={dismissDrawnCard}
-          />
+          </ActionCard>
         )}
+        {tile && !offer && (
+          <TileDetailsDialog
+            property={!!tile.price}
+            cardKey={`tile:${tile.id}`}
+            title={translate(tileTitle(tile))}
+            onClose={() => setSelected(null)}
+            reducedMotion={reduced}
+          >
+            {(close) => (
+              <>
+                <div className="property-hero" style={{ background: tile.color ?? '#e6b94a' }}>
+                  {tile.type === 'city' ? (
+                    <BuildingIllustration level={property?.level || 1} cityName={tile.name} />
+                  ) : (
+                    <span>{tile.type === 'resort' ? '☀' : '✦'}</span>
+                  )}
+                  <p>
+                    {property?.ownerId
+                      ? formatText(
+                          'Propriété de {0}',
+                          current.players.find((p) => p.id === property.ownerId)?.name,
+                        )
+                      : tile.price
+                        ? translate('Cette escale attend son propriétaire.')
+                        : translate('Une escale spéciale de votre voyage.')}
+                  </p>
+                </div>
+                {tile.type === 'city' && (
+                  <p className="architecture-name">
+                    {translate(architectureLabels[architectureForCity(tile.name)])}
+                  </p>
+                )}
+                {!!tile.price && (
+                  <PropertyInsight
+                    state={current}
+                    tileId={tile.id}
+                    playerId={online?.self ?? active.id}
+                    onTile={setSelected}
+                  />
+                )}
+                {!!property?.roachTurns && (
+                  <p className="roach-warning">
+                    {translate('🪳 Hôtel de ')}
+                    {translate(tile.name)}
+                    {translate(' infesté · loyer −50 % · encore ')}
+                    {property.roachTurns}
+                    {translate(' retours du tour de son propriétaire.')}
+                  </p>
+                )}
+                {tile.price ? (
+                  <>
+                    <div className="property-stats">
+                      <div>
+                        <small>{translate('Terrain')}</small>
+                        <strong>{translate(money(tile.price))}</strong>
+                      </div>
+                    </div>
+                    {tile.type === 'resort' && (
+                      <p>
+                        {translate(
+                          'Collection d’îles : 1 → 50 · 2 → 100 · 3 → 200 · 4 → 500 de loyer.',
+                        )}
+                      </p>
+                    )}
+                    {tile.rents && (
+                      <div className="rent-table">
+                        {tile.rents.map((rent, level) => (
+                          <div
+                            key={level}
+                            className={
+                              property?.ownerId && property.level === level ? 'selected' : ''
+                            }
+                          >
+                            <span>
+                              {translate(
+                                ['Terrain', 'Maison 1', 'Maison 2', 'Maison 3', 'Hôtel'][level],
+                              )}
+                            </span>
+                            <b>{translate(money(rent, true))}</b>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <p>
+                      {reservedCity(current, tile.id)
+                        ? translate('Ville réservée au Marché flottant du tour de table 10. ')
+                        : ''}
+                    </p>
+                  </>
+                ) : (
+                  <p>
+                    {tile.type === 'start'
+                      ? translate('Chaque passage en avant rapporte 300.')
+                      : tile.type === 'island'
+                        ? translate(
+                            'Jusqu’à trois tours sur l’île. Sortez par un double, un billet ou 200.',
+                          )
+                        : tile.type === 'championship'
+                          ? translate(
+                              'Pour 50, doublez le loyer d’une de vos villes ou îles pendant 4 de vos tours. Un nouveau Festival renouvelle la durée, sans cumuler le bonus.',
+                            )
+                          : tile.type === 'travel'
+                            ? translate(
+                                'Au prochain tour, voyagez pour 50 vers une case libre ou alliée.',
+                              )
+                            : tile.type === 'tax'
+                              ? translate(
+                                  'Vous payez 50 plus 10 % de la valeur foncière de vos propriétés.',
+                                )
+                              : translate(
+                                  'Une des dix-huit cartes peut transformer votre voyage, y compris des attaques contre vos adversaires.',
+                                )}
+                  </p>
+                )}
+                <button className="secondary" onClick={close}>
+                  {modal === 'pocket'
+                    ? translate('Retour au carnet')
+                    : modal === 'tiles'
+                      ? translate('Retour aux escales')
+                      : modal === 'strategy'
+                        ? translate('Retour à ma stratégie')
+                        : translate('Retour au plateau')}
+                </button>
+              </>
+            )}
+          </TileDetailsDialog>
+        )}
+        {screen === 'game' &&
+          !modal &&
+          !tile &&
+          !cinema.dismissed &&
+          cinema.frame.cue.kind === 'tax' && (
+            <DrawnCard
+              cardKey={drawnCardKey}
+              tone="tax"
+              reducedMotion={reduced}
+              ownerLabel={
+                translate('Carte de ') +
+                (current.players.find((p) => p.id === cinema.frame.cue.playerId)?.name ??
+                  active.name)
+              }
+              title={translate('Avis de taxe')}
+              artwork={import.meta.env.BASE_URL + 'textures/tax-tile-v2.webp'}
+              actionLabel={translate('Aïe, j’ai compris !')}
+              onDismiss={dismissDrawnCard}
+            >
+              <p>
+                {current.players.find((p) => p.id === cinema.frame.cue.playerId)?.name}
+                {translate(' · somme à régler')}
+              </p>
+              <strong className="tax-amount">
+                {translate(money(cinema.frame.cue.amount ?? 0))}
+              </strong>
+              <p className="drawn-card-news">
+                {translate(
+                  [
+                    'Le président augmente encore le prix de l’essence. Même votre pion fait le plein !',
+                    'Oups, dissolution de l’assemblée ! L’inflation explose… votre portefeuille demande des vacances.',
+                    'Le président américain augmente les droits de douane. Vos souvenirs passent à la caisse !',
+                  ][(current.turn + (cinema.frame.cue.tile ?? 0)) % 3],
+                )}
+              </p>
+              <p>
+                {cinema.frame.cue.reason === 'fraud' ? (
+                  'Contrôle fiscal ! Votre achat à prix réduit entraîne une taxe égale à deux fois le prix normal de la propriété. Le contrôle clôt ce risque.'
+                ) : (
+                  <>
+                    {translate('Taxe : ')}
+                    {translate(money(current.config.taxBase ?? 0, true))} +{' '}
+                    {current.config.taxRate * 100}
+                    {translate(' % de votre patrimoine immobilier.')}
+                  </>
+                )}
+              </p>
+            </DrawnCard>
+          )}
+        {screen === 'game' &&
+          !modal &&
+          !tile &&
+          !cinema.dismissed &&
+          cinema.frame.cue.kind === 'card' && (
+            <DrawnCard
+              cardKey={drawnCardKey}
+              reducedMotion={reduced}
+              ownerLabel={
+                translate('Carte de ') +
+                (current.players.find((p) => p.id === cinema.frame.cue.playerId)?.name ??
+                  active.name)
+              }
+              title={translate(
+                festivalText(
+                  current.config.cards.find((c) => c.id === cinema.frame.cue.cardId)?.title,
+                ),
+              )}
+              description={translate(
+                propertyRulesText(
+                  current.config.cards.find((c) => c.id === cinema.frame.cue.cardId)?.description,
+                ),
+              )}
+              artworkAlt={translate('Une enveloppe pleine de surprises')}
+              actionLabel={translate('J’ai lu · continuer')}
+              onDismiss={dismissDrawnCard}
+            />
+          )}
         <Suspense fallback={<div className="notice">{translate('Ouverture du salon…')}</div>}>
           {(modal === 'online' || online) && (
             <OnlineLobby
@@ -2457,33 +2784,45 @@ export default function App() {
           )}
         </Suspense>
         {screen === 'game' && current.winner && !rolling && (
-          <Modal title={translate('Une fortune à célébrer !')} onClose={goHome}>
-            <div className="victory-art">
-              ✦<span>♜</span>✦
-            </div>
-            <p className="winner-name">
-              {current.winner.playerIds
-                .map((id) => current.players.find((p) => p.id === id)?.name)
-                .join(' & ')}
-            </p>
-            <p className="winner-reason">
-              {current.winner.reasons.map((r) => translate(victoryText[r] ?? r)).join(' · ')}
-            </p>
-            <GameResults
-              state={current}
-              stats={online ? online.stats : save?.stats}
-              onRematch={!online || online.self === online.host ? rematch : undefined}
-              rematchDisabled={!!online && (online.busy || online.blocked)}
-              rematchLabel={
-                online && online.self !== online.host
-                  ? 'L’hôte peut lancer la revanche dans ce salon.'
-                  : undefined
-              }
-            />
-            <button className="secondary" onClick={goHome}>
-              {translate('Retour à l’accueil')}
-            </button>
-          </Modal>
+          <ActionCard
+            cardKey={`winner:${current.turn}`}
+            reducedMotion={reduced}
+            icon="trophy"
+            title={translate('Une fortune à célébrer !')}
+            onClose={goHome}
+          >
+            {(card) => (
+              <>
+                <div className="victory-art">
+                  ✦<span>♜</span>✦
+                </div>
+                <p className="winner-name">
+                  {current
+                    .winner!.playerIds.map((id) => current.players.find((p) => p.id === id)?.name)
+                    .join(' & ')}
+                </p>
+                <p className="winner-reason">
+                  {current.winner!.reasons.map((r) => translate(victoryText[r] ?? r)).join(' · ')}
+                </p>
+                <GameResults
+                  state={current}
+                  stats={online ? online.stats : save?.stats}
+                  onRematch={
+                    !online || online.self === online.host ? () => card.run(rematch) : undefined
+                  }
+                  rematchDisabled={!!online && (online.busy || online.blocked)}
+                  rematchLabel={
+                    online && online.self !== online.host
+                      ? 'L’hôte peut lancer la revanche dans ce salon.'
+                      : undefined
+                  }
+                />
+                <button className="secondary" onClick={() => card.run(goHome)}>
+                  {translate('Retour à l’accueil')}
+                </button>
+              </>
+            )}
+          </ActionCard>
         )}
       </div>
     </GameProviders>

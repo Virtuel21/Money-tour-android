@@ -3,6 +3,7 @@ import { useEffect, useState, type CSSProperties } from 'react';
 import { getLegalActions, type GameAction, type GameState } from '@money-tour/engine';
 import type { Cue } from './presentation';
 import { ActionClock } from './ActionClock';
+import { ActionCardActions } from './ActionCard';
 import { money } from './local';
 
 export function CasinoView({
@@ -118,29 +119,31 @@ export function CasinoView({
                 ` Chaque résultat gagnant rapporte au moins ${money(state.config.casinoMinWin, true)}, avant partage éventuel de l’alliance.`,
             )}
           </p>
-          <div className="casino-actions">
-            {getLegalActions(state)
-              .filter((a) => a.type.startsWith('casino_'))
-              .map((a) => (
-                <button key={a.type} className={'primary ' + a.type} onClick={() => act(a)}>
-                  <span>
-                    {a.type === 'casino_red'
-                      ? translate('Choisir rouge')
-                      : a.type === 'casino_black'
-                        ? translate('Choisir noir')
-                        : translate('Lancer les rouleaux')}
-                  </span>
-                  <ActionClock />
-                </button>
-              ))}
-          </div>
-          <button
-            className="secondary"
-            onClick={() => act({ type: 'finish', playerId: player.id })}
-          >
-            {translate('Passer mon tour au casino ')}
-            <ActionClock />
-          </button>
+          <ActionCardActions className="casino-card-actions">
+            <div className="casino-actions">
+              {getLegalActions(state)
+                .filter((a) => a.type.startsWith('casino_'))
+                .map((a) => (
+                  <button key={a.type} className={'primary ' + a.type} onClick={() => act(a)}>
+                    <span>
+                      {a.type === 'casino_red'
+                        ? translate('Choisir rouge')
+                        : a.type === 'casino_black'
+                          ? translate('Choisir noir')
+                          : translate('Lancer les rouleaux')}
+                    </span>
+                    <ActionClock />
+                  </button>
+                ))}
+            </div>
+            <button
+              className="secondary"
+              onClick={() => act({ type: 'finish', playerId: player.id })}
+            >
+              {translate('Passer mon tour au casino ')}
+              <ActionClock />
+            </button>
+          </ActionCardActions>
         </>
       )}
     </div>
