@@ -6,7 +6,7 @@ Le monorepo d’origine est conservé : moteur TypeScript pur dans `packages/eng
 
 Identifiant : `com.moneytour.android`. Version : `0.1.0`. SDK minimum 24 ; compilation et cible 36. JDK 21, AGP 8.13.0 et Gradle 8.14.3. L’APK utilise le WebView fourni par Android et ne contient pas de bibliothèque native propre à un processeur.
 
-La WebView s’exécute sur l’origine sécurisée `https://localhost` pour les API cryptographiques et WebRTC. Les requêtes en clair sont désactivées. Seule l’autorisation Internet est déclarée par le jeu. La sauvegarde Android vers le cloud est désactivée pour ne pas copier l’identité privée des salons. Les barres système, découpes d’écran et le clavier sont pris en compte nativement ; l’HTML embarqué déclare `viewport-fit=contain` avant le premier affichage.
+La WebView s’exécute sur l’origine sécurisée `https://localhost` pour les API cryptographiques et WebRTC. Les requêtes en clair sont désactivées. Seule l’autorisation Internet est déclarée par le jeu. La sauvegarde Android vers le cloud est désactivée pour ne pas copier l’identité privée des salons. Les barres système, découpes d’écran et le clavier sont pris en compte nativement ; le champ de texte actif est recentré s’il est masqué après redimensionnement ; l’HTML embarqué déclare `viewport-fit=contain` avant le premier affichage.
 
 Le lien public d’invitation reste `https://virtuel21.github.io/money-tour/#room=…`, compatible avec le navigateur existant. L’APK n’annonce pas de liens HTTPS vérifiés : aucun domaine et fichier `assetlinks.json` n’est associé à sa signature. Les liens `moneytour://room/<32 caractères hexadécimaux>` sont acceptés. Le code et les options réseau sont extraits sans naviguer la WebView vers une page arbitraire.
 
@@ -31,7 +31,7 @@ adb install -r artifacts/android/Money-Tour-Android-0.1.0-debug.apk
 
 Le build debug utilise la clé du poste (`~/.android/debug.keystore`). Le workflow peut restaurer la même clé via le secret `ANDROID_DEBUG_KEYSTORE_BASE64`, pour permettre les mises à jour sans désinstallation. Cette clé de test n’est pas destinée à Google Play. Les fichiers de clés sont exclus de Git.
 
-La connexion GitHub utilisée pour cette livraison ne permet pas de créer des secrets Actions (erreur 403). La première APK est donc signée avec la clé locale conservée dans l’environnement de travail. Les builds Actions sans ce secret produisent des APK de contrôle avec une autre clé temporaire ; leur publication automatique est désactivée. Pour automatiser les mises à jour de cette APK, il faudra ajouter sa clé de test au secret du dépôt depuis un accès GitHub autorisé. Aucune clé n’a été mise dans le dépôt public.
+Une copie privée de la clé de test est conservée hors du dépôt dans `/workspace/shared/money-tour-android-signing/`. La connexion GitHub utilisée pour cette livraison ne permet pas de créer des secrets Actions (erreur 403). La première APK est donc signée avec la clé locale conservée dans l’environnement de travail. Les builds Actions sans ce secret produisent des APK de contrôle avec une autre clé temporaire ; leur publication automatique est désactivée. Pour automatiser les mises à jour de cette APK, il faudra ajouter sa clé de test au secret du dépôt depuis un accès GitHub autorisé. Aucune clé n’a été mise dans le dépôt public.
 
 `ANDROID_VERSION_CODE` peut fournir un entier positif aux builds suivants. Sur GitHub Actions, il prend le numéro d’exécution du workflow. Une publication de production nécessitera un numéro croissant et une clé de production distincte.
 

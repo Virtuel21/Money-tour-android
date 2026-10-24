@@ -2,11 +2,11 @@
 
 Application Android issue de [Virtuel21/money-tour](https://github.com/Virtuel21/money-tour), avec le moteur, les règles, le plateau 3D, les musiques et les illustrations d’origine. Le dépôt web d’origine n’est pas modifié.
 
-**[Télécharger l’APK Android](https://raw.githubusercontent.com/Virtuel21/Money-tour-android/9fb3bf711b6ca263355b2ee2fcbeec410f10099b/Money-Tour-Android-0.1.0-debug.apk)** · [Versions et notes de livraison](https://github.com/Virtuel21/Money-tour-android/releases) · [Documentation du jeu web](README-WEB.md)
+**[Télécharger l’APK Android](https://raw.githubusercontent.com/Virtuel21/Money-tour-android/b65c078e021fcc9fbed7c255d2d31063f2e63f5f/Money-Tour-Android-0.1.0-debug.apk)** · [Versions et notes de livraison](https://github.com/Virtuel21/Money-tour-android/releases) · [Documentation du jeu web](README-WEB.md)
 
 ## Installer sur votre téléphone
 
-1. Ouvrir le [téléchargement direct de l’APK](https://raw.githubusercontent.com/Virtuel21/Money-tour-android/9fb3bf711b6ca263355b2ee2fcbeec410f10099b/Money-Tour-Android-0.1.0-debug.apk) sur le téléphone. Les [notes de version](https://github.com/Virtuel21/Money-tour-android/releases) regroupent aussi les liens de téléchargement.
+1. Ouvrir le [téléchargement direct de l’APK](https://raw.githubusercontent.com/Virtuel21/Money-tour-android/b65c078e021fcc9fbed7c255d2d31063f2e63f5f/Money-Tour-Android-0.1.0-debug.apk) sur le téléphone. Les [notes de version](https://github.com/Virtuel21/Money-tour-android/releases) regroupent aussi les liens de téléchargement.
 2. Ouvrir le fichier téléchargé. Si Android le demande, autoriser l’installation pour le navigateur ou l’application Fichiers, puis choisir **Installer**.
 3. Ouvrir **Money Tour**. Choisir **Solo & bots** pour jouer seul, ou **Entre amis → Jouer sur cet appareil** pour partager le téléphone. Les salons en ligne nécessitent Internet.
 
@@ -26,6 +26,8 @@ Les mises à jour avec la même signature conservent les sauvegardes. Désinstal
 En ligne, Android peut suspendre une application en arrière-plan. La partie des autres joueurs continue ; la reprise dépend des mécanismes de reconnexion du jeu. Certains réseaux mobiles nécessitent un serveur TURN : voir [Connexions mobiles](docs/NETWORK_MOBILE.md). Aucun service TURN n’est inclus dans l’APK.
 
 ## Recette et preuves
+
+[Résultats de livraison et installation](docs/ANDROID_VALIDATION.md).
 
 - [Recette fonctionnelle](docs/ANDROID_FUNCTIONAL_QA.md) : modes, actions du jeu, sauvegardes, tutoriel et invitations.
 - [Recette visuelle et tactile](docs/ANDROID_VISUAL_QA.md) : petits écrans, paysage, textes agrandis, fenêtres et clavier.
@@ -48,6 +50,6 @@ pnpm android:build
 
 Le build reconstruit le jeu, synchronise Capacitor, compile l’APK et exécute Android Lint. Résultats dans `artifacts/android/` : APK et `SHA256SUMS.txt`. `pnpm android:open` ouvre Android Studio ; après une modification web, exécuter `pnpm android:sync` avant de lancer depuis Android Studio. `pnpm android:icons` régénère les ressources natives depuis l’icône originale.
 
-Le workflow **Android APK** compile les changements sur `main`, les pull requests et les exécutions manuelles. Les tags `android-v*` produisent une préversion GitHub avec l’APK et son empreinte SHA-256. Une clé de test stable peut être fournie par un secret du dépôt ; aucune clé privée n’est versionnée. La publication Google Play nécessitera une signature de production et la procédure de publication correspondante.
+Le workflow **Android APK** compile les changements sur `main`, les pull requests et les exécutions manuelles. La publication automatique des tags `android-v*` exige une clé de test stable dans le secret du dépôt et une recette native réussie. Sans cette clé, les APK Actions restent des artefacts de contrôle ; la livraison signée est publiée séparément. Aucune clé privée n’est versionnée. La publication Google Play nécessitera une signature de production et la procédure de publication correspondante.
 
 Licence [MIT](LICENSE) ; provenance et licences des ressources dans [CREDITS.md](CREDITS.md).
