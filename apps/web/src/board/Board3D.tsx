@@ -17,7 +17,7 @@ import type { Cue } from '../game/presentation';
 import { boardModel, boardArtwork } from './boardModel';
 import { colors } from '../game/local';
 import { boardTileTitle, tileTitle } from '../game/tileTitle';
-import { concertSprite, festivalBeat } from './specialArt';
+import { concertSprite, festivalBeat, illustratedSprite } from './specialArt';
 import { advanceScenery, lagoonScale } from './lagoon';
 import { festivalFlag, lagoonBoat } from './scenery';
 import { projectTileLabels, tileDecorationPoint, type TileLabelAnchors } from './tileLabels';
@@ -454,7 +454,7 @@ export default function Board({
           chanceArt,
           taxArt,
           insuranceArt,
-          airportArt,
+          airplaneArt,
         ] = await Promise.all([
           textureLoader.loadAsync(import.meta.env.BASE_URL + 'textures/travelers-v3.webp'),
           textureLoader.loadAsync(import.meta.env.BASE_URL + 'textures/architecture-v3.webp'),
@@ -465,7 +465,7 @@ export default function Board({
           textureLoader.loadAsync(import.meta.env.BASE_URL + 'textures/chance-tile-v2.webp'),
           textureLoader.loadAsync(import.meta.env.BASE_URL + 'textures/tax-tile-v2.webp'),
           textureLoader.loadAsync(import.meta.env.BASE_URL + 'textures/insurance-tile-v2.webp'),
-          textureLoader.loadAsync(import.meta.env.BASE_URL + 'textures/travel-airport-v1.webp'),
+          textureLoader.loadAsync(import.meta.env.BASE_URL + 'textures/travel-plane-v1.webp'),
         ]);
         const loadedTextures = [
           travelers,
@@ -477,7 +477,7 @@ export default function Board({
           chanceArt,
           taxArt,
           insuranceArt,
-          airportArt,
+          airplaneArt,
         ];
         if (disposed) {
           loadedTextures.forEach((texture) => texture.dispose());
@@ -612,29 +612,13 @@ export default function Board({
             concertBeats.push(concert.beat);
           }
           if (tile.type === 'travel') {
-            airportArt.colorSpace = THREE.SRGBColorSpace;
-            const height = 3.25 / 1.5;
-            const geometry = new THREE.PlaneGeometry(3.25, height);
-            geometry.translate(0, height * (0.5 - 0.08), 0);
-            const airport = new THREE.Mesh(
-              geometry,
-              new THREE.MeshBasicMaterial({
-                map: airportArt,
-                transparent: true,
-                alphaTest: 0.05,
-                depthWrite: false,
-                toneMapped: false,
-                side: THREE.DoubleSide,
-              }),
-            );
-            // Turn 45° from the camera-facing pose to follow the tile's outer edge.
-            airport.rotation.y = p.angle;
-            airport.position.set(
-              p.x + p.normal.x * (p.width / 2 - 0.18),
-              0.29,
-              p.z + p.normal.z * (p.depth / 2 - 0.18),
-            );
-            resources.add(airport);
+            // The illustration already contains its isometric perspective.
+            // Face the camera so world-plane rotation cannot flatten or shear it.
+            const airplane = illustratedSprite(airplaneArt, 3, 0.08);
+            airplane.scale.y *= airplaneArt.image.height / airplaneArt.image.width;
+            // Keep the title and front walking lane clear, like the concert corner.
+            airplane.position.set(p.x - 0.5, 0.29, p.z - 0.5);
+            resources.add(airplane);
           }
           if (tile.type === 'resort') {
             const palm = clone('palm');

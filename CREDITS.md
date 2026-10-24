@@ -49,6 +49,6 @@ textures/expansion-v1.webp : atlas original généré avec l’outil d’images 
 
 ## Cases spéciales et Festival (v15)
 
-`textures/travel-airport-v1.webp` : aéroport original généré avec l’outil imagegen intégré le 24 octobre 2026, proposition B retenue par le créateur du jeu. Sprite RGBA 1536 × 1024, WebP qualité 82 avec transparence conservée. [Prompt exact et provenance](docs/TRAVEL_ART.md).
+`textures/travel-plane-v1.webp` : avion original en vue isométrique généré avec l’outil imagegen intégré le 24 octobre 2026. Source PNG RGBA 1536 × 1024, livraison WebP 1024 × 683, qualité 86 avec transparence conservée. [Prompt exact et provenance](docs/TRAVEL_ART.md).
 
 Cinq illustrations originales générées avec l’outil imagegen intégré : `lost-island-v1.webp`, `festival-stage-v1.webp`, `chance-tile-v2.webp`, `tax-tile-v2.webp`, `insurance-tile-v2.webp`. Référence de style : notre atlas `architecture-v3.webp`. Aucun nouvel asset tiers. Dioramas natifs 1254 × 1254, textures natives 1024 × 1536 ; livraison WebP 768 × 768 et 768 × 1152. [Prompts exacts, provenance et intégration](docs/SPECIAL_TILES_ART.md).
