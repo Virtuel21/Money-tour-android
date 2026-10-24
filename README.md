@@ -4,8 +4,8 @@ Cette branche conserve uniquement l’APK de test signée et son empreinte SHA-2
 
 Télécharger `Money-Tour-Android-0.1.0-debug.apk`, ouvrir le fichier sur Android puis autoriser son installation si le système le demande. Android7.0+, WebView/Chrome111+ et WebGL2 requis.
 
-Version0.1.0, code1, application `com.moneytour.android`. Construite depuis le code Android de `ced78022893ecd3154e26f587b4f34ef382a5109` (inchangé dans `b79549df9e08c5f294cfb9e601e6c51c58adba38`). Le jeu d’origine provient de `Virtuel21/money-tour` au commit `a56b9b1`. Licence MIT ; voir les crédits dans le code source.
+Version0.1.0, code1, application `com.moneytour.android`. Construite depuis le code Android de `6d94b1c` ; inclut le recentrage des champs au-dessus du clavier Android. Le jeu d’origine provient de `Virtuel21/money-tour` au commit `a56b9b1`. Licence MIT ; voir les crédits dans le code source.
 
-SHA-256 : `177f45fce2127b5bfe21744340b26cdb34192b10de71bf2ab454f3faa73bd257`.
+SHA-256 : `39d4c86205cdfc172763381607ba9f8786811789355e22aeefadbb8d4d8939f4`.
 
 Aucune clé de signature privée n’est présente dans cette branche. L’APK est une version de test, disponible hors Google Play. Les essais sur téléphone et entre réseaux physiques distincts restent nécessaires ; les rapports distinguent les tests exécutés et leurs limites.
