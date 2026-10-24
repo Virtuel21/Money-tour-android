@@ -111,7 +111,12 @@ try {
   }
   assert(socket, 'Android WebView exposes debugging socket');
   adb('forward', `tcp:${port}`, `localabstract:${socket}`);
-  browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`, { timeout: 120_000 });
+  // WebView does not implement Browser.setDownloadBehavior/context management.
+  // Leave its native defaults intact, including focus/visibility lifecycle.
+  browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`, {
+    timeout: 120_000,
+    noDefaults: true,
+  });
   const page = browser.contexts()[0].pages()[0];
   assert(page, 'The Android application contains a WebView page');
   page.setDefaultTimeout(60_000);
@@ -285,7 +290,10 @@ try {
     }
     assert(restoredSocket);
     adb('forward', `tcp:${port}`, `localabstract:${restoredSocket}`);
-    browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`, { timeout: 120_000 });
+    browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`, {
+      timeout: 120_000,
+      noDefaults: true,
+    });
     const restoredPage = browser.contexts()[0].pages()[0];
     restoredPage.setDefaultTimeout(120_000);
     restoredPage.on('pageerror', (error) => report.errors.push(error.message));
