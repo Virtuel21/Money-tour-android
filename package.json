@@ -26,6 +26,8 @@
     "qa:turn": "node scripts/qa-turn-form.mjs",
     "qa:social": "node scripts/qa-social-cards.mjs",
     "qa:actions": "node scripts/qa-action-cards.mjs",
+    "qa:profiles": "node scripts/qa-player-profiles.mjs",
+    "qa:scene": "node scripts/qa-scene-interactions.mjs",
     "qa:lobby": "node scripts/qa-lobby-delay.mjs"
   },
   "devDependencies": {

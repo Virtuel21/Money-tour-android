@@ -31,6 +31,10 @@ Sources: local Money tour assets/songs folder, supplied for game integration. Th
 
 Author: Kenney. [Interface Sounds](https://kenney.nl/assets/interface-sounds) pack, [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) licence; attribution is optional. Redistributed files: apps/web/public/audio/switch_001.ogg (dice), drop_001.ogg (steps), select_001.ogg (card), confirmation_001.ogg (construction). Notice retained in audio/Kenney-LICENSE.txt. Purchase, rent, victory and bankruptcy effects remain original Web Audio syntheses, MIT.
 
+## Archipelago scenery
+
+`textures/archipelago-bokeh.webp` and `textures/archipelago-mobile-bokeh.webp`: scenery generated with the built-in imagegen tool from the supplied player-profile concepts, encoded as WebP (1536 × 1024 and 1024 × 1536, 282,708 bytes combined). [Exact prompts and provenance](docs/ARCHIPELAGO_ART.md).
+
 ## Libraries
 
 React, Three.js, Vite, Vitest, Trystero and Zod: MIT. TypeScript and Sharp: Apache-2.0. Their notices remain in the dependency distributions. Blender is the model creation tool, not a browser runtime dependency.

@@ -35,7 +35,9 @@ import { MobileTiles } from './game/MobileTiles';
 import { useMobile } from './game/useMobile';
 import { MobilePocket } from './game/MobilePocket';
 import { AuctionView } from './game/AuctionView';
-import { AdventureBanner, PrivateQuest, PlayerInventory } from './game/AdventureHUD';
+import { AdventureBanner } from './game/AdventureHUD';
+import { PlayerProfiles } from './game/PlayerProfiles';
+import { ArchipelagoBackdrop } from './game/ArchipelagoBackdrop';
 import { ActionClock, GameClockContext } from './game/ActionClock';
 import { lazy, Suspense, useEffect, useId, useRef, useState } from 'react';
 import {
@@ -65,7 +67,6 @@ import {
   loadLocal,
   money,
   newLocal,
-  pawnNames,
   persistLocal,
   phaseText,
   victoryText,
@@ -232,7 +233,7 @@ export default function App() {
       document.querySelector(selector!)?.setAttribute('content', translate(source!));
   }, [language]);
   const mobile = useMobile();
-  const [overview, setOverview] = useState(false);
+  const [overview, setOverview] = useState(true);
   const [boardPanned, setBoardPanned] = useState(false);
   const [viewResetKey, setViewResetKey] = useState(0);
   const [strategicTiles, setStrategicTiles] = useState<number[]>([]);
@@ -241,7 +242,6 @@ export default function App() {
   useEffect(() => saveComfort(comfort), [comfort]);
   const [boardReady, setBoardReady] = useState(false);
   const [inspectedOwner, setInspectedOwner] = useState<string | null>(null);
-  const [collapsedPlayers, setCollapsedPlayers] = useState<Record<string, boolean>>({});
   const [save, setSave] = useState<LocalSave | null>(() => previewScenario() ?? loadLocal());
   const localSaveRef = useRef(save);
   localSaveRef.current = save;
@@ -363,13 +363,13 @@ export default function App() {
   };
   const turnKey = (online?.state ?? save?.state)?.turn;
   useEffect(() => {
-    setOverview(false);
     setInspectedOwner(null);
     setStrategicTiles([]);
   }, [turnKey]);
   const display = cinema.frame.state;
   useEffect(() => {
     sound.current?.setScene(screen);
+    if (screen === 'game') setOverview(true);
   }, [screen]);
   useEffect(() => {
     if (screen !== 'game' || paused) return;
@@ -1005,8 +1005,9 @@ export default function App() {
           </main>
         ) : (
           <main
-            className={`game-layout ${!interactionDisabled && options.some((a) => a.type === 'insure') ? 'insurance-selecting' : ''}`}
+            className={`game-layout play-scene ${!interactionDisabled && options.some((a) => a.type === 'insure') ? 'insurance-selecting' : ''}`}
           >
+            <ArchipelagoBackdrop />
             {!paused && (
               <TurnBanner
                 key={`${current.turn}-${active.id}`}
@@ -1071,153 +1072,26 @@ export default function App() {
                 </button>
               </div>
             </div>
-            {!mobile && (
-              <div className="shared-game-info">
-                <AdventureBanner state={current} />
-                {!!warnings.length && (
-                  <div className="victory-watch" role="status">
-                    {warnings.map((w) => (
-                      <p key={w.key}>⚠ {translate(w.message)}</p>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-            <div className="players">
-              {current.players.map((p, i) => (
-                <article
-                  key={p.id}
-                  data-bank={p.id}
-                  className={`player-card ${current.currentPlayer === i ? 'active' : ''} ${p.eliminated ? 'eliminated' : ''} ${!mobile && collapsedPlayers[p.id] ? 'player-collapsed' : ''}`}
-                  style={{ '--player-color': colors[i] } as React.CSSProperties}
-                >
-                  <button
-                    className="player-profile"
-                    aria-label={formatText('Voir les propriétés de {0}', p.name)}
-                    aria-pressed={inspectedOwner === p.id}
-                    onClick={() => setInspectedOwner(inspectedOwner === p.id ? null : p.id)}
-                  />
-                  {!mobile && (
-                    <button
-                      className="player-collapse"
-                      aria-label={formatText(
-                        '{0} le volet de {1}',
-                        collapsedPlayers[p.id] ? translate('Développer') : translate('Réduire'),
-                        p.name,
-                      )}
-                      aria-expanded={!collapsedPlayers[p.id]}
-                      title={
-                        collapsedPlayers[p.id]
-                          ? translate('Afficher les propriétés et les bonus')
-                          : translate('Garder seulement le nom et le solde')
-                      }
-                      onClick={() =>
-                        setCollapsedPlayers((previous) => ({
-                          ...previous,
-                          [p.id]: !previous[p.id],
-                        }))
-                      }
-                    >
-                      <span aria-hidden="true">{collapsedPlayers[p.id] ? '+' : '−'}</span>
-                    </button>
-                  )}
-                  <span className={`avatar portrait portrait-${i}`} aria-hidden="true" />
-                  <div className="player-summary">
-                    <span className="player-name">
-                      {p.name === 'Vous' && online ? formatText('Joueur {0}', i + 1) : p.name}{' '}
-                      {p.insurance && (
-                        <span
-                          className="inventory-token"
-                          title={
-                            p.insurance.tile === null
-                              ? translate('Assurance disponible')
-                              : formatText(
-                                  'Assurance : {0}',
-                                  translate(current.config.board[p.insurance.tile]?.name),
-                                )
-                          }
-                        >
-                          <GameIcon name="shield" />
-                        </span>
-                      )}
-                      <small className="player-seat-label">
-                        {online?.self === p.id
-                          ? translate('VOUS')
-                          : p.bot
-                            ? translate('BOT')
-                            : current.mode === 'teams'
-                              ? formatText(
-                                  'ÉQ. {0}',
-                                  p.team === 0 ? translate('A') : translate('B'),
-                                )
-                              : translate(pawnNames[i])}
-                      </small>
-                    </span>
-                    <strong>
-                      {p.eliminated ? translate('Faillite') : translate(money(p.cash, true))}
-                    </strong>
-                  </div>
-                  {(mobile || !collapsedPlayers[p.id]) && (
-                    <>
-                      <span className="property-count" title={translate('Propriétés')}>
-                        <GameIcon name="house" />{' '}
-                        {Object.values(current.properties).filter((v) => v.ownerId === p.id).length}{' '}
-                        · {p.laps}
-                        {translate(' tour(s) du plateau terminé(s)')}
-                      </span>
-                      {p.islandTurns !== null && !p.eliminated && (
-                        <span
-                          className="island-remaining"
-                          title={translate(
-                            'Île perdue : un double, un billet ou la caution permettent de sortir plus tôt.',
-                          )}
-                        >
-                          <span className="island-label">{translate('Île perdue · ')}</span>
-                          {Math.max(0, current.config.maxIslandTurns - p.islandTurns)}
-                          {translate(' tour(s) max')}
-                        </span>
-                      )}
-                      {!!p.fraudLiability && (
-                        <small
-                          className="fraud-risk"
-                          title={translate('Jusqu’au prochain passage par Départ')}
-                        >
-                          {translate('⚠ Taxe : ')}
-                          {translate(money(p.fraudLiability, true))}
-                        </small>
-                      )}
-                      <PlayerInventory
-                        state={current}
-                        player={p}
-                        onTile={chooseTile}
-                        onBonus={showBonus}
-                      />
-                      {p.id === (online?.self ?? active.id) && (
-                        <PrivateQuest
-                          key={p.id + current.turn}
-                          state={current}
-                          player={p}
-                          self={online?.self}
-                        />
-                      )}
-                    </>
-                  )}
-                </article>
-              ))}
-            </div>
-            <section className="board-area">
-              {mobile && (
-                <div className="mobile-shared-info">
-                  <AdventureBanner state={current} />
-                  {!!warnings.length && (
-                    <div className="victory-watch" role="status">
-                      {warnings.map((w) => (
-                        <p key={w.key}>⚠ {translate(w.message)}</p>
-                      ))}
-                    </div>
-                  )}
+            <div className="shared-game-info">
+              <AdventureBanner state={current} />
+              {!!warnings.length && (
+                <div className="victory-watch" role="status">
+                  {warnings.map((w) => (
+                    <p key={w.key}>⚠ {translate(w.message)}</p>
+                  ))}
                 </div>
               )}
+            </div>
+            <PlayerProfiles
+              state={current}
+              self={online?.self}
+              mobile={mobile}
+              inspectedOwner={inspectedOwner}
+              onInspectOwner={setInspectedOwner}
+              onTile={chooseTile}
+              onBonus={showBonus}
+            />
+            <section className="board-area">
               <div className="board-viewport">
                 <Suspense
                   fallback={
@@ -1324,105 +1198,6 @@ export default function App() {
                   <button className="clear-owner" onClick={() => setInspectedOwner(null)}>
                     {translate('Tout afficher')}
                   </button>
-                )}
-              </div>
-              <div className="board-controls">
-                <button
-                  className="strategy-button icon-label"
-                  aria-label={formatText(
-                    'Ma stratégie · {0}/{1} collections',
-                    victoryProgress.completed,
-                    victoryProgress.target,
-                  )}
-                  onClick={() => setModal('strategy')}
-                >
-                  <span className="board-nav-symbol">
-                    <GameIcon name="target" />
-                    <small aria-hidden="true">
-                      {victoryProgress.completed}/{victoryProgress.target}
-                    </small>
-                  </span>
-                  <span className="board-nav-label">
-                    {mobile ? translate('Stratégie') : translate('Ma stratégie')}
-                  </span>
-                </button>
-                <button
-                  className="icon-label"
-                  aria-label={translate('Journal des actions')}
-                  onClick={() => setModal('journal')}
-                >
-                  <GameIcon name="journal" />
-                  <span className="board-nav-label">
-                    {mobile ? translate('Journal') : translate('Journal des actions')}
-                  </span>
-                </button>
-                <button
-                  className="icon-label"
-                  aria-label={
-                    mobile && options.length && !interactionDisabled
-                      ? translate('Choisir une case')
-                      : translate('Explorer les cases')
-                  }
-                  onClick={() => setModal('tiles')}
-                >
-                  <GameIcon name="map" />
-                  <span className="board-nav-label">
-                    {mobile
-                      ? options.length && !interactionDisabled
-                        ? translate('Choisir')
-                        : translate('Escales')
-                      : translate('Explorer les cases')}
-                  </span>
-                </button>
-                {mobile ? (
-                  <>
-                    <button
-                      className="icon-label"
-                      aria-label={
-                        inspectedOwner
-                          ? translate('Tout afficher')
-                          : boardPanned
-                            ? translate('Recentrer mon pion')
-                            : overview
-                              ? translate('Suivre mon pion')
-                              : translate('Vue globale')
-                      }
-                      aria-pressed={overview || boardPanned}
-                      onClick={() => {
-                        if (inspectedOwner) setInspectedOwner(null);
-                        else if (boardPanned) {
-                          setOverview(false);
-                          setViewResetKey((key) => key + 1);
-                        } else setOverview(!overview);
-                      }}
-                    >
-                      <GameIcon name={boardPanned ? 'target' : 'compass'} />
-                      <span className="board-nav-label">
-                        {inspectedOwner
-                          ? translate('Tout voir')
-                          : boardPanned
-                            ? translate('Recentrer')
-                            : overview
-                              ? translate('Suivre')
-                              : translate('Vue globale')}
-                      </span>
-                    </button>
-                    <button
-                      className="icon-label"
-                      aria-label={translate('Mon carnet')}
-                      onClick={() => setModal('pocket')}
-                    >
-                      <GameIcon name="book" />
-                      <span className="board-nav-label">{translate('Carnet')}</span>
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button className="icon-label" onClick={() => setInspectedOwner(null)}>
-                      <GameIcon name="map" />
-                      {translate('Vue globale')}
-                    </button>
-                  </>
                 )}
               </div>
             </section>
@@ -1706,6 +1481,105 @@ export default function App() {
                 </p>
               </div>
             </aside>
+            <div className="board-controls">
+              <button
+                className="strategy-button icon-label"
+                aria-label={formatText(
+                  'Ma stratégie · {0}/{1} collections',
+                  victoryProgress.completed,
+                  victoryProgress.target,
+                )}
+                onClick={() => setModal('strategy')}
+              >
+                <span className="board-nav-symbol">
+                  <GameIcon name="target" />
+                  <small aria-hidden="true">
+                    {victoryProgress.completed}/{victoryProgress.target}
+                  </small>
+                </span>
+                <span className="board-nav-label">
+                  {mobile ? translate('Stratégie') : translate('Ma stratégie')}
+                </span>
+              </button>
+              <button
+                className="icon-label"
+                aria-label={translate('Journal des actions')}
+                onClick={() => setModal('journal')}
+              >
+                <GameIcon name="journal" />
+                <span className="board-nav-label">
+                  {mobile ? translate('Journal') : translate('Journal des actions')}
+                </span>
+              </button>
+              <button
+                className="icon-label"
+                aria-label={
+                  mobile && options.length && !interactionDisabled
+                    ? translate('Choisir une case')
+                    : translate('Explorer les cases')
+                }
+                onClick={() => setModal('tiles')}
+              >
+                <GameIcon name="map" />
+                <span className="board-nav-label">
+                  {mobile
+                    ? options.length && !interactionDisabled
+                      ? translate('Choisir')
+                      : translate('Escales')
+                    : translate('Explorer les cases')}
+                </span>
+              </button>
+              {mobile ? (
+                <>
+                  <button
+                    className="icon-label"
+                    aria-label={
+                      inspectedOwner
+                        ? translate('Tout afficher')
+                        : boardPanned
+                          ? translate('Recentrer mon pion')
+                          : overview
+                            ? translate('Suivre mon pion')
+                            : translate('Vue globale')
+                    }
+                    aria-pressed={overview || boardPanned}
+                    onClick={() => {
+                      if (inspectedOwner) setInspectedOwner(null);
+                      else if (boardPanned) {
+                        setOverview(false);
+                        setViewResetKey((key) => key + 1);
+                      } else setOverview(!overview);
+                    }}
+                  >
+                    <GameIcon name={boardPanned ? 'target' : 'compass'} />
+                    <span className="board-nav-label">
+                      {inspectedOwner
+                        ? translate('Tout voir')
+                        : boardPanned
+                          ? translate('Recentrer')
+                          : overview
+                            ? translate('Suivre')
+                            : translate('Vue globale')}
+                    </span>
+                  </button>
+                  <button
+                    className="icon-label"
+                    aria-label={translate('Mon carnet')}
+                    onClick={() => setModal('pocket')}
+                  >
+                    <GameIcon name="book" />
+                    <span className="board-nav-label">{translate('Carnet')}</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button className="icon-label" onClick={() => setInspectedOwner(null)}>
+                    <GameIcon name="map" />
+                    {translate('Vue globale')}
+                  </button>
+                </>
+              )}
+            </div>
           </main>
         )}
         <footer>

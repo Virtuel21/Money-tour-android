@@ -31,6 +31,10 @@ Sources : dossier local Money tour assets/songs, fourni pour intégration au jeu
 
 Auteur : Kenney. Pack [Interface Sounds](https://kenney.nl/assets/interface-sounds), licence [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/), attribution non obligatoire. Fichiers redistribués : apps/web/public/audio/switch_001.ogg (dés), drop_001.ogg (pas), select_001.ogg (carte), confirmation_001.ogg (construction). Notice conservée dans audio/Kenney-LICENSE.txt. Les effets d’achat, loyer, victoire et faillite restent des synthèses originales Web Audio, MIT.
 
+## Décor d’archipel
+
+`textures/archipelago-bokeh.webp` et `textures/archipelago-mobile-bokeh.webp` : décors générés avec l’outil imagegen intégré à partir des concepts fournis pour les profils joueurs, puis encodés en WebP (1536 × 1024 et 1024 × 1536, 282 708 octets au total). [Prompts exacts et provenance](docs/ARCHIPELAGO_ART.md).
+
 ## Bibliothèques
 
 React, Three.js, Vite, Vitest, Trystero et Zod : MIT. TypeScript et Sharp : Apache-2.0. Leurs notices restent dans les distributions des dépendances. Blender est l’outil de création des modèles, pas une dépendance exécutée dans le navigateur.

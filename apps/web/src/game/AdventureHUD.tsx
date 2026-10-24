@@ -96,7 +96,12 @@ export function PlayerInventory({
                 <button
                   key={t.id}
                   className="mini-property"
-                  style={{ borderTopColor: t.color ?? '#f1d17b' }}
+                  style={
+                    {
+                      borderTopColor: t.color ?? '#f1d17b',
+                      '--estate-color': t.color ?? '#f1d17b',
+                    } as React.CSSProperties
+                  }
                   onClick={() => onTile(t.id)}
                   title={formatText(
                     '{0} · loyer {1}',

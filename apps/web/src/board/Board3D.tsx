@@ -282,8 +282,12 @@ export default function Board({
         festivalScene.add(festivalLight);
         const ground = new THREE.Mesh(
           new THREE.PlaneGeometry(200, 200),
-          new THREE.MeshStandardMaterial({ color: 0xd5edf2, roughness: 1 }),
+          demo
+            ? new THREE.MeshStandardMaterial({ color: 0xd5edf2, roughness: 1 })
+            : new THREE.ShadowMaterial({ color: 0x126878, opacity: 0.2, depthWrite: false }),
         );
+        // Keep the board and its shadow grounded over the illustrated sea. An
+        // opaque floor would hide the archipelago behind the transparent canvas.
         ground.rotation.x = -Math.PI / 2;
         ground.position.y = -0.5;
         ground.receiveShadow = true;
