@@ -6,7 +6,7 @@ Création originale du 24 octobre 2026 avec l’outil imagegen intégré. À la 
 
 - Fichier du jeu : `apps/web/public/textures/travel-plane-v1.webp`.
 - Source PNG RGBA : 1536 × 1024. Export WebP : 1024 × 683, qualité 86, alpha 100, 89 464 octets. L’ancien atlas d’aéroport a été retiré du jeu.
-- Le sprite conserve les proportions exactes de l’image et mesure 3 unités de large. Il fait toujours face à la caméra : la vue isométrique est peinte dans l’image, sans rotation supplémentaire autour d’un axe du monde.
+- Le sprite conserve les proportions exactes de l’image et mesure 2,25 unités de large, soit une réduction de 25 % pour dégager la case Duel voisine. Il fait toujours face à la caméra : la vue isométrique est peinte dans l’image, sans rotation supplémentaire autour d’un axe du monde.
 - L’avion occupe la partie arrière de la case, avec le même retrait que la scène de concert. Le titre Voyage et la voie de passage des pions restent devant l’illustration. Le sol doré d’origine est conservé.
 - Les pixels hors silhouette ont un alpha nul ; les couleurs RGB présentes sous cette transparence ne constituent pas un fond visible.
 

@@ -614,7 +614,7 @@ export default function Board({
           if (tile.type === 'travel') {
             // The illustration already contains its isometric perspective.
             // Face the camera so world-plane rotation cannot flatten or shear it.
-            const airplane = illustratedSprite(airplaneArt, 3, 0.08);
+            const airplane = illustratedSprite(airplaneArt, 2.25, 0.08);
             airplane.scale.y *= airplaneArt.image.height / airplaneArt.image.width;
             // Keep the title and front walking lane clear, like the concert corner.
             airplane.position.set(p.x - 0.5, 0.29, p.z - 0.5);
