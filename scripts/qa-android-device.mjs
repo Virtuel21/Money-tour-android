@@ -252,7 +252,7 @@ try {
     );
     const resumed = await save();
     assert.equal(resumed.seed, previous.seed);
-    assert.equal(resumed.state.seq, previous.state.seq, 'No game action occurs in background');
+    assert.equal(resumed.state.seq, paused.state.seq, 'No game action occurs in background');
     assert.equal(
       resumed.state.elapsedMs,
       paused.state.elapsedMs,

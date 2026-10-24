@@ -26,7 +26,7 @@ const report = {
   url: server.url,
   browser: browser.version(),
   environment:
-    'Desktop Chromium, software WebGL, emulated Android touch viewport and Capacitor platform bridge. Decision snapshots hold performance.now to isolate layout from timeout. Native system bars, keyboard and plugins require APK verification.',
+    'Desktop Chromium, software WebGL, emulated Android touch viewport and Capacitor platform bridge. Snapshot scenarios suspend one-second intervals to isolate layout from timeout while preserving real animation frames. Native system bars, keyboard and plugins require APK verification.',
   screens: [],
   captures: [],
   checks: [],
@@ -41,6 +41,7 @@ const screens = (process.env.ANDROID_VISUAL_SCREENS ?? '360x640,393x851,412x915,
 const cases = process.env.ANDROID_VISUAL_CASES?.split(',');
 if (process.env.ANDROID_VISUAL_APPEND) {
   const previous = JSON.parse(await fs.readFile(path.join(out, 'results.json'), 'utf8'));
+  report.startedAt = previous.startedAt;
   for (const key of ['screens', 'captures', 'checks', 'accessibility', 'failures', 'pageErrors'])
     report[key] = previous[key];
 }
@@ -68,6 +69,21 @@ async function contextFor(width, height, save) {
     reducedMotion: 'reduce',
   });
   await context.addInitScript((saved) => {
+    const startInterval = window.setInterval.bind(window);
+    const stopInterval = window.clearInterval.bind(window);
+    const clocks = new Set();
+    let held = false;
+    window.setInterval = (callback, delay, ...args) => {
+      if (delay === 1000 && held) return 0;
+      const id = startInterval(callback, delay, ...args);
+      if (delay === 1000) clocks.add(id);
+      return id;
+    };
+    window.__holdAndroidVisualClock = () => {
+      held = true;
+      for (const id of clocks) stopInterval(id);
+      clocks.clear();
+    };
     try {
       localStorage.setItem('money-tour.language.v1', 'fr');
       localStorage.setItem('money-tour.audio', JSON.stringify({ music: false, effects: false }));
@@ -174,6 +190,10 @@ async function capture(page, name, { fullPage = false, audit = false, targets = 
       impact: violation.impact,
       nodes: violation.nodes.map((node) => ({ target: node.target, summary: node.failureSummary })),
     }));
+    report.accessibility = report.accessibility.filter(
+      (entry) =>
+        entry.name !== name || entry.width !== geometry.width || entry.height !== geometry.height,
+    );
     report.accessibility.push({
       name,
       width: geometry.width,
@@ -209,8 +229,7 @@ async function resume(page, waitForBoard = true) {
 }
 async function holdSnapshotClock(page) {
   await page.evaluate(() => {
-    const now = performance.now();
-    performance.now = () => now;
+    window.__holdAndroidVisualClock();
   });
 }
 
@@ -258,6 +277,26 @@ try {
         await context.close();
       }
     });
+    await check(`adventure-welcome-${size}`, async () => {
+      const context = await contextFor(width, height);
+      const page = await context.newPage();
+      try {
+        await page.goto(server.url);
+        await page.getByRole('button', { name: 'Jouer sur cet appareil', exact: true }).tap();
+        await page.locator('.adventure-start[open]').waitFor();
+        await capture(page, 'adventure-welcome', { targets: true });
+        const start = page.getByRole('button', { name: 'Démarrer l’aventure', exact: true });
+        const geometry = await start.boundingBox();
+        assert(
+          geometry && geometry.y >= 0 && geometry.y + geometry.height <= height,
+          'Start adventure is visible without searching below the fold',
+        );
+        await start.tap();
+        await page.locator('.adventure-start[open]').waitFor({ state: 'hidden' });
+      } finally {
+        await context.close();
+      }
+    });
     await check(`tutorial-${size}`, async () => {
       const context = await contextFor(width, height);
       const page = await context.newPage();
@@ -281,7 +320,10 @@ try {
           ? lessons
           : [lessons[4], lessons[7], lessons[14], lessons.at(-1)]) {
           await page.getByLabel('Choisir une leçon', { exact: true }).selectOption(lesson.value);
-          await page.waitForTimeout(100);
+          await page
+            .getByRole('heading', { name: lesson.title.replace(/^\d+\.\s*/, ''), exact: true })
+            .waitFor();
+          await readyBoard(page);
           await capture(page, `tutorial-lesson-${lesson.value}`, { targets: true });
         }
         await page.getByRole('button', { name: 'Quitter le tutoriel', exact: true }).tap();
@@ -320,10 +362,7 @@ try {
           await holdSnapshotClock(page);
           // Decision modals open after the entry presentation; insurance is passive.
           if (!['insurance', 'travel', 'festival'].includes(name))
-            await page
-              .locator('dialog[open]')
-              .waitFor({ timeout: 12000 })
-              .catch(() => {});
+            await page.locator('dialog[open]').waitFor({ timeout: 12000 });
           await capture(page, `decision-${name}`, {
             audit: width === 393 && ['purchase', 'debt', 'duel', 'casino'].includes(name),
             targets: !!(await page.locator('dialog[open]').count()),
@@ -346,8 +385,7 @@ try {
       const page = await context.newPage();
       try {
         await resume(page);
-        // Pause isolates camera/layout acceptance from the automatic turn timeout.
-        await page.getByRole('button', { name: 'Pause', exact: true }).tap();
+        await holdSnapshotClock(page);
         await page.getByRole('button', { name: 'Réglages de la partie', exact: true }).tap();
         await page.locator('dialog[open]').waitFor();
         await page.getByRole('checkbox', { name: /Textes agrandis/ }).check();
@@ -356,6 +394,7 @@ try {
         await zoom.fill('200');
         await page.getByRole('button', { name: 'Terminé', exact: true }).tap();
         await page.getByRole('button', { name: 'Suivre mon pion', exact: true }).tap();
+        await page.locator('.board-can-pan').waitFor();
         await page.waitForTimeout(300);
         await capture(page, 'board-follow-zoom-200');
         // Real touch events exercise pinch + drag on the rendered board.
