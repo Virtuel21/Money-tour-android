@@ -172,6 +172,51 @@ try {
       timeout: 30000,
     });
     await input.fill('Android natif');
+    // Android's final IME inset and the page's focus reveal settle after the first shrink.
+    try {
+      await page.waitForFunction(
+        (element) => {
+          if (!element || document.activeElement !== element) return false;
+          const bounds = element.getBoundingClientRect();
+          const viewport = window.visualViewport;
+          const top = Math.max(0, viewport?.offsetTop ?? 0);
+          const bottom = Math.min(
+            innerHeight,
+            (viewport?.offsetTop ?? 0) + (viewport?.height ?? innerHeight),
+          );
+          return bounds.top >= top - 1 && bounds.bottom <= bottom + 1;
+        },
+        await input.elementHandle(),
+        { timeout: 10000, polling: 'raf' },
+      );
+    } catch (error) {
+      report.keyboardFailureGeometry = await input.evaluate((element) => {
+        const bounds = element.getBoundingClientRect();
+        const viewport = window.visualViewport;
+        return {
+          focused: document.activeElement === element,
+          top: bounds.top,
+          bottom: bounds.bottom,
+          left: bounds.left,
+          right: bounds.right,
+          innerHeight,
+          innerWidth,
+          scrollY,
+          visualViewport: viewport
+            ? {
+                height: viewport.height,
+                width: viewport.width,
+                offsetTop: viewport.offsetTop,
+                offsetLeft: viewport.offsetLeft,
+              }
+            : null,
+        };
+      });
+      throw new Error(
+        `Focused name field remains clipped after IME settles: ${JSON.stringify(report.keyboardFailureGeometry)}`,
+        { cause: error },
+      );
+    }
     const geometry = await input.evaluate((element) => {
       const bounds = element.getBoundingClientRect();
       return {

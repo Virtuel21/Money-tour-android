@@ -3,6 +3,7 @@ import type { PluginListenerHandle } from '@capacitor/core';
 import { invitationCode } from '../network/invitation';
 import { invitationTurn } from '../network/turnSettings';
 import { nativePlatform } from './platform';
+import { installFocusedFieldReveal } from './focusedField';
 
 /** Normalize only room/mode data; never navigate the WebView to an incoming URL. */
 export function nativeInvitation(value: string): string | null {
@@ -48,6 +49,7 @@ export interface NativeRuntimeCallbacks {
 /** Listener promises may resolve after React unmount; remove those handles as well. */
 export function installNativeRuntime(callbacks: NativeRuntimeCallbacks): () => void {
   if (!nativePlatform()) return () => {};
+  const removeFieldReveal = installFocusedFieldReveal();
   let disposed = false;
   let stateRevision = 0;
   let receivedUrl = false;
@@ -95,6 +97,7 @@ export function installNativeRuntime(callbacks: NativeRuntimeCallbacks): () => v
     .catch(() => {});
   return () => {
     disposed = true;
+    removeFieldReveal();
     for (const handle of handles) void handle.remove().catch(() => {});
   };
 }
