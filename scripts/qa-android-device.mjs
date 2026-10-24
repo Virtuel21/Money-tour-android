@@ -40,6 +40,29 @@ const adb = (...args) =>
     timeout: 120_000,
   }).trim();
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+// Android may recreate the first Activity/WebView when its package-install
+// broadcast arrives. Attach to the rendered app after that initial transition.
+async function renderedAppPage(browser) {
+  const deadline = Date.now() + 60_000;
+  let lastError;
+  while (Date.now() < deadline) {
+    for (const candidate of browser.contexts()[0]?.pages() ?? []) {
+      if (candidate.isClosed()) continue;
+      try {
+        await candidate.getByRole('button', { name: 'Français', exact: true }).waitFor({
+          state: 'visible',
+          timeout: 1500,
+        });
+        await candidate.waitForTimeout(500);
+        if (!candidate.isClosed()) return candidate;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    await pause(100);
+  }
+  throw new Error(`Android did not expose a rendered app page: ${lastError?.message ?? 'no page'}`);
+}
 const currentPid = () => {
   try {
     return adb('shell', 'pidof', appId);
@@ -117,7 +140,7 @@ try {
     timeout: 120_000,
     noDefaults: true,
   });
-  const page = browser.contexts()[0].pages()[0];
+  const page = await renderedAppPage(browser);
   assert(page, 'The Android application contains a WebView page');
   page.setDefaultTimeout(60_000);
   page.on('pageerror', (error) => report.errors.push(error.message));
@@ -339,7 +362,7 @@ try {
       timeout: 120_000,
       noDefaults: true,
     });
-    const restoredPage = browser.contexts()[0].pages()[0];
+    const restoredPage = await renderedAppPage(browser);
     restoredPage.setDefaultTimeout(120_000);
     restoredPage.on('pageerror', (error) => report.errors.push(error.message));
     await restoredPage.getByRole('button', { name: /Reprendre ma partie$/ }).waitFor();
