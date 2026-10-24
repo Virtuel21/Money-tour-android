@@ -37,6 +37,8 @@ export interface ActionCardProps {
   children: CardContent;
   footer?: CardContent;
   onClose?: () => void;
+  /** Hide this local decision view without resolving or discarding its game action. */
+  onMinimize?: () => void;
   reducedMotion?: boolean;
 }
 
@@ -76,6 +78,7 @@ function ActionCardDialog({
   children,
   footer,
   onClose,
+  onMinimize,
   reducedMotion = false,
 }: ActionCardProps) {
   const titleId = useId();
@@ -142,6 +145,9 @@ function ActionCardDialog({
   }, [leaving]);
 
   const card = { run, leaving };
+  const minimize = () => {
+    if (!departing.current && mounted.current) onMinimize?.();
+  };
   const renderContent = (content: CardContent) =>
     typeof content === 'function' ? content(card) : content;
 
@@ -159,6 +165,7 @@ function ActionCardDialog({
           onCancel={(event) => {
             event.preventDefault();
             if (onClose) run(onClose);
+            else minimize();
           }}
         >
           <div
@@ -179,6 +186,29 @@ function ActionCardDialog({
                 <span className="drawn-card-brand" aria-hidden="true">
                   MONEY <b>TOUR</b>
                 </span>
+                {onMinimize && (
+                  <button
+                    type="button"
+                    className="action-card-minimize"
+                    aria-label={translate('Réduire pour voir le plateau')}
+                    title={translate('Réduire pour voir le plateau')}
+                    onClick={minimize}
+                    disabled={leaving}
+                  >
+                    <svg
+                      className="game-icon"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      aria-hidden="true"
+                      focusable="false"
+                    >
+                      <path d="M5 12h14" />
+                    </svg>
+                  </button>
+                )}
                 {onClose && (
                   <button
                     type="button"

@@ -497,7 +497,11 @@ async function decisions(browser, name) {
       await ready(page);
       if (scenario === 'auction')
         await page.locator('dialog[open] .auction-seals').waitFor({ timeout: 10000 });
-      if (scenario === 'travel') await open(page, 'Choisir ma destination');
+      if (scenario === 'travel') {
+        assert.equal(await page.locator('dialog[open]').count(), 0);
+        assert.equal(await page.locator('.travel-destination').count(), 0);
+        assert(await page.locator('.board-hit-polygons polygon.selectable').count());
+      }
       if (scenario === 'hotel-purchase') {
         const hotel = page.getByRole('button', { name: /^Hôtel : loyer/ });
         await hotel.click();
@@ -621,9 +625,11 @@ async function preferences(browser, name) {
     await open(page, 'Réglages de la partie');
     await capture(page, name, 'systeme-sombre', true);
     await close(page);
-    await page.goto(server.url + '/?scenario=travel');
+    // Travel now selects directly on the board. Exercise the remaining editable
+    // property-search field in the insurance picker for keyboard-height coverage.
+    await page.goto(server.url + '/?scenario=insurance');
     await ready(page);
-    await open(page, 'Choisir ma destination');
+    await open(page, 'Choisir un bien à assurer');
     await page.getByRole('searchbox', { name: 'Rechercher une escale' }).fill('Lisbonne');
     await page.setViewportSize({ width: 390, height: 460 });
     await capture(page, name, 'hauteur-clavier', true);

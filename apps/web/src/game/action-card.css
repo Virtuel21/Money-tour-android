@@ -11,11 +11,12 @@
   min-block-size: 52px;
 }
 
-.action-card-owner:has(.action-card-close) {
+.action-card-owner:has(.action-card-close, .action-card-minimize) {
   padding-block: 5px;
 }
 
-.action-card-close {
+.action-card-close,
+.action-card-minimize {
   display: grid;
   place-items: center;
   flex: 0 0 44px;
@@ -28,9 +29,15 @@
   background: #142d3d0a;
 }
 
-.action-card-close .game-icon {
+.action-card-close .game-icon,
+.action-card-minimize .game-icon {
   inline-size: 20px;
   block-size: 20px;
+}
+
+.action-card-minimize:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
 }
 
 .action-card-status {

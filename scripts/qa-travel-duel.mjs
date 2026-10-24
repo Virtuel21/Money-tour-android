@@ -88,10 +88,13 @@ try {
       const buyer = initial.players[0].cash,
         seller = initial.players[1].cash;
       await open(page, fixture.save);
-      await page.getByRole('button', { name: /Choisir ma destination/ }).click();
-      const card = page.locator('.action-card-dialog[open]');
-      await card.getByRole('searchbox').fill(initial.config.board[destination].name);
-      await card.locator('.tile-list button').first().click();
+      await page.locator('.board-loading').waitFor({ state: 'hidden', timeout: 45000 });
+      await page.locator('.turn-banner').waitFor({ state: 'hidden' });
+      assert.equal(await page.locator('dialog[open]').count(), 0);
+      const target = page.locator('.board-hit-polygons polygon').nth(destination);
+      await target.waitFor();
+      assert.match(await target.getAttribute('class'), /selectable/);
+      await target.press('Enter');
       await until(
         async () => (await saved(page)).players[0].position === destination,
         'Rival travel applied',

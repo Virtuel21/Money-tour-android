@@ -276,6 +276,26 @@
     inset 0 2px 0 #86d5ec44,
     0 4px 10px #13425140;
 }
+.app .play-scene .game-sidebar .action-card[hidden] {
+  display: none;
+}
+.app .play-scene .game-sidebar .action-card > .board-choice-hint {
+  display: block;
+}
+.app .play-scene .game-sidebar .debt-minimized > h2,
+.app .play-scene .game-sidebar .debt-minimized > .decision-time {
+  display: none;
+}
+.app .play-scene .game-sidebar .debt-minimized > .board-choice-hint {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 .app .play-scene .game-sidebar .action-card h2 {
   margin: 0;
   color: #fffbed;

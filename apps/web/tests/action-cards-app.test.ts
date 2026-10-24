@@ -35,11 +35,37 @@ vi.mock('../src/game/local', async (importOriginal) => {
   };
 });
 vi.mock('../src/board/Board3D', () => ({
-  default: ({ onTile }: { onTile: (id: number) => void }) =>
-    createElement('button', {
-      'aria-label': 'Inspecter une escale spéciale',
-      onClick: () => onTile(16),
-    }),
+  default: ({
+    state,
+    onTile,
+    choices = [],
+    selecting = false,
+  }: {
+    state: GameState;
+    onTile: (id: number) => void;
+    choices?: number[];
+    selecting?: boolean;
+  }) =>
+    createElement(
+      'div',
+      { 'data-testid': 'board', 'data-choices': choices.join(','), 'data-selecting': selecting },
+      createElement('button', {
+        'aria-label': 'Inspecter une escale spéciale',
+        onClick: () => onTile(16),
+      }),
+      ...state.config.board.map((tile) =>
+        createElement(
+          'button',
+          {
+            key: tile.id,
+            'data-board-tile': tile.id,
+            'aria-label': `${choices.includes(tile.id) ? 'Choisir' : 'Voir'} ${tile.name}`,
+            onClick: () => onTile(tile.id),
+          },
+          tile.name,
+        ),
+      ),
+    ),
 }));
 vi.mock('../src/audio/synth', () => ({
   loadAudio: () => ({ music: false, effects: false, volume: 0 }),
@@ -115,6 +141,18 @@ function button(text: string, scope: ParentNode = host) {
 async function click(text: string, scope: ParentNode = host) {
   await act(() => button(text, scope).click());
 }
+async function clickBoard(id: number) {
+  const tile = host.querySelector<HTMLButtonElement>(`[data-board-tile="${id}"]`);
+  expect(tile).not.toBeNull();
+  await act(() => tile!.click());
+}
+async function minimizeDebt() {
+  const minimize = card().querySelector<HTMLButtonElement>(
+    '[aria-label="Réduire pour voir le plateau"]',
+  );
+  expect(minimize).not.toBeNull();
+  await act(() => minimize!.click());
+}
 async function finishDeparture() {
   await act(() => vi.advanceTimersByTime(DRAWN_CARD_EXIT_MS));
 }
@@ -140,39 +178,81 @@ it.each([false, true])('leaves the island through an animated card (mobile=%s)',
   state.players[0]!.islandTurns = 1;
   const cash = state.players[0]!.cash;
   await mount(state, mobile);
+  expect(host.querySelector('.game-sidebar .action-card')?.hasAttribute('hidden')).toBe(true);
   await expectDeferred('Quitter l’île', 'pay_bail');
   expect(scene.latest!.players[0]!.islandTurns).toBeNull();
   expect(scene.latest!.players[0]!.cash).toBe(cash - state.config.islandFee);
 });
 
-it.each([false, true])('chooses a Festival property from its card (mobile=%s)', async (mobile) => {
-  const state = game();
-  state.phase = 'championship';
-  state.players[0]!.position = state.config.board.find((tile) => tile.type === 'championship')!.id;
-  const cash = state.players[0]!.cash;
-  await mount(state, mobile);
-  await expectDeferred(state.config.board[1]!.name, 'place_championship');
-  expect(scene.latest!.properties[1]).toMatchObject({
-    ownerId: 'a',
-    championships: 1,
-    championshipTurns: state.config.championshipDuration,
-  });
-  expect(scene.latest!.players[0]!.cash).toBe(cash - state.config.championshipFee);
-});
+it.each([false, true])(
+  'chooses a Festival property directly on the board (mobile=%s)',
+  async (mobile) => {
+    const state = game();
+    state.phase = 'championship';
+    state.players[0]!.position = state.config.board.find(
+      (tile) => tile.type === 'championship',
+    )!.id;
+    const cash = state.players[0]!.cash;
+    await mount(state, mobile);
+    expect(host.querySelector('.action-card-dialog')).toBeNull();
+    expect(host.querySelector('.mondial-picker')).toBeNull();
+    expect(host.querySelector('.mobile-tile-list')).toBeNull();
+    await clickBoard(9);
+    expect(scene.actions).toEqual([]);
+    expect(host.querySelector('dialog')).toBeNull();
+    await clickBoard(1);
+    expect(scene.actions.map((action) => action.type)).toEqual(['place_championship']);
+    expect(scene.latest!.properties[1]).toMatchObject({
+      ownerId: 'a',
+      championships: 1,
+      championshipTurns: state.config.championshipDuration,
+    });
+    expect(scene.latest!.players[0]!.cash).toBe(cash - state.config.championshipFee);
+  },
+);
 
-it.each([false, true])('picks a travel destination from a card (mobile=%s)', async (mobile) => {
-  const state = game();
-  state.phase = 'travel';
-  state.players[0]!.position = 24;
-  state.players[0]!.travelPending = true;
-  state.extraRoll = true;
-  await mount(state, mobile);
-  await click('Choisir ma destination');
-  await expectDeferred('Départ', 'travel');
-  expect(scene.latest!.players[0]!.position).toBe(0);
-  expect(scene.latest!.players[0]!.travelPending).toBe(false);
-  expect(scene.latest!.extraRoll).toBe(false);
-});
+it.each(['funds', 'property'] as const)(
+  'keeps the Festival decline available without enough %s',
+  async (missing) => {
+    const state = game();
+    state.phase = 'championship';
+    if (missing === 'funds') state.players[0]!.cash = state.config.championshipFee - 1;
+    else {
+      state.properties[1]!.ownerId = null;
+      state.properties[2]!.ownerId = null;
+    }
+    const cash = state.players[0]!.cash;
+    await mount(state);
+    expect(host.querySelector('.action-card-dialog')).toBeNull();
+    expect(host.querySelector('[data-testid="board"]')?.getAttribute('data-choices')).toBe('');
+    expect(host.querySelector('.game-sidebar .board-choice-hint')?.textContent).toContain(
+      missing === 'funds' ? 'Il vous faut' : 'Achetez d’abord',
+    );
+    await click('Ne pas organiser le Festival');
+    expect(scene.actions.at(-1)?.type).toBe('finish');
+    expect(scene.latest!.phase).not.toBe('championship');
+    expect(scene.latest!.players[0]!.cash).toBe(cash);
+  },
+);
+
+it.each([false, true])(
+  'picks a travel destination directly on the board (mobile=%s)',
+  async (mobile) => {
+    const state = game();
+    state.phase = 'travel';
+    state.players[0]!.position = 24;
+    state.players[0]!.travelPending = true;
+    state.extraRoll = true;
+    await mount(state, mobile);
+    expect(host.querySelector('.action-card-dialog')).toBeNull();
+    expect(host.querySelector('.travel-destination')).toBeNull();
+    await clickBoard(0);
+    expect(scene.actions.map((action) => action.type)).toEqual(['travel']);
+    expect(scene.latest!.players[0]!.position).toBe(0);
+    expect(scene.latest!.players[0]!.travelPending).toBe(false);
+    expect(scene.latest!.extraRoll).toBe(false);
+  },
+);
 
 it.each([false, true])(
   'travels to a rival property and completes its buyout in the real interface (mobile=%s)',
@@ -186,9 +266,7 @@ it.each([false, true])(
       bob = state.players[1]!.cash;
     const rent = getRent(state, 9);
     await mount(state, mobile);
-    await click('Choisir ma destination');
-    await click('Suivant', card());
-    await expectDeferred(state.config.board[9]!.name, 'travel');
+    await clickBoard(9);
     expect(scene.latest!.phase).toBe('property');
     const quote = getBuyoutQuote(scene.latest!)!;
     expect(quote.canBuy).toBe(true);
@@ -341,6 +419,55 @@ it.each([false, true])(
 );
 
 it.each([false, true])(
+  'minimizes debt across ticks and property inspection without selling (mobile=%s)',
+  async (mobile) => {
+    const state = game();
+    state.phase = 'debt';
+    state.players[0]!.cash = 0;
+    state.debt = {
+      playerId: 'a',
+      creditorId: 'b',
+      amount: Math.floor(
+        (getPropertyValue(state, 1) + getPropertyValue(state, 2)) * state.config.resaleRate,
+      ),
+      reason: 'rent',
+      continuation: 'end',
+    };
+    window.history.replaceState(null, '', '?clock=1');
+    await mount(state, mobile);
+    expect(host.querySelector('.game-sidebar .action-card')?.hasAttribute('hidden')).toBe(true);
+    await minimizeDebt();
+    expect(host.querySelector('.action-card-dialog')).toBeNull();
+    expect(scene.actions).toEqual([]);
+    const resume = button('Reprendre la vente');
+    expect(document.activeElement).toBe(resume);
+    expect(host.querySelector('[data-testid="board"]')?.getAttribute('data-choices')).toBe('');
+    expect(host.querySelector('[data-testid="board"]')?.getAttribute('data-selecting')).toBe(
+      'false',
+    );
+    expect(host.querySelector('.game-sidebar .action-card')?.hasAttribute('hidden')).toBe(false);
+    await act(() => vi.advanceTimersByTime(1000));
+    expect(scene.latest!.phase).toBe('debt');
+    expect(host.querySelector('.action-card-dialog')).toBeNull();
+    expect(scene.actions.map((action) => action.type)).toEqual(['tick']);
+    await clickBoard(1);
+    const details = host.querySelector<HTMLDialogElement>('dialog[open]')!;
+    expect(details.textContent).toContain(state.config.board[1]!.name);
+    expect(details.textContent).not.toContain('Réglons cette dette ensemble');
+    expect(scene.latest!.properties[1]!.ownerId).toBe('a');
+    expect(scene.latest!.players[0]!.cash).toBe(0);
+    await click('Retour au plateau', details);
+    expect(host.querySelector('dialog[open]')).toBeNull();
+    expect(document.activeElement).toBe(resume);
+    await click('Reprendre la vente');
+    expect(card().textContent).toContain('Réglons cette dette ensemble');
+    expect(card().textContent).toContain(state.config.board[1]!.name);
+    expect(card().textContent).toContain(state.config.board[2]!.name);
+    expect(scene.actions.every((action) => action.type === 'tick')).toBe(true);
+  },
+);
+
+it.each([false, true])(
   'keeps one duel card through offers, stakes, a tie and the final result (mobile=%s)',
   async (mobile) => {
     const state = game();
@@ -447,33 +574,37 @@ it('automatically animates the same duel card out when its result reading time e
   expect(host.querySelector('.action-card-dialog')).toBeNull();
 });
 
-it('cancels an outgoing Festival choice if its decision expires before the card leaves', async () => {
+it('cancels an outgoing island choice if its decision expires before the card leaves', async () => {
   const state = game();
-  state.phase = 'championship';
+  state.phase = 'island';
+  state.players[0]!.position = state.config.board.find((tile) => tile.type === 'island')!.id;
+  state.players[0]!.islandTurns = 1;
   state.decisionElapsedMs = state.config.actionTimeoutMs - 1000;
   window.history.replaceState(null, '', '?clock=1');
   await mount(state);
   await act(() => vi.advanceTimersByTime(500));
-  await click(state.config.board[1]!.name, card());
+  await click('Quitter l’île', card());
   expect(scene.actions).toEqual([]);
   // The next game tick expires this turn halfway through the departure animation.
   await act(() => vi.advanceTimersByTime(500));
   expect(scene.actions.map((action) => action.type)).toContain('tick');
-  expect(scene.latest!.currentPlayer).toBe(1);
+  expect(scene.latest!.phase).not.toBe('island');
+  const cashAfterTimeout = scene.latest!.players[0]!.cash;
   await act(() => vi.advanceTimersByTime(DRAWN_CARD_EXIT_MS));
-  expect(scene.actions.some((action) => action.type === 'place_championship')).toBe(false);
-  expect(scene.latest!.properties[1]!.championships).toBe(0);
+  expect(scene.actions.some((action) => action.type === 'pay_bail')).toBe(false);
+  expect(scene.latest!.players[0]!.cash).toBe(cashAfterTimeout);
 });
 
-it('preserves the Festival payment and journal when its departure and the next tick share one React batch', async () => {
+it('preserves the direct Festival payment and journal when its click and the next tick share one React batch', async () => {
   const state = game();
   state.phase = 'championship';
   const cash = state.players[0]!.cash;
   window.history.replaceState(null, '', '?clock=1');
   await mount(state);
-  await click(state.config.board[1]!.name, card());
-  // One batch deliberately runs both the 800 ms departure and the 1 s game tick.
-  await act(() => vi.advanceTimersByTime(1000));
+  await act(() => {
+    host.querySelector<HTMLButtonElement>('[data-board-tile="1"]')!.click();
+    vi.advanceTimersByTime(1000);
+  });
   expect(scene.actions.map((action) => action.type)).toEqual(['place_championship', 'tick']);
   expect(scene.latest!.properties[1]!.championships).toBe(1);
   expect(scene.latest!.players[0]!.cash).toBe(cash - state.config.championshipFee);

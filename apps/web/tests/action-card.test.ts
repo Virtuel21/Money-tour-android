@@ -147,6 +147,64 @@ describe('interactive physical action cards', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  it('minimizes locally without scheduling a departure or applying a game action', async () => {
+    const onMinimize = vi.fn();
+    await render({ onMinimize });
+    const control = host.querySelector<HTMLButtonElement>('.action-card-minimize')!;
+    expect(control.getAttribute('aria-label')).toBe('Réduire pour voir le plateau');
+    expect(control.getAttribute('type')).toBe('button');
+    await act(() => control.click());
+    expect(onMinimize).toHaveBeenCalledTimes(1);
+    expect(action).not.toHaveBeenCalled();
+    expect(host.querySelector('dialog')!.classList.contains('is-leaving')).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('minimizes on Escape when there is no close action', async () => {
+    const onMinimize = vi.fn();
+    await render({ onMinimize });
+    const event = new Event('cancel', { cancelable: true });
+    await act(() => host.querySelector('dialog')!.dispatchEvent(event));
+    expect(event.defaultPrevented).toBe(true);
+    expect(onMinimize).toHaveBeenCalledTimes(1);
+    expect(action).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('preserves the close action priority on Escape when both controls exist', async () => {
+    const onClose = vi.fn();
+    const onMinimize = vi.fn();
+    await render({ onClose, onMinimize });
+    expect(host.querySelector('.action-card-minimize')).not.toBeNull();
+    expect(host.querySelector('.action-card-close')).not.toBeNull();
+    await act(() => host.querySelector('dialog')!.dispatchEvent(new Event('cancel')));
+    expect(onMinimize).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    await act(() => vi.runAllTimers());
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks minimize and Escape while an outgoing decision is pending', async () => {
+    const onMinimize = vi.fn();
+    await render({ onMinimize });
+    await act(() => host.querySelector<HTMLButtonElement>('.action-card-footer button')!.click());
+    const control = host.querySelector<HTMLButtonElement>('.action-card-minimize')!;
+    expect(control.disabled).toBe(true);
+    await act(() => {
+      control.click();
+      host.querySelector('dialog')!.dispatchEvent(new Event('cancel'));
+    });
+    expect(onMinimize).not.toHaveBeenCalled();
+    await act(() => vi.runAllTimers());
+    expect(action).toHaveBeenCalledTimes(1);
+    expect(control.disabled).toBe(false);
+  });
+
+  it('does not add a minimize control to cards that cannot be minimized', async () => {
+    await render();
+    expect(host.querySelector('.action-card-minimize')).toBeNull();
+  });
+
   it.each(['comfort', 'OS'])(
     'applies the decision immediately when reduced motion comes from %s',
     async (source) => {

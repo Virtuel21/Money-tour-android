@@ -255,7 +255,6 @@ export default function App() {
     | 'rules'
     | 'credits'
     | 'settings'
-    | 'tiles'
     | 'insurance'
     | 'leave'
     | 'new-game'
@@ -520,6 +519,12 @@ export default function App() {
           .join(',')}`
       : '',
   ].join(':');
+  const debtDialog = useSpectatorDialog(decisionKey, current.phase === 'debt');
+  const debtReopen = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (debtDialog.hidden && !modal && selected === null)
+      debtReopen.current?.focus({ preventScroll: true });
+  }, [debtDialog.hidden, modal, selected]);
   const currentDecision = useRef(decisionKey);
   currentDecision.current = decisionKey;
   const dispatchDecision = (action: GameAction) => {
@@ -687,6 +692,10 @@ export default function App() {
   const offer = eligibleOffer && dismissedOffer !== offerKey ? eligibleOffer : null;
   const chooseTile = (id: number) => {
     setInspectedOwner(null);
+    if (current.phase === 'debt' && debtDialog.hidden) {
+      if (!rolling) setSelected(id);
+      return;
+    }
     const action = options.find((a) => a.tile === id);
     if (action && !interactionDisabled) act(action);
     else if (current.phase === 'championship') return;
@@ -704,18 +713,41 @@ export default function App() {
   const options = legal.filter((a): a is Extract<GameAction, { tile: number }> =>
     ['travel', 'place_championship', 'insure', 'attack', 'sell'].includes(a.type),
   );
+  const boardOptions = current.phase === 'debt' && debtDialog.hidden ? [] : options;
+  const phaseCardOpen =
+    screen === 'game' &&
+    !interactionDisabled &&
+    !modal &&
+    !tile &&
+    (current.phase === 'island' || (current.phase === 'debt' && !debtDialog.hidden));
+  const festivalDescription = options.length
+    ? translate('Choisissez directement une propriété éclairée sur le plateau.') +
+      ' ' +
+      translate(money(current.config.championshipFee, true))
+    : current.config.board.some((t) => current.properties[t.id]?.ownerId === active.id)
+      ? translate('Il vous faut ') +
+        translate(money(current.config.championshipFee, true)) +
+        translate(' pour organiser le Festival.')
+      : translate('Achetez d’abord une ville ou une île pour y organiser le Festival.');
+  const travelDescription =
+    translate(
+      options.length
+        ? 'Choisissez directement une case éclairée sur le plateau.'
+        : 'Voyage · fonds insuffisants',
+    ) +
+    ' · ' +
+    translate(money(current.config.travelFee, true));
   const insuranceAvailable = !interactionDisabled && options.some((a) => a.type === 'insure');
   useEffect(() => {
     if (modal === 'insurance' && (!insuranceAvailable || insuranceDecision !== decisionKey))
       setModal(null);
   }, [modal, insuranceAvailable, insuranceDecision, decisionKey]);
   const browseTile = (id: number) => {
+    const boardOnly =
+      ['championship', 'travel'].includes(current.phase) ||
+      (current.phase === 'debt' && debtDialog.hidden);
     const actionable = !interactionDisabled && options.some((action) => action.tile === id);
-    if (
-      actionable ||
-      current.phase === 'championship' ||
-      purchaseOffer(current, online?.self)?.tile.id === id
-    ) {
+    if (!boardOnly && (actionable || purchaseOffer(current, online?.self)?.tile.id === id)) {
       setModal(null);
       chooseTile(id);
     } else if (!rolling) {
@@ -1206,11 +1238,12 @@ export default function App() {
                     }
                     selecting={
                       !interactionDisabled &&
+                      !(current.phase === 'debt' && debtDialog.hidden) &&
                       (options.some((a) => a.type === 'insure') ||
                         ['championship', 'attack', 'travel', 'debt'].includes(current.phase))
                     }
                     cue={cinema.frame.cue}
-                    choices={interactionDisabled ? [] : options.map((a) => a.tile)}
+                    choices={interactionDisabled ? [] : boardOptions.map((a) => a.tile)}
                     onTile={chooseTile}
                     reducedMotion={reduced || paused}
                   />
@@ -1252,7 +1285,7 @@ export default function App() {
                       ? cinema.frame.cue.kind === 'hop'
                         ? translate('En route…')
                         : translate('Votre aventure continue…')
-                      : mobile && options.length && !interactionDisabled
+                      : mobile && boardOptions.length && !interactionDisabled
                         ? current.phase === 'championship'
                           ? translate('Touchez une propriété éclairée · Festival 50')
                           : translate('Touchez une case éclairée pour la choisir')
@@ -1276,48 +1309,15 @@ export default function App() {
               <ContextTip
                 state={current}
                 self={online?.self ?? active.id}
-                disabled={rolling || paused || !!modal || !!offer || !!tile}
+                disabled={
+                  rolling ||
+                  paused ||
+                  !!modal ||
+                  !!offer ||
+                  !!tile ||
+                  ['debt', 'island', 'championship', 'travel'].includes(current.phase)
+                }
               />
-              {current.phase === 'championship' && !interactionDisabled && (
-                <section
-                  className="mondial-picker"
-                  aria-label={translate('Choisir la propriété du Festival')}
-                >
-                  <strong>{translate('🎸 Où accueillir le Festival ?')}</strong>
-                  {options.length ? (
-                    <>
-                      <p>
-                        {translate(
-                          'Vos propriétés sont éclairées. Cliquez sur une case ou une carte ci-dessous.',
-                        )}
-                      </p>
-                      <div>
-                        {options.map((a) => (
-                          <button className="primary" key={a.tile} onClick={() => act(a)}>
-                            {translate(current.config.board[a.tile]!.name)} ·{' '}
-                            {translate(money(current.config.championshipFee, true))} <ActionClock />
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  ) : (
-                    <p>
-                      {current.config.board.some(
-                        (t) => current.properties[t.id]?.ownerId === active.id,
-                      )
-                        ? translate(
-                            translate('Il vous faut ') +
-                              translate(money(current.config.championshipFee, true)) +
-                              translate(' pour organiser le Festival.'),
-                          )
-                        : translate(
-                            'Achetez d’abord une ville ou une île pour y organiser le Festival.',
-                          )}
-                    </p>
-                  )}
-                </section>
-              )}
-
               {sharedDialog.hidden && current.phase === 'duel' && (
                 <button className="secondary" onClick={sharedDialog.reopen}>
                   {translate('Revoir le duel')}
@@ -1341,7 +1341,10 @@ export default function App() {
                   </button>
                 </div>
               )}
-              <section className="action-card">
+              <section
+                className={`action-card${current.phase === 'debt' && debtDialog.hidden ? ' debt-minimized' : ''}`}
+                hidden={phaseCardOpen}
+              >
                 <span className="eyebrow">
                   {paused
                     ? translate('PARTIE EN PAUSE')
@@ -1358,14 +1361,30 @@ export default function App() {
                       ? formatText('{0} joue', decisionPlayer.name)
                       : translate(phaseText[current.phase])}
                 </h2>
-                <p>
+                <p
+                  className={
+                    (['championship', 'travel'].includes(current.phase) ||
+                      (current.phase === 'debt' && debtDialog.hidden)) &&
+                    !interactionDisabled
+                      ? 'board-choice-hint'
+                      : undefined
+                  }
+                >
                   {paused
                     ? translate('Le chrono et les bots vous attendent.')
                     : decisionPlayer.bot || (online && online.self !== decisionPlayer.id)
                       ? translate(
                           'Suivez son déplacement. Vos commandes seront disponibles à votre tour.',
                         )
-                      : translate(actionDescription)}
+                      : current.phase === 'championship'
+                        ? festivalDescription
+                        : current.phase === 'travel'
+                          ? travelDescription
+                          : current.phase === 'debt' && debtDialog.hidden
+                            ? translate(
+                                'La vente est réduite. Consultez vos propriétés sur le plateau, puis reprenez la vente.',
+                              )
+                            : translate(actionDescription)}
                 </p>
                 <div className="decision-time">
                   <span
@@ -1393,19 +1412,22 @@ export default function App() {
                     </p>
                   </div>
                 )}
-                {options.length > 0 && current.phase !== 'championship' && !interactionDisabled && (
-                  <p className="board-choice-hint">
-                    {translate('Cliquez directement sur une case dorée du plateau pour')}{' '}
-                    {current.phase === 'travel'
-                      ? translate('vous y déplacer')
-                      : current.phase === 'attack'
-                        ? translate('choisir votre cible')
-                        : current.phase === 'debt'
-                          ? translate('la vendre et régler votre dette')
-                          : translate('l’assurer')}
-                    .
-                  </p>
-                )}
+                {options.length > 0 &&
+                  !['championship', 'travel'].includes(current.phase) &&
+                  !(current.phase === 'debt' && debtDialog.hidden) &&
+                  !interactionDisabled && (
+                    <p className="board-choice-hint">
+                      {translate('Cliquez directement sur une case dorée du plateau pour')}{' '}
+                      {current.phase === 'travel'
+                        ? translate('vous y déplacer')
+                        : current.phase === 'attack'
+                          ? translate('choisir votre cible')
+                          : current.phase === 'debt'
+                            ? translate('la vendre et régler votre dette')
+                            : translate('l’assurer')}
+                      .
+                    </p>
+                  )}
                 {current.phase === 'property' &&
                   current.properties[active.position]?.ownerId === active.id &&
                   current.properties[active.position]?.level === 3 &&
@@ -1420,6 +1442,12 @@ export default function App() {
                     </p>
                   )}
                 <div className="actions">
+                  {current.phase === 'debt' && debtDialog.hidden && !interactionDisabled && (
+                    <button className="primary" ref={debtReopen} onClick={debtDialog.reopen}>
+                      {translate('Reprendre la vente')}
+                      <ActionClock />
+                    </button>
+                  )}
                   {options.some((a) => a.type === 'insure') && !interactionDisabled && (
                     <button
                       className="secondary"
@@ -1433,27 +1461,14 @@ export default function App() {
                     </button>
                   )}
 
-                  {current.phase === 'travel' &&
-                    !active.bot &&
-                    (!online || online.self === active.id) && (
-                      <button
-                        className="primary travel-destination"
-                        disabled={interactionDisabled || !options.length}
-                        onClick={() => setModal('tiles')}
-                      >
-                        <span>
-                          {options.length
-                            ? translate('Choisir ma destination')
-                            : translate('Voyage · fonds insuffisants')}{' '}
-                          · {translate(money(current.config.travelFee, true))}
-                        </span>
-                        <ActionClock />
-                      </button>
-                    )}
                   {!active.bot &&
                     (!online || online.self === active.id) &&
                     available
-                      .filter((a) => !mobile || a.type !== 'sell')
+                      .filter(
+                        (a) =>
+                          (current.phase !== 'debt' || a.type !== 'sell') &&
+                          (!mobile || a.type !== 'sell'),
+                      )
                       .map((a, i) => (
                         <button
                           key={`${a.type}-${'tile' in a ? a.tile : ''}`}
@@ -1767,15 +1782,12 @@ export default function App() {
             />
           </Modal>
         )}
-        {((modal === 'insurance' && insuranceAvailable && insuranceDecision === decisionKey) ||
-          (modal === 'tiles' && current.phase === 'travel' && !interactionDisabled)) && (
+        {modal === 'insurance' && insuranceAvailable && insuranceDecision === decisionKey && (
           <ActionCard
             cardKey={`${decisionKey}:${modal}`}
-            title={translate(
-              modal === 'insurance' ? 'Choisir un bien à assurer' : 'Choisir ma destination',
-            )}
+            title={translate('Choisir un bien à assurer')}
             ownerLabel={active.name}
-            icon={modal === 'insurance' ? 'shield' : 'map'}
+            icon="shield"
             status={<ActionClock full />}
             reducedMotion={reduced}
             onClose={() => setModal(null)}
@@ -1788,14 +1800,9 @@ export default function App() {
             {(card) => (
               <MobileTiles
                 state={current}
-                choices={options
-                  .filter((a) => a.type === (modal === 'insurance' ? 'insure' : 'travel'))
-                  .map((a) => a.tile)}
+                choices={options.filter((a) => a.type === 'insure').map((a) => a.tile)}
                 onTile={(id) => {
-                  const action = options.find(
-                    (a) =>
-                      a.tile === id && a.type === (modal === 'insurance' ? 'insure' : 'travel'),
-                  );
+                  const action = options.find((a) => a.tile === id && a.type === 'insure');
                   if (action && !interactionDisabled)
                     card.run(() => {
                       dispatchDecision(action);
@@ -1805,41 +1812,6 @@ export default function App() {
               />
             )}
           </ActionCard>
-        )}
-        {modal === 'tiles' && (current.phase !== 'travel' || interactionDisabled) && (
-          <Modal
-            title={
-              current.phase === 'travel' && !interactionDisabled
-                ? translate('Choisir ma destination')
-                : formatText('Les {0} escales', current.config.board.length)
-            }
-            onClose={() => setModal(null)}
-          >
-            {mobile || (current.phase === 'travel' && !interactionDisabled) ? (
-              <MobileTiles
-                state={current}
-                choices={interactionDisabled ? [] : options.map((a) => a.tile)}
-                onTile={browseTile}
-              />
-            ) : (
-              <div className="tile-list">
-                {current.config.board.map((t) => (
-                  <button
-                    key={t.id}
-                    onClick={() => {
-                      setSelected(t.id);
-                    }}
-                  >
-                    <i style={{ background: t.color ?? '#e6b94a' }} />
-                    {translate(tileTitle(t))}
-                    <small>
-                      {t.price ? translate(money(t.price, true)) : translate('Escale spéciale')}
-                    </small>
-                  </button>
-                ))}
-              </div>
-            )}
-          </Modal>
         )}
         {modal === 'new-game' && save && (
           <Modal
@@ -1963,24 +1935,14 @@ export default function App() {
           !interactionDisabled &&
           !modal &&
           !tile &&
-          ['championship', 'island', 'attack'].includes(current.phase) && (
+          ['island', 'attack'].includes(current.phase) && (
             <ActionCard
               cardKey={decisionKey}
               title={translate(
-                current.phase === 'championship'
-                  ? '🎸 Où accueillir le Festival ?'
-                  : current.phase === 'island'
-                    ? 'Île perdue'
-                    : 'Choisir une propriété adverse',
+                current.phase === 'island' ? 'Île perdue' : 'Choisir une propriété adverse',
               )}
               ownerLabel={active.name}
-              icon={
-                current.phase === 'championship'
-                  ? 'music'
-                  : current.phase === 'island'
-                    ? 'island'
-                    : 'target'
-              }
+              icon={current.phase === 'island' ? 'island' : 'target'}
               status={<ActionClock full />}
               reducedMotion={reduced}
               footer={(card) => {
@@ -2001,13 +1963,7 @@ export default function App() {
                   <div className="decision-actions">
                     {legal
                       .filter((a) =>
-                        [
-                          'place_championship',
-                          'attack',
-                          'pay_bail',
-                          'use_escape',
-                          'attempt_escape',
-                        ].includes(a.type),
+                        ['attack', 'pay_bail', 'use_escape', 'attempt_escape'].includes(a.type),
                       )
                       .map((action, i) => (
                         <button
@@ -2016,9 +1972,6 @@ export default function App() {
                           onClick={() => card.run(() => dispatchDecision(action))}
                         >
                           {translate(actionLabel(action))}
-                          {action.type === 'place_championship' && (
-                            <> · {translate(money(current.config.championshipFee, true))}</>
-                          )}
                         </button>
                       ))}
                   </div>
@@ -2272,7 +2225,8 @@ export default function App() {
           !tile &&
           !interactionDisabled &&
           !modal &&
-          current.phase === 'debt' && (
+          current.phase === 'debt' &&
+          !debtDialog.hidden && (
             <ActionCard
               cardKey={decisionKey}
               reducedMotion={reduced}
@@ -2280,6 +2234,10 @@ export default function App() {
               icon="coin"
               status={<ActionClock full />}
               title={translate('Réglons cette dette ensemble')}
+              onMinimize={() => {
+                setOverview(true);
+                debtDialog.onClose?.();
+              }}
             >
               {(card) => (
                 <div className="debt-card-layout">
@@ -2487,11 +2445,9 @@ export default function App() {
                 <button className="secondary" onClick={close}>
                   {modal === 'pocket'
                     ? translate('Retour au carnet')
-                    : modal === 'tiles'
-                      ? translate('Retour aux escales')
-                      : modal === 'strategy'
-                        ? translate('Retour à ma stratégie')
-                        : translate('Retour au plateau')}
+                    : modal === 'strategy'
+                      ? translate('Retour à ma stratégie')
+                      : translate('Retour au plateau')}
                 </button>
               </>
             )}

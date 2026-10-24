@@ -3,7 +3,6 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { config, createGame, reduceGame, type GameState } from '@money-tour/engine';
-import { DRAWN_CARD_EXIT_MS } from '../src/game/DrawnCard';
 import App from '../src/App';
 
 const scene = vi.hoisted(() => ({
@@ -14,9 +13,32 @@ vi.mock('../src/game/preview', () => ({
   previewScenario: () => ({ version: 1, seed: 'travel-app', state: scene.initial }),
 }));
 vi.mock('../src/board/Board3D', () => ({
-  default: ({ state }: { state: GameState }) => {
+  default: ({
+    state,
+    onTile,
+    choices = [],
+  }: {
+    state: GameState;
+    onTile: (id: number) => void;
+    choices?: number[];
+  }) => {
     scene.visible = state;
-    return null;
+    return createElement(
+      'div',
+      { 'data-testid': 'board', 'data-choices': choices.join(',') },
+      ...state.config.board.map((tile) =>
+        createElement(
+          'button',
+          {
+            key: tile.id,
+            'data-board-tile': tile.id,
+            'aria-label': `${choices.includes(tile.id) ? 'Choisir' : 'Voir'} ${tile.name}`,
+            onClick: () => onTile(tile.id),
+          },
+          tile.name,
+        ),
+      ),
+    );
   },
 }));
 vi.mock('../src/audio/synth', () => ({
@@ -85,18 +107,16 @@ it.each([false, true])(
     await settle();
     expect(scene.visible!.phase).toBe('travel');
     const cash = scene.visible!.players[0]!.cash;
-    await click('Choisir ma destination');
-    expect(document.querySelector('dialog')!.textContent).toContain('Choisir ma destination');
-    expect(document.querySelector('.tile-list')!.textContent).toContain('Lisbonne');
-    expect(document.querySelector('.tile-list small')!.textContent).toContain('Voyage · 50');
-    // Closing the picker must not consume the right or force the extra roll.
-    await act(() => document.querySelector<HTMLButtonElement>('[aria-label="Fermer"]')!.click());
-    await act(() => vi.advanceTimersByTime(DRAWN_CARD_EXIT_MS));
-    expect(scene.visible!.phase).toBe('travel');
-    expect(scene.visible!.players[0]!.cash).toBe(cash);
-    await click('Choisir ma destination');
-    await click('Départ');
-    await act(() => vi.advanceTimersByTime(DRAWN_CARD_EXIT_MS));
+    expect(document.querySelector('dialog')).toBeNull();
+    expect(document.querySelector('.tile-list')).toBeNull();
+    expect(document.querySelector('.travel-destination')).toBeNull();
+    expect(document.querySelector('.game-sidebar .board-choice-hint')?.textContent).toContain(
+      'Choisissez directement une case éclairée',
+    );
+    expect(document.querySelector('[data-board-tile="1"]')?.getAttribute('aria-label')).toBe(
+      'Choisir Lisbonne',
+    );
+    await act(() => document.querySelector<HTMLButtonElement>('[data-board-tile="0"]')!.click());
     await settle();
     expect(document.querySelector('dialog')).toBeNull();
     expect(scene.visible!.players[0]!.position).toBe(0);
@@ -124,6 +144,9 @@ it('explains why travel is unavailable when the player cannot pay', async () => 
   await mount(true, config.travelFee - 1);
   await click('Continuer · Voyage disponible');
   await settle();
-  expect(button('fonds insuffisants').disabled).toBe(true);
+  expect(document.querySelector('.game-sidebar .board-choice-hint')?.textContent).toContain(
+    'fonds insuffisants',
+  );
+  expect(document.querySelector('[data-testid="board"]')?.getAttribute('data-choices')).toBe('');
   expect(button('Rester et lancer les dés').disabled).toBe(false);
 });

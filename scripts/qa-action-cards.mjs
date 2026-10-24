@@ -1,4 +1,5 @@
 /** Real application acceptance using valid current saves, suitable for dev and public Pages.
+ * Festival and travel use direct board choices; other scenarios exercise physical cards.
  * ACTION_QA_URL / ACTION_QA_OUT reuse a deployment and choose the evidence destination.
  * ACTION_QA_NAMES / ACTION_QA_LANGUAGES / ACTION_QA_SCREENS can select a smaller smoke run.
  * ACTION_QA_PROFILE=release selects 42 representative cases; public selects 21.
@@ -85,13 +86,6 @@ async function openFixture(page, fixture, language, largeText) {
     await page
       .getByRole('button', {
         name: language === 'fr' ? /Choisir un bien à assurer/ : /Choose a property to insure/,
-      })
-      .click();
-  }
-  if (fixture.name === 'travel') {
-    await page
-      .getByRole('button', {
-        name: language === 'fr' ? /Choisir ma destination/ : /Choose my destination/,
       })
       .click();
   }
@@ -187,7 +181,6 @@ async function pickAction(dialog, fixture, language) {
     case 'duel':
       await dialog.getByRole('spinbutton').fill('100');
       return dialog.getByRole('button', { name: fr ? /Défier Max/ : /Challenge Max/ });
-    case 'festival':
     case 'insurance':
     case 'attack':
     case 'debt':
@@ -196,8 +189,6 @@ async function pickAction(dialog, fixture, language) {
       return dialog.getByRole('button', { name: fr ? /Choisir rouge/ : /Choose red/ });
     case 'slots':
       return dialog.getByRole('button', { name: fr ? /Lancer les rouleaux/ : /Spin the reels/ });
-    case 'travel':
-      return dialog.locator('.action-card-content button').first();
     case 'island':
       return dialog.getByRole('button', { name: fr ? /Quitter l’île/ : /Leave the island/ });
     case 'alliance':
@@ -261,6 +252,23 @@ async function runCase(fixture, language, width, height, reducedMotion = false, 
   page.on('pageerror', (error) => results.errors.push({ name, message: error.message }));
   try {
     await openFixture(page, fixture, language, largeText);
+    if (['festival', 'travel'].includes(fixture.name)) {
+      await page.locator('.board-loading').waitFor({ state: 'hidden', timeout: 45000 });
+      await page.locator('.board-hit-polygons polygon').first().waitFor();
+      await page.locator('.turn-banner').waitFor({ state: 'hidden' });
+      assert.equal(await page.locator('dialog[open]').count(), 0);
+      assert.equal(await page.locator('.mondial-picker, .travel-destination').count(), 0);
+      const tile = fixture.name === 'festival' ? fixture.owned : 0;
+      const target = page.locator('.board-hit-polygons polygon').nth(tile);
+      await target.waitFor();
+      assert.match(await target.getAttribute('class'), /selectable/);
+      await capture(page, name, 'board-choice');
+      // Real SVG keyboard interaction, with pointer/touch coverage in qa-board-decisions.
+      await target.press('Enter');
+      await assertAfterAction(page, fixture);
+      results.checks.push({ name, directBoardChoice: true, afterAction: true, clock: 'real' });
+      return;
+    }
     if (fixture.name === 'purchase') {
       const purchase = page.locator('dialog.modal[open]');
       await purchase.waitFor({ state: 'visible' });
