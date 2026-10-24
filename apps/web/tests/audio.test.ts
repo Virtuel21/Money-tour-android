@@ -246,6 +246,28 @@ it('stays silent after pagehide until pageshow even if visibility has not update
   sound.close();
 });
 
+it('respects Android Activity suspension before WebView visibility updates', async () => {
+  const sound = new Soundscape();
+  sound.configure({ effects: true, music: true, volume: 0.4 });
+  await sound.unlock();
+  await Promise.resolve();
+  const track = tracks[0]!;
+  const plays = track.play.mock.calls.length;
+  sound.effect('earthquake');
+  sound.setAppActive(false);
+  expect(track.pause).toHaveBeenCalled();
+  expect(contexts[0]!.suspend).toHaveBeenCalledOnce();
+  sources.forEach((source) => expect(source.stop).toHaveBeenCalled());
+  browser.dispatchEvent(new Event('focus'));
+  page.dispatchEvent(new Event('visibilitychange'));
+  await sound.unlock();
+  expect(track.play).toHaveBeenCalledTimes(plays);
+  sound.setAppActive(true);
+  await Promise.resolve();
+  expect(track.play).toHaveBeenCalledTimes(plays + 1);
+  sound.close();
+});
+
 it('does not unlock audio in the background or start music when returning with music disabled', async () => {
   const sound = new Soundscape();
   sound.configure({ effects: true, music: true, volume: 0.4 });

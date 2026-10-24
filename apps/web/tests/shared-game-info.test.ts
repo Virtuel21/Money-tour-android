@@ -129,6 +129,64 @@ describe('shared game messages', () => {
     expect(host.querySelector('.adventure-banner')).not.toBeNull();
   });
 
+  it('opens reactions for the selected player without requiring a tiny board pawn', async () => {
+    const state = game();
+    const onTaunt = vi.fn();
+    await act(() =>
+      root.render(
+        createElement(PlayerProfiles, {
+          state,
+          mobile: true,
+          inspectedOwner: null,
+          onInspectOwner: vi.fn(),
+          onTile: vi.fn(),
+          onBonus: vi.fn(),
+          onTaunt,
+        }),
+      ),
+    );
+    await act(() =>
+      host.querySelector<HTMLButtonElement>('[aria-label="Voir le profil de Max"]')!.click(),
+    );
+    await act(() =>
+      document.querySelector<HTMLButtonElement>('[aria-label="Réagir à Max"]')!.click(),
+    );
+    expect(onTaunt).toHaveBeenCalledExactlyOnceWith('b');
+    expect(document.querySelector('dialog[open]')).toBeNull();
+  });
+
+  it('does not offer reactions when the game is read-only or the target is eliminated', async () => {
+    const state = game();
+    const renderProfiles = (onTaunt?: (id: string) => void) =>
+      act(() =>
+        root.render(
+          createElement(PlayerProfiles, {
+            state,
+            mobile: true,
+            inspectedOwner: null,
+            onInspectOwner: vi.fn(),
+            onTile: vi.fn(),
+            onBonus: vi.fn(),
+            onTaunt,
+          }),
+        ),
+      );
+    await renderProfiles();
+    await act(() =>
+      host.querySelector<HTMLButtonElement>('[aria-label="Voir le profil de Max"]')!.click(),
+    );
+    expect(document.querySelector('.player-details-react')).toBeNull();
+    await act(() =>
+      document.querySelector<HTMLButtonElement>('[aria-label="Fermer le profil"]')!.click(),
+    );
+    state.players[1]!.eliminated = true;
+    await renderProfiles(vi.fn());
+    await act(() =>
+      host.querySelector<HTMLButtonElement>('[aria-label="Voir le profil de Max"]')!.click(),
+    );
+    expect(document.querySelector('.player-details-react')).toBeNull();
+  });
+
   it('expires a victory warning after 30 seconds even while game ticks keep rerendering it', async () => {
     const state = game();
     const islands = state.config.board.filter((tile) => tile.type === 'resort');

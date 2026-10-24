@@ -1,4 +1,9 @@
 {
+  "Réagir": "React",
+  "Réagir à {0}": "React to {0}",
+  "Une invitation vous attend": "An invitation is waiting",
+  "Votre partie locale reste sauvegardée. Une partie en ligne déjà lancée continue sans vous.": "Your local game remains saved. An online game already in progress continues without you.",
+  "Ouvrir l’invitation": "Open invitation",
   "Choisir un bien à assurer": "Choose a property to insure",
   "Choisir une propriété adverse": "Choose an opponent's property",
   "Nouveau voyage ! ": "New journey! ",

@@ -35,6 +35,7 @@ const melodies: Record<string, number[]> = {
 /** User-supplied music, CC0 interface samples and original synthesis for remaining effects. */
 export class Soundscape {
   private closed = false;
+  private appActive = true;
   private pageHidden = false;
   private readonly onVisibilityChange = () => {
     if (this.isForeground()) void this.resumeForeground();
@@ -63,9 +64,16 @@ export class Soundscape {
   private isForeground(): boolean {
     return (
       !this.closed &&
+      this.appActive &&
       !this.pageHidden &&
       (typeof document === 'undefined' || document.visibilityState !== 'hidden')
     );
+  }
+  /** Android Activity lifecycle can precede the WebView visibility event. */
+  setAppActive(active: boolean): void {
+    this.appActive = active;
+    if (active) void this.resumeForeground();
+    else this.suspendBackground();
   }
   private suspendBackground(): void {
     this.track?.pause();

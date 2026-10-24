@@ -1,5 +1,5 @@
 {
-  "name": "money-tour",
+  "name": "money-tour-android",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -28,10 +28,18 @@
     "qa:actions": "node scripts/qa-action-cards.mjs",
     "qa:profiles": "node scripts/qa-player-profiles.mjs",
     "qa:scene": "node scripts/qa-scene-interactions.mjs",
-    "qa:lobby": "node scripts/qa-lobby-delay.mjs"
+    "qa:lobby": "node scripts/qa-lobby-delay.mjs",
+    "android:sync": "pnpm build && node scripts/sync-android.mjs",
+    "android:build": "pnpm android:sync && node scripts/build-android.mjs",
+    "android:open": "cap open android",
+    "android:icons": "node scripts/android-icons.mjs",
+    "qa:android:functional": "node scripts/qa-android-functional.mjs",
+    "qa:android:device": "node scripts/qa-android-device.mjs",
+    "qa:android:visual": "node scripts/qa-android-visual.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",
+    "@capacitor/cli": "8.5.3",
     "@eslint/js": "10.0.1",
     "@types/node": "^22.19.0",
     "@vitest/coverage-v8": "5.0.2",
@@ -45,5 +53,12 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.48.1",
     "vitest": "5.0.2"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/clipboard": "^8.0.1",
+    "@capacitor/core": "8.5.3",
+    "@capacitor/share": "^8.0.3"
   }
 }

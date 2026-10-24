@@ -421,6 +421,28 @@
 .tutorial-navigation .primary {
   min-width: 0;
 }
+
+/* The guide is a full-screen dialog, with the same touch targets as the game. */
+.guided-tutorial .tutorial-header :is(button, select),
+.guided-tutorial .tutorial-accounts button,
+.guided-tutorial .tutorial-navigation button,
+.guided-tutorial .tutorial-action :is(button, input, select),
+.guided-tutorial .tutorial-destinations button {
+  min-height: 48px;
+  min-width: 48px;
+  touch-action: manipulation;
+}
+.guided-tutorial .tutorial-header select,
+.guided-tutorial .tutorial-action :is(input, select) {
+  font-size: max(16px, 1em);
+}
+html[data-platform='android'] .guided-tutorial .tutorial-coach :is(p, .tutorial-task) {
+  font-size: 14px;
+  line-height: 1.45;
+}
+html[data-platform='android'] .guided-tutorial .tutorial-coach small {
+  font-size: 12px;
+}
 @media (max-width: 700px) {
   .guided-tutorial[open] {
     grid-template-rows: auto auto minmax(200px, 1fr) minmax(0, 30dvh);

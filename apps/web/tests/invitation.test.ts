@@ -6,6 +6,8 @@ it('accepts a shared link, fragment or formatted code without accepting incomple
   const code = 'abcdef01'.repeat(4);
   expect(invitationCode(`https://example.test/money-tour/#room=${code}`)).toBe(code);
   expect(invitationCode(`#room=${code.toUpperCase()}`)).toBe(code);
+  expect(invitationCode(`moneytour://room/${code}`)).toBe(code);
+  expect(invitationCode(`moneytour://other/${code}`)).toBeNull();
   expect(invitationCode('ABCDEF01 ABCDEF01-ABCDEF01 ABCDEF01')).toBe(code);
   expect(invitationCode('#room=broken')).toBeNull();
   expect(invitationCode('')).toBeNull();

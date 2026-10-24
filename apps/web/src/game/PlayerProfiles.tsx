@@ -18,6 +18,7 @@ interface PlayerProfilesProps {
   onInspectOwner: (id: string | null) => void;
   onTile: (id: number) => void;
   onBonus: (bonus: BonusInfo) => void;
+  onTaunt?: (id: string) => void;
 }
 
 const profileStyle = (index: number): CSSProperties =>
@@ -108,6 +109,7 @@ export function PlayerProfiles({
   onInspectOwner,
   onTile,
   onBonus,
+  onTaunt,
 }: PlayerProfilesProps) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [openedPlayer, setOpenedPlayer] = useState<string | null>(null);
@@ -285,6 +287,7 @@ export function PlayerProfiles({
             onClose={() => setOpenedPlayer(null)}
             onTile={onTile}
             onBonus={onBonus}
+            onTaunt={onTaunt}
           />,
           document.body,
         )}
@@ -306,6 +309,7 @@ function PlayerDetails({
   onClose,
   onTile,
   onBonus,
+  onTaunt,
 }: {
   state: GameState;
   player: Player;
@@ -320,6 +324,7 @@ function PlayerDetails({
   onClose: () => void;
   onTile: (id: number) => void;
   onBonus: (bonus: BonusInfo) => void;
+  onTaunt?: (id: string) => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
@@ -417,6 +422,19 @@ function PlayerDetails({
           </button>
         </div>
         <footer>
+          {onTaunt && !player.eliminated && (
+            <button
+              className="player-details-react"
+              aria-label={formatText('Réagir à {0}', name)}
+              onClick={() => {
+                onClose();
+                onTaunt(player.id);
+              }}
+            >
+              <GameIcon name="sparkles" />
+              {translate('Réagir')}
+            </button>
+          )}
           <button className="player-details-back" onClick={onClose}>
             {translate('Revenir au plateau')}
           </button>

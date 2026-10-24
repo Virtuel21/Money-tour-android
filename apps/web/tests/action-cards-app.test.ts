@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { act, createElement } from 'react';
+import { act, createElement, useEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
@@ -40,13 +40,16 @@ vi.mock('../src/board/Board3D', () => ({
     onTile,
     choices = [],
     selecting = false,
+    onReady,
   }: {
     state: GameState;
     onTile: (id: number) => void;
     choices?: number[];
     selecting?: boolean;
-  }) =>
-    createElement(
+    onReady?: () => void;
+  }) => {
+    useEffect(() => onReady?.(), [onReady]);
+    return createElement(
       'div',
       { 'data-testid': 'board', 'data-choices': choices.join(','), 'data-selecting': selecting },
       createElement('button', {
@@ -65,7 +68,8 @@ vi.mock('../src/board/Board3D', () => ({
           tile.name,
         ),
       ),
-    ),
+    );
+  },
 }));
 vi.mock('../src/audio/synth', () => ({
   loadAudio: () => ({ music: false, effects: false, volume: 0 }),

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { act, createElement } from 'react';
+import { act, createElement, useEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type GameState } from '@money-tour/engine';
@@ -11,8 +11,9 @@ import App from '../src/App';
 const scene = vi.hoisted(() => ({ visible: null as GameState | null }));
 vi.mock('../src/game/preview', () => ({ previewScenario: () => undefined }));
 vi.mock('../src/board/Board3D', () => ({
-  default: ({ state }: { state: GameState }) => {
+  default: ({ state, onReady }: { state: GameState; onReady?: () => void }) => {
     scene.visible = state;
+    useEffect(() => onReady?.(), [onReady]);
     return null;
   },
 }));

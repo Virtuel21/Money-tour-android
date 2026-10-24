@@ -201,6 +201,26 @@ it('opens while a bot animates, keeps the sender across turn changes and display
   expect(host.textContent).not.toContain('Merci pour le loyer !');
   expect(host.querySelector('.pawn-taunt')!.getAttribute('src')).toBe('a-cash');
 });
+it('opens the same reaction picker from an accessible player profile action', async () => {
+  scene.state = game();
+  scene.busy = false;
+  const before = structuredClone(scene.state);
+  const host = await mount();
+  await act(() =>
+    host.querySelector<HTMLButtonElement>('[aria-label="Voir le profil de Bob"]')!.click(),
+  );
+  const react = document.querySelector<HTMLButtonElement>('[aria-label="Réagir à Bob"]');
+  expect(react).not.toBeNull();
+  await act(() => react!.click());
+  expect(document.querySelector('.player-details-dialog')).toBeNull();
+  expect(host.querySelector('.taunt-picker')!.textContent).toContain('Bob');
+  await act(() =>
+    host.querySelector<HTMLButtonElement>('[aria-label="Merci pour le loyer !"]')!.click(),
+  );
+  await act(() => vi.advanceTimersByTime(DRAWN_CARD_EXIT_MS));
+  expect(host.querySelector('.pawn-taunt')!.getAttribute('src')).toBe('b-cash');
+  expect(scene.state).toEqual(before);
+});
 it('collapses each desktop player independently, keeps the balance and restores the inventory after a turn change', async () => {
   scene.state = game();
   scene.busy = false;

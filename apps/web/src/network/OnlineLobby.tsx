@@ -13,6 +13,13 @@ import {
 } from './storage';
 import { TrysteroTransport } from './trystero';
 import { invitationCode } from './invitation';
+import {
+  canShareInvitation,
+  copyInvitation,
+  invitationBase,
+  shareInvitation,
+  shareWasCancelled,
+} from '../native/platform';
 import { DurationPicker, validMinutes } from '../game/DurationPicker';
 import { loadTurnServers, manualTurnServers, probeTurn } from './ice';
 import { TurnPanel } from './TurnPanel';
@@ -236,11 +243,9 @@ export default function OnlineLobby({
       setError(message);
     }
   }
-  const link = invitationLink(location.href, code, networkSettings);
+  const link = invitationLink(invitationBase(location.href), code, networkSettings);
   const shareData = { title: 'Money Tour', url: link };
-  const canShare =
-    typeof navigator.share === 'function' &&
-    (typeof navigator.canShare !== 'function' || navigator.canShare(shareData));
+  const canShare = canShareInvitation(shareData);
   const turnPanel = (
     <TurnPanel
       open={setupTurn || requiredTurn}
@@ -376,7 +381,7 @@ export default function OnlineLobby({
     setShareError('');
     if (error === 'Copiez le lien affiché ci-dessous.') setError('');
     try {
-      await navigator.clipboard.writeText(link);
+      await copyInvitation(link);
       setCopied(true);
     } catch {
       setError('Copiez le lien affiché ci-dessous.');
@@ -388,9 +393,9 @@ export default function OnlineLobby({
     setShareError('');
     try {
       // Keep the native sheet in this click's activation; copying must finish beforehand.
-      await navigator.share(shareData);
+      await shareInvitation(shareData);
     } catch (error) {
-      if (!(error instanceof DOMException && error.name === 'AbortError'))
+      if (!shareWasCancelled(error))
         setShareError(
           'Le partage n’a pas pu être ouvert. Collez le lien copié dans votre application de messagerie.',
         );

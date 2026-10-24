@@ -1,6 +1,8 @@
 /** Real-browser delayed invitations over the app's public Nostr signaling.
  * LOBBY_QA_URL reuses a local/public deployment; otherwise Vite starts on 4186.
  * LOBBY_QA_DELAY_MS defaults to 65000; LOBBY_QA_OUT selects evidence output.
+ * CHROMIUM_EXECUTABLE_PATH selects a system browser. LOBBY_QA_PROXY_SERVER overrides
+ * the inherited HTTP proxy (empty disables it); localhost remains direct.
  * Chromium contexts on one computer do not validate physical phones or mobile networks.
  */
 import assert from 'node:assert/strict';
@@ -135,7 +137,24 @@ async function diagnostics(page) {
 try {
   app = await qaServer(process.env.LOBBY_QA_URL, 4186);
   result.url = app.url;
-  browser = await chromium.launch({ headless: true });
+  const proxyServer =
+    process.env.LOBBY_QA_PROXY_SERVER ?? process.env.HTTPS_PROXY ?? process.env.HTTP_PROXY;
+  const proxy = proxyServer ? new URL(proxyServer) : null;
+  browser = await chromium.launch({
+    headless: true,
+    executablePath: process.env.CHROMIUM_EXECUTABLE_PATH,
+    args: ['--no-sandbox', '--enable-unsafe-swiftshader'],
+    ...(proxy
+      ? {
+          proxy: {
+            server: `${proxy.protocol}//${proxy.host}`,
+            bypass: 'localhost,127.0.0.1',
+            ...(proxy.username ? { username: decodeURIComponent(proxy.username) } : {}),
+            ...(proxy.password ? { password: decodeURIComponent(proxy.password) } : {}),
+          },
+        }
+      : {}),
+  });
   result.browser = browser.version();
   host = await makePage('host');
   await host.goto(app.url);

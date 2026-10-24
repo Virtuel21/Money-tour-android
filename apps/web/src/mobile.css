@@ -1044,3 +1044,38 @@
     grid-row: auto;
   }
 }
+
+/* Android uses a native inset viewport; keep the landing page focused on play. */
+@media (max-width: 999px) {
+  html[data-platform='android'] .app:not(:has(.game-layout)) .landing {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding-top: 16px;
+  }
+  html[data-platform='android'] .app .intro {
+    text-align: center;
+  }
+  html[data-platform='android'] .app .intro > .eyebrow {
+    display: none;
+  }
+  html[data-platform='android'] .app .intro h1 {
+    margin: 0 0 10px;
+    font-size: clamp(30px, 8vw, 40px);
+    line-height: 1.08;
+    letter-spacing: -1px;
+  }
+  html[data-platform='android'] .app .intro-copy {
+    margin: 0 0 16px;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  html[data-platform='android'] .app .setup {
+    width: 100%;
+    max-width: 540px;
+    margin-inline: auto;
+  }
+  html[data-platform='android'] .app .features {
+    display: none;
+  }
+}

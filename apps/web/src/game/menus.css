@@ -688,6 +688,47 @@
   flex: 1 1 10rem;
   overflow-wrap: normal;
 }
+
+/* A comfortable hit area applies to the home header as well as modal controls. */
+@media (max-width: 999px) {
+  .app .topbar .brand-button {
+    min-height: 48px;
+    display: inline-flex;
+    align-items: center;
+  }
+  .app .topbar nav .icon-button {
+    min-width: 48px;
+    width: 48px;
+    flex-shrink: 0;
+  }
+  .app .topbar nav {
+    gap: 4px;
+  }
+  .app .topbar nav .language-picker-compact {
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+  }
+  .app .live-actions {
+    padding-block: 0;
+  }
+  .app .live-actions > summary {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+  .app .live-actions > summary::before {
+    content: '▸';
+    margin-right: 6px;
+  }
+  .app .live-actions[open] > summary::before {
+    content: '▾';
+  }
+  .app .live-actions > button {
+    min-height: 44px;
+    min-width: 44px;
+    padding-block: 8px;
+  }
+}
 @media (max-width: 480px) {
   .app .modal .purchase-simple:has(.island-rates) .purchase-buttons {
     flex-direction: column;

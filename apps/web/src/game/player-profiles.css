@@ -789,6 +789,37 @@
   border-radius: 22px;
   font-size: 18px;
 }
+.player-details-sheet > footer:has(.player-details-react) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+  gap: 8px;
+}
+.player-details-dialog .player-details-react {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 52px;
+  padding: 8px;
+  border: 1px solid #be8824;
+  border-radius: 22px;
+  background: linear-gradient(#ffdf69, #ffc133);
+  color: #173d4d;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.2;
+  box-shadow: 0 3px 0 #ad7623;
+  touch-action: manipulation;
+}
+.player-details-dialog .player-details-react .game-icon {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+}
+.player-details-sheet > footer:has(.player-details-react) .player-details-back {
+  min-width: 0;
+}
 @media (hover: hover) {
   .player-property-preview-item:hover,
   .player-details-dialog .mini-property:hover {

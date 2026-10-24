@@ -11,6 +11,9 @@ import { loadComfort, saveComfort } from './game/comfort';
 import { guardGameNavigation } from './game/navigationGuard';
 import { loadOnlineResume, type OnlineResume } from './network/storage';
 import { invitationCode } from './network/invitation';
+import { cancelTopDialog } from './native/runtime';
+import { useNativeRuntime } from './native/useNativeRuntime';
+import { nativePlatform } from './native/platform';
 import { SettingsPanel } from './game/SettingsPanel';
 import { restoreDialogFocus, trapDialogFocus } from './game/dialogFocus';
 import { ContextTip } from './game/ContextTip';
@@ -258,6 +261,7 @@ export default function App() {
     | 'insurance'
     | 'leave'
     | 'new-game'
+    | 'invitation'
     | 'online'
     | 'pocket'
     | 'bonus'
@@ -266,6 +270,7 @@ export default function App() {
     | 'taunt'
     | null
   >(location.hash.includes('room=') ? 'online' : null);
+  const [pendingInvitation, setPendingInvitation] = useState<string | null>(null);
   const [selectedBonus, setSelectedBonus] = useState<BonusInfo | null>(null);
   const [insuranceDecision, setInsuranceDecision] = useState('');
   const showBonus = (bonus: BonusInfo) => {
@@ -334,6 +339,7 @@ export default function App() {
   const [bots, setBots] = useState([false, false, false, false]);
   const tutorialPause = useRef(false);
   const [paused, setPaused] = useState(false);
+  const nativeForeground = useRef(true);
   const [reduced, setReduced] = useState(
     () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
   );
@@ -385,6 +391,9 @@ export default function App() {
   const goHome = () => {
     sound.current?.stopEffects();
     cinema.reset(online?.state ?? save?.state ?? demo);
+    // The next visit mounts a fresh renderer; shader/asset loading must not
+    // spend a local player's decision time or let bots act behind the loader.
+    setBoardReady(false);
     setScreen('menu');
     setPaused(true);
     setSelected(null);
@@ -433,6 +442,54 @@ export default function App() {
     sound.current?.stopEffects();
     setPaused((value) => !value);
   };
+  const openNativeInvitation = (hash: string) => {
+    detachOnline();
+    goHome();
+    window.history.replaceState(
+      window.history.state,
+      '',
+      `${location.pathname}${location.search}${hash}`,
+    );
+    const code = invitationCode(hash)!;
+    setResumeRequest(loadOnlineResume(code) ?? undefined);
+    setPendingInvitation(null);
+    setModal('online');
+  };
+  useNativeRuntime({
+    onBack: () => {
+      if (cancelTopDialog()) return true;
+      if (inspectedOwner) {
+        setInspectedOwner(null);
+        return true;
+      }
+      if (modal) {
+        setModal(null);
+        return true;
+      }
+      if (screen === 'game') {
+        setModal('leave');
+        return true;
+      }
+      return false;
+    },
+    onActiveChange: (active) => {
+      nativeForeground.current = active;
+      sound.current?.setAppActive(active);
+      if (!active && !online) {
+        const currentSave = localSaveRef.current;
+        if (currentSave && !previewScenario()) persistLocal(currentSave);
+        // Keep the local game paused on return so no decision expires while the player is away.
+        if (screen === 'game') setPaused(true);
+      }
+    },
+    onInvitation: (hash) => {
+      if (online && invitationCode(location.hash) === invitationCode(hash)) return;
+      if (screen === 'game' || online) {
+        setPendingInvitation(hash);
+        setModal('invitation');
+      } else openNativeInvitation(hash);
+    },
+  });
   const current =
     screen === 'game' ? (rolling ? display : (online?.state ?? save?.state ?? demo)) : demo;
   const active = current.players[current.currentPlayer]!;
@@ -442,6 +499,15 @@ export default function App() {
     !adventureHeld &&
     !current.winner &&
     (online ? humans.some((p) => p.id === online.self) : humans.length > 0);
+  const openTaunt = (id: string) => {
+    if (!canTaunt) return;
+    const sender = tauntPlayer(current, online?.self, id);
+    if (!sender) return;
+    setTauntSender(sender);
+    setTauntTarget(id);
+    setSelected(null);
+    setModal('taunt');
+  };
   const sendTaunt = (kind: TauntKind) => {
     if (!tauntSender || tauntReadyAt || tauntPlayer(current, tauntSender) !== tauntSender) return;
     if (onlineSession.current)
@@ -477,7 +543,11 @@ export default function App() {
   );
   const legal = screen === 'game' ? getLegalActions(current) : [];
   const act = (action: GameAction) => {
-    if (screen !== 'game' || ((paused || adventureHeld) && action.type !== 'quit')) return;
+    if (
+      screen !== 'game' ||
+      ((!nativeForeground.current || paused || adventureHeld) && action.type !== 'quit')
+    )
+      return;
     if (action.type !== 'tick') setInspectedOwner(null);
     if (['roll', 'attempt_escape', 'travel'].includes(action.type)) setOverview(false);
     if (onlineSession.current) {
@@ -551,6 +621,7 @@ export default function App() {
       (previewScenario() && new URLSearchParams(location.search).get('clock') !== '1') ||
       online ||
       screen !== 'game' ||
+      !boardReady ||
       paused ||
       adventureHeld ||
       rolling ||
@@ -565,11 +636,20 @@ export default function App() {
       dispatchRef.current({ type: 'tick', elapsedMs });
     }, 1000);
     return () => clearInterval(timer);
-  }, [screen, paused, adventureHeld, rolling, Boolean(current.winner), Boolean(online)]);
+  }, [
+    screen,
+    boardReady,
+    paused,
+    adventureHeld,
+    rolling,
+    Boolean(current.winner),
+    Boolean(online),
+  ]);
   useEffect(() => {
     if (
       online ||
       screen !== 'game' ||
+      !boardReady ||
       paused ||
       adventureHeld ||
       rolling ||
@@ -579,7 +659,7 @@ export default function App() {
       return;
     const timer = setTimeout(() => dispatchRef.current(chooseBotAction(current)), 650);
     return () => clearTimeout(timer);
-  }, [save, screen, paused, adventureHeld, rolling, Boolean(online)]);
+  }, [save, screen, boardReady, paused, adventureHeld, rolling, Boolean(online)]);
   const start = () => {
     if (!validMinutes(minutes)) return;
     detachOnline();
@@ -1038,24 +1118,26 @@ export default function App() {
                 </p>
               </div>
             </section>
-            <section className="hero-map" aria-label={translate('Aperçu du plateau')}>
-              <span className="map-stamp">
-                {translate('32 ESCALES')}
-                <br />
-                <b>{translate('∞ POSSIBILITÉS')}</b>
-              </span>
-              <Suspense
-                fallback={
-                  <div className="board-shell">{translate('Préparation de l’archipel…')}</div>
-                }
-              >
-                <Board state={demo} onTile={setSelected} reducedMotion demo />
-              </Suspense>
-              <div className="map-caption">
-                <span>{translate('✦ Créé pour les bons moments')}</span>
-                <span>{translate('2–4 voyageurs · dès maintenant')}</span>
-              </div>
-            </section>
+            {!nativePlatform() && (
+              <section className="hero-map" aria-label={translate('Aperçu du plateau')}>
+                <span className="map-stamp">
+                  {translate('32 ESCALES')}
+                  <br />
+                  <b>{translate('∞ POSSIBILITÉS')}</b>
+                </span>
+                <Suspense
+                  fallback={
+                    <div className="board-shell">{translate('Préparation de l’archipel…')}</div>
+                  }
+                >
+                  <Board state={demo} onTile={setSelected} reducedMotion demo />
+                </Suspense>
+                <div className="map-caption">
+                  <span>{translate('✦ Créé pour les bons moments')}</span>
+                  <span>{translate('2–4 voyageurs · dès maintenant')}</span>
+                </div>
+              </section>
+            )}
             <div className="features">
               <div>
                 <b>01</b>
@@ -1193,6 +1275,7 @@ export default function App() {
               onInspectOwner={setInspectedOwner}
               onTile={browseTile}
               onBonus={showBonus}
+              onTaunt={canTaunt ? openTaunt : undefined}
             />
             <section className="board-area">
               <div className="board-viewport">
@@ -1207,18 +1290,7 @@ export default function App() {
                     onReady={() => setBoardReady(true)}
                     auctionTile={current.auction?.tile}
                     strategicTiles={strategicTiles}
-                    onPlayer={
-                      canTaunt
-                        ? (id) => {
-                            const sender = tauntPlayer(current, online?.self, id);
-                            if (!sender) return;
-                            setTauntSender(sender);
-                            setTauntTarget(id);
-                            setSelected(null);
-                            setModal('taunt');
-                          }
-                        : undefined
-                    }
+                    onPlayer={canTaunt ? openTaunt : undefined}
                     taunt={visibleTaunt ?? undefined}
                     mobile={mobile}
                     onZoomChange={(boardZoom) => setComfort((old) => ({ ...old, boardZoom }))}
@@ -1848,6 +1920,33 @@ export default function App() {
               }}
             >
               {translate('Remplacer et commencer')}
+            </button>
+          </Modal>
+        )}
+        {modal === 'invitation' && pendingInvitation && (
+          <Modal
+            title={translate('Une invitation vous attend')}
+            onClose={() => {
+              setPendingInvitation(null);
+              setModal(null);
+            }}
+          >
+            <p>
+              {translate(
+                'Votre partie locale reste sauvegardée. Une partie en ligne déjà lancée continue sans vous.',
+              )}
+            </p>
+            <button className="primary" onClick={() => openNativeInvitation(pendingInvitation)}>
+              {translate('Ouvrir l’invitation')}
+            </button>
+            <button
+              className="secondary"
+              onClick={() => {
+                setPendingInvitation(null);
+                setModal(null);
+              }}
+            >
+              {translate('Continuer la partie')}
             </button>
           </Modal>
         )}
