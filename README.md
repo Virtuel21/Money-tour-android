@@ -30,6 +30,7 @@ En ligne, Android peut suspendre une application en arrière-plan. La partie des
 - [Recette fonctionnelle](docs/ANDROID_FUNCTIONAL_QA.md) : modes, actions du jeu, sauvegardes, tutoriel et invitations.
 - [Recette visuelle et tactile](docs/ANDROID_VISUAL_QA.md) : petits écrans, paysage, textes agrandis, fenêtres et clavier.
 - [Compilation et recette native](docs/ANDROID.md) : APK, signature, émulateur, bouton Retour et cycle de vie.
+- [Recette réseau](docs/ANDROID_NETWORK_QA.md) : WebRTC réel, relais publics, reprise et limites des réseaux mobiles.
 - [Inventaire des mécaniques](docs/MECANIQUES_ET_PROBABILITES.md), [règles](docs/FORTUNE_RULES.md) et [crédits](CREDITS.md).
 
 Les captures et rapports JSON sont joints aux preuves de la version. Les essais sur navigateur et émulateur ne remplacent pas une partie sur téléphone physique, ni des essais entre opérateurs Wi-Fi/4G/5G distincts.
