@@ -612,8 +612,8 @@ export default function Board({
             concertBeats.push(concert.beat);
           }
           if (tile.type === 'travel') {
-            const airport = illustratedSprite(airportArt, 2.6, 0.08);
-            airport.scale.y = 2.6 / 1.5;
+            const airport = illustratedSprite(airportArt, 3.25, 0.08);
+            airport.scale.y = 3.25 / 1.5;
             // Keep the airport at the rear; travelers and the name use the front lane.
             airport.position.set(p.x - 0.35, 0.29, p.z - 0.65);
             resources.add(airport);

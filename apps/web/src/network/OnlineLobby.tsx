@@ -82,6 +82,8 @@ export default function OnlineLobby({
   const [error, setError] = useState(initialTurn.error),
     [working, setWorking] = useState(false),
     [copied, setCopied] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [shareError, setShareError] = useState('');
   const [count, setCount] = useState(defaults?.count ?? 4),
     [teams, setTeams] = useState(defaults?.teams ?? false),
     [minutes, setMinutes] = useState(defaults?.minutes ?? 20);
@@ -235,6 +237,10 @@ export default function OnlineLobby({
     }
   }
   const link = invitationLink(location.href, code, networkSettings);
+  const shareData = { title: 'Money Tour', url: link };
+  const canShare =
+    typeof navigator.share === 'function' &&
+    (typeof navigator.canShare !== 'function' || navigator.canShare(shareData));
   const turnPanel = (
     <TurnPanel
       open={setupTurn || requiredTurn}
@@ -366,11 +372,30 @@ export default function OnlineLobby({
     else onClose();
   }
   async function copy() {
+    setCopied(false);
+    setShareError('');
+    if (error === 'Copiez le lien affiché ci-dessous.') setError('');
     try {
       await navigator.clipboard.writeText(link);
       setCopied(true);
     } catch {
       setError('Copiez le lien affiché ci-dessous.');
+    }
+  }
+  async function share() {
+    if (sharing) return;
+    setSharing(true);
+    setShareError('');
+    try {
+      // Keep the native sheet in this click's activation; copying must finish beforehand.
+      await navigator.share(shareData);
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === 'AbortError'))
+        setShareError(
+          'Le partage n’a pas pu être ouvert. Collez le lien copié dans votre application de messagerie.',
+        );
+    } finally {
+      setSharing(false);
     }
   }
   return (
@@ -529,6 +554,16 @@ export default function OnlineLobby({
                     {copied ? translate('Lien copié ✓') : translate('Copier le lien d’invitation')}
                   </button>
                   <input aria-label={translate('Lien d’invitation')} readOnly value={link} />
+                  {copied && canShare && (
+                    <button className="secondary" disabled={sharing} onClick={() => void share()}>
+                      {translate(sharing ? 'Ouverture du partage…' : 'Partager le lien')}
+                    </button>
+                  )}
+                  {shareError && (
+                    <p role="alert" className="network-error invite-share-error">
+                      {translate(shareError)}
+                    </p>
+                  )}
                 </div>
                 {!view.state && (
                   <form
