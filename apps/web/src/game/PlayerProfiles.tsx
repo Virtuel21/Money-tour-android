@@ -36,7 +36,7 @@ function PlayerBalance({ player }: { player: Player }) {
   const amount = money(player.cash, true).replace(' 💵', '');
   const compactAmount = new Intl.NumberFormat(numberLocale(), {
     notation: 'compact',
-    maximumFractionDigits: 1,
+    maximumFractionDigits: 0,
   }).format(player.cash);
   return (
     <span
