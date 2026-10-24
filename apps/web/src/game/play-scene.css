@@ -573,3 +573,29 @@
     padding: 3px 8px;
   }
 }
+
+/* Frame play between the HUD panels, but render all the way to the phone's edges. */
+@media (max-width: 999px) {
+  .app .play-scene .board-viewport,
+  .app .play-scene .board-area.zoomed .board-viewport {
+    overflow: visible;
+  }
+  .app .play-scene .board-shell,
+  .app .play-scene .board-3d,
+  .app .play-scene .board-area.zoomed .board-shell {
+    position: fixed;
+    /* Cover the edges even during the earthquake's 5px camera shake. */
+    inset: -6px;
+    width: calc(100vw + 12px);
+    height: calc(100dvh + 12px);
+    max-width: none;
+  }
+  .app .play-scene > .game-top {
+    position: relative;
+    z-index: 2;
+  }
+  .app .play-scene .roll-status {
+    position: relative;
+    z-index: 1;
+  }
+}

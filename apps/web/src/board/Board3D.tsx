@@ -4,7 +4,7 @@ import { InsuranceBadge, type InsuranceStyle } from './InsuranceBadge';
 import { architectureFamilies, architectureForCity } from '../game/architecture';
 import { tauntAsset, type Taunt } from '../game/taunts';
 import { scaledAmount } from '@money-tour/engine';
-import { cameraBounds, cameraZoom, followPlayer } from './camera';
+import { cameraFrustum, cameraZoom, followPlayer, zoomFrustum } from './camera';
 import { bindPinchZoom } from './pinchZoom';
 import { panFocus } from './cameraPan';
 import { useEffect, useId, useRef, useState } from 'react';
@@ -250,20 +250,47 @@ export default function Board({
         camera.position.set(18, 22, 18);
         camera.lookAt(0, 0, 0);
         camera.updateMatrixWorld();
+        const viewport = element.closest('.board-viewport');
+        let framingHalfWidth = 18;
+        let framing: ReturnType<typeof cameraFrustum>;
+        const project = () => {
+          if (framing) {
+            const bounds = zoomFrustum(framing, camera.zoom);
+            camera.left = bounds.left;
+            camera.right = bounds.right;
+            camera.top = bounds.top;
+            camera.bottom = bounds.bottom;
+          }
+          camera.updateProjectionMatrix();
+        };
         const resize = () => {
           const width = element.clientWidth,
             height = element.clientHeight;
+          if (!width || !height) return;
           renderer!.setSize(width, height, false);
           festivalRenderer!.setSize(width, height, false);
-          const bounds = cameraBounds(width, height, live.current.mobile);
-          camera.left = -bounds.halfWidth;
-          camera.right = bounds.halfWidth;
-          camera.top = bounds.halfHeight;
-          camera.bottom = -bounds.halfHeight;
-          camera.updateProjectionMatrix();
+          // Menu previews can be rotated by CSS: their DOM bounding box is not the renderer size.
+          const fullBleed = live.current.mobile && !demo && viewport;
+          const canvas = fullBleed
+            ? element.getBoundingClientRect()
+            : { left: 0, top: 0, width, height };
+          const frame = fullBleed ? viewport.getBoundingClientRect() : canvas;
+          framing = cameraFrustum(canvas, frame, live.current.mobile);
+          framingHalfWidth = framing.framingHalfWidth;
+          project();
         };
         observer = new ResizeObserver(resize);
         observer.observe(element);
+        // Tips, the journal and the HUD can resize the framing cell while the canvas stays full screen.
+        if (viewport) observer.observe(viewport);
+        const area = element.closest('.board-area');
+        if (area) observer.observe(area);
+        // Row changes can move the frame without changing its own dimensions.
+        area?.parentElement
+          ?.querySelectorAll(
+            ':scope > .game-top, :scope > .shared-game-info, :scope > .game-sidebar, :scope > .board-controls',
+          )
+          .forEach((panel) => observer!.observe(panel));
         resize();
         scene.add(new THREE.HemisphereLight(0xf4fcff, 0xa8a388, 1.8));
         const light = new THREE.DirectionalLight(0xfff4df, 2.4);
@@ -920,13 +947,13 @@ export default function Board({
             Boolean(game.winner);
           const zoomTarget = manualView.current
             ? (manualView.current.zoomBase * live.current.zoomPercent) / 100
-            : cameraZoom(camera.right, following, live.current.zoomPercent, frameAll);
+            : cameraZoom(framingHalfWidth, following, live.current.zoomPercent, frameAll);
           camera.zoom = THREE.MathUtils.lerp(camera.zoom, zoomTarget, factor);
           panEnabled.current = live.current.mobile && !demo && !frameAll && camera.zoom > 1.01;
           element.parentElement?.classList.toggle('board-can-pan', panEnabled.current);
           camera.position.copy(cameraOffset).add(focus);
           camera.lookAt(focus);
-          camera.updateProjectionMatrix();
+          project();
           camera.updateMatrixWorld();
           // The character art sits above DOM labels. Project it every frame so hops and
           // camera transitions stay as smooth as the original WebGL billboards.
@@ -989,7 +1016,7 @@ export default function Board({
             projectLabels();
             element.parentElement?.style.setProperty(
               '--camera-label-scale',
-              String((camera.zoom * 18) / camera.right),
+              String((camera.zoom * 36) / (camera.right - camera.left)),
             );
             element.parentElement?.setAttribute(
               'data-camera',

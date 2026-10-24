@@ -26,6 +26,46 @@ export function cameraBounds(width: number, height: number, mobile: boolean) {
   return { halfWidth, halfHeight: halfWidth / aspect };
 }
 
+interface ViewRect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+/** Draw beyond the HUD's framing cell without changing its scale or focus position. */
+export function cameraFrustum(canvas: ViewRect, frame: ViewRect, mobile: boolean) {
+  const { halfWidth, halfHeight } = cameraBounds(frame.width, frame.height, mobile);
+  const unitsX = (2 * halfWidth) / Math.max(1, frame.width);
+  const unitsY = (2 * halfHeight) / Math.max(1, frame.height);
+  const centerX = frame.left - canvas.left + frame.width / 2;
+  const centerY = frame.top - canvas.top + frame.height / 2;
+  return {
+    left: -centerX * unitsX,
+    right: (canvas.width - centerX) * unitsX,
+    top: centerY * unitsY,
+    bottom: -(canvas.height - centerY) * unitsY,
+    framingHalfWidth: halfWidth,
+  };
+}
+
+/** Orthographic zoom must keep the focus in the framing cell, rather than the canvas center. */
+export function zoomFrustum(
+  bounds: { left: number; right: number; top: number; bottom: number },
+  zoom: number,
+) {
+  const centerX = (bounds.left + bounds.right) / (2 * zoom);
+  const centerY = (bounds.top + bounds.bottom) / (2 * zoom);
+  const halfWidth = (bounds.right - bounds.left) / 2;
+  const halfHeight = (bounds.top - bounds.bottom) / 2;
+  return {
+    left: centerX - halfWidth,
+    right: centerX + halfWidth,
+    top: centerY + halfHeight,
+    bottom: centerY - halfHeight,
+  };
+}
+
 export function followPlayer({
   mobile,
   overview,
