@@ -144,8 +144,8 @@ try {
   await host.getByRole('button', { name: /Créer un salon en ligne/ }).click();
   const invitation = host.getByLabel('Lien d’invitation', { exact: true });
   await invitation.waitFor();
-  const link = await invitation.inputValue();
-  assert.match(new URL(link).hash, /^#room=[a-f\d]{32}$/);
+  const cancelledLink = await invitation.inputValue();
+  assert.match(new URL(cancelledLink).hash, /^#room=[a-f\d]{32}$/);
   assert.equal(await host.getByRole('button', { name: 'Copier le code du salon' }).count(), 0);
   assert.equal(await host.locator('.invite-code code').count(), 0);
   assert.equal(await host.getByText('Mode réseau : connexion directe', { exact: true }).count(), 1);
@@ -155,19 +155,40 @@ try {
   await capture(host, 'host-created');
   await host.getByRole('button', { name: 'Fermer le salon', exact: true }).click();
   await host.locator('.online-modal[open]').waitFor({ state: 'hidden' });
+  assert.equal(new URL(host.url()).hash, '');
+  assert.equal(
+    await host.evaluate(() => localStorage.getItem('money-tour.online-resume.v1')),
+    null,
+  );
+  assert.equal(
+    await host.getByRole('button', { name: 'Créer un salon en ligne', exact: true }).isEnabled(),
+    true,
+  );
+  assert.equal(
+    await host.getByRole('button', { name: 'Jouer sur cet appareil', exact: true }).isEnabled(),
+    true,
+  );
+  check(
+    'Closing pregame creation cancelled its room, cleared recovery and URL, and restored both start modes',
+  );
   await capture(host, 'host-dialog-closed');
+  await host.getByRole('button', { name: 'Créer un salon en ligne', exact: true }).click();
+  await invitation.waitFor();
+  const link = await invitation.inputValue();
+  assert.match(new URL(link).hash, /^#room=[a-f\d]{32}$/);
+  assert.notEqual(link, cancelledLink);
+  check('The host created a fresh room with a different invitation after cancellation');
   const waitStarted = Date.now();
-  console.log(`Host is waiting alone with its room dialog closed for ${delayMs} ms.`);
+  console.log(`Host is waiting alone with its room dialog open for ${delayMs} ms.`);
   await save();
   await new Promise((resolve) => setTimeout(resolve, delayMs));
   result.actualIdleMs = Date.now() - waitStarted;
-  await host.getByRole('button', { name: 'Rejoindre un salon', exact: true }).click();
   assert.equal(await invitation.inputValue(), link);
   assert.equal(
     await host.getByLabel('Votre nom dans le salon', { exact: true }).inputValue(),
     'HoteQA',
   );
-  check(`The same room and host name survived ${result.actualIdleMs} ms with the dialog closed`);
+  check(`The fresh room and host name survived ${result.actualIdleMs} ms with the dialog open`);
   await capture(host, 'host-after-delay');
   guest = await makePage('guest');
   await guest.goto(link);

@@ -20,6 +20,12 @@ Fond transparent : oui.
 
 > Use case: stylized-concept. Asset type: transparent game diorama sprite for Money Tour. Reference image is STYLE ONLY: match its high quality colorful cartoon city miniatures, bevelled toy-like forms, richly detailed painted materials, warm soft illumination and orthographic camera. Create ONE miniature outdoor ROCK CONCERT stage on a compact cream stone plinth, seen nearly front-on from a slightly elevated three-quarter camera, so front of speakers is clearly visible. Central low wooden stage with burgundy drum kit and two electric guitars on stands; short teal overhead lighting truss with golden lamps. Two chunky charcoal loudspeaker stacks symmetrically flanking stage at far left and far right, each with two LARGE ROUND clearly visible speaker cones facing camera, warm gold trim around cones and a coral accent. Turquoise and magenta stage accents, joyful polished game artwork, detailed yet highly readable at small size. Equipment only, no performers or crowd. No trophy, no palm trees, no text, no logos, no watermark. Entire composition within image with 8 percent clear margins; square 1024x1024 true transparent alpha background. One asset, not atlas. Keep speakers visually separated from center stage so their cones can be animated in game.
 
+### festival-stage-v2
+
+Révision du 24 octobre 2026, générée avec l'outil ImageGen à partir de `festival-stage-v1.webp` : même scène et mêmes instruments, vue strictement de face, traverse horizontale et marches centrées. Le fond transparent est conservé. L'original est archivé à côté de la révision ; le jeu charge désormais `festival-stage-v2.webp` (768 × 768, WebP qualité 92).
+
+> Edit the existing festival concert stage game sprite only to face exactly straight toward the viewer. Preserve the teal and magenta canopy, four golden lights, two double speaker stacks, drums, two guitars, orange timber stage, bunting, cream stone base, shrubs, gold finials and front steps. Slightly elevated camera, no left/right yaw or tilt; horizontal front edge, centered stairs, symmetric speaker alignment. Preserve the stylized materials and lighting. Full object, no text, people, new scenery or background; actual transparent RGBA.
+
 ### chance-tile-v2
 
 Fond transparent : non.

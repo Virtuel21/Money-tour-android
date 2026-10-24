@@ -37,6 +37,7 @@ import { MobilePocket } from './game/MobilePocket';
 import { AuctionView } from './game/AuctionView';
 import { AdventureBanner } from './game/AdventureHUD';
 import { PlayerProfiles } from './game/PlayerProfiles';
+import { useOwnerInspectionDismissal } from './game/useOwnerInspectionDismissal';
 import { ArchipelagoBackdrop } from './game/ArchipelagoBackdrop';
 import { ActionClock, GameClockContext } from './game/ActionClock';
 import { lazy, Suspense, useEffect, useId, useRef, useState } from 'react';
@@ -242,6 +243,7 @@ export default function App() {
   useEffect(() => saveComfort(comfort), [comfort]);
   const [boardReady, setBoardReady] = useState(false);
   const [inspectedOwner, setInspectedOwner] = useState<string | null>(null);
+  useOwnerInspectionDismissal(inspectedOwner, () => setInspectedOwner(null));
   const [save, setSave] = useState<LocalSave | null>(() => previewScenario() ?? loadLocal());
   const localSaveRef = useRef(save);
   localSaveRef.current = save;
@@ -277,6 +279,7 @@ export default function App() {
   const [tauntReadyAt, setTauntReadyAt] = useState(0);
   const seenTaunt = useRef('');
   const [createSalon, setCreateSalon] = useState(false);
+  const [lobbyKey, setLobbyKey] = useState(0);
   const [setupTurn, setSetupTurn] = useState(false);
   const [online, setOnline] = useState<SessionView | null>(null);
   const [onlineResume, setOnlineResume] = useState(() => loadOnlineResume());
@@ -385,6 +388,19 @@ export default function App() {
     setPaused(true);
     setSelected(null);
     setModal(null);
+  };
+  const detachOnline = () => {
+    // Starting another game releases this connection while retaining a valid saved seat.
+    onlineSession.current?.close();
+    onlineSession.current = null;
+    setOnline(null);
+    onlineSeq.current = -1;
+    setOnlineResume(loadOnlineResume());
+    setResumeRequest(undefined);
+    setCreateSalon(false);
+    setSetupTurn(false);
+    setLobbyKey((value) => value + 1);
+    window.history.replaceState(window.history.state, '', `${location.pathname}${location.search}`);
   };
   const rematch = () => {
     if (!current.winner) return;
@@ -535,6 +551,7 @@ export default function App() {
   }, [save, screen, paused, rolling, Boolean(online)]);
   const start = () => {
     if (!validMinutes(minutes)) return;
+    detachOnline();
     const next = newLocal({
       randomFirstPlayer: true,
       players: Array.from({ length: count }, (_, i) => ({
@@ -869,13 +886,14 @@ export default function App() {
                           if (save && !save.state.winner) setModal('new-game');
                           else start();
                         } else {
+                          detachOnline();
                           setResumeRequest(undefined);
                           setSetupTurn(false);
                           setCreateSalon(true);
                           setModal('online');
                         }
                       }}
-                      disabled={!!online || !validMinutes(minutes)}
+                      disabled={!validMinutes(minutes)}
                     >
                       {target === 'online'
                         ? translate('Créer un salon en ligne')
@@ -888,8 +906,9 @@ export default function App() {
                 )}
                 <button
                   className="secondary local-launch"
-                  disabled={!!online || !validMinutes(minutes)}
+                  disabled={!validMinutes(minutes)}
                   onClick={() => {
+                    detachOnline();
                     setResumeRequest(undefined);
                     setCreateSalon(false);
                     setSetupTurn(true);
@@ -925,8 +944,9 @@ export default function App() {
                   <>
                     <button
                       className="resume"
-                      disabled={!!online || !validMinutes(minutes)}
+                      disabled={!validMinutes(minutes)}
                       onClick={() => {
+                        detachOnline();
                         cinema.reset(save.state);
                         setScreen('game');
                         setPaused(false);
@@ -1886,6 +1906,7 @@ export default function App() {
             <button
               className="primary"
               onClick={() => {
+                detachOnline();
                 cinema.reset(save.state);
                 setScreen('game');
                 setPaused(false);
@@ -2150,46 +2171,54 @@ export default function App() {
           )}
         {screen === 'game' &&
           !tile &&
-          !interactionDisabled &&
           !modal &&
-          current.phase === 'casino' && (
+          !paused &&
+          ((current.phase === 'casino' &&
+            !rolling &&
+            !decisionPlayer.bot &&
+            !current.winner &&
+            (!online || online.self === decisionPlayer.id)) ||
+            (!cinema.dismissed && cinema.frame.cue.kind === 'casino')) && (
             <ActionCard
-              cardKey={decisionKey}
+              cardKey={[
+                save?.seed ?? journey,
+                current.turn,
+                active.id,
+                active.position,
+                'casino',
+              ].join(':')}
               reducedMotion={reduced}
-              ownerLabel={decisionPlayer.name}
+              ownerLabel={active.name}
               icon="dice"
-              status={<ActionClock full />}
-              title={translate('Bienvenue au casino')}
+              status={cinema.frame.cue.kind !== 'casino' && <ActionClock full />}
+              title={translate(
+                cinema.frame.cue.kind === 'casino'
+                  ? 'Le casino joue pour vous'
+                  : 'Bienvenue au casino',
+              )}
+              onClose={cinema.frame.cue.kind === 'casino' ? dismissDrawnCard : undefined}
+              footer={
+                cinema.frame.cue.kind === 'casino'
+                  ? (card) => (
+                      <button className="secondary" onClick={() => card.run(dismissDrawnCard)}>
+                        {translate('Passer l’animation')}
+                      </button>
+                    )
+                  : undefined
+              }
             >
               {(card) => (
-                <>
-                  <CasinoView
-                    state={current}
-                    act={(action) => card.run(() => dispatchDecision(action))}
-                  />
-                </>
+                <CasinoView
+                  state={current}
+                  cue={cinema.frame.cue.kind === 'casino' ? cinema.frame.cue : undefined}
+                  disabled={Boolean(online?.busy || online?.blocked)}
+                  act={(action) =>
+                    action.type === 'finish'
+                      ? card.run(() => dispatchDecision(action))
+                      : dispatchDecision(action)
+                  }
+                />
               )}
-            </ActionCard>
-          )}
-        {screen === 'game' &&
-          !modal &&
-          !tile &&
-          !paused &&
-          !cinema.dismissed &&
-          cinema.frame.cue.kind === 'casino' && (
-            <ActionCard
-              cardKey={drawnCardKey}
-              reducedMotion={reduced}
-              icon="dice"
-              title={translate('Le casino joue pour vous')}
-              onClose={dismissDrawnCard}
-              footer={(card) => (
-                <button className="secondary" onClick={() => card.run(dismissDrawnCard)}>
-                  {translate('Passer l’animation')}
-                </button>
-              )}
-            >
-              <CasinoView key={drawnCardKey} state={current} cue={cinema.frame.cue} act={act} />
             </ActionCard>
           )}
         {screen === 'game' &&
@@ -2600,6 +2629,7 @@ export default function App() {
         <Suspense fallback={<div className="notice">{translate('Ouverture du salon…')}</div>}>
           {(modal === 'online' || online) && (
             <OnlineLobby
+              key={lobbyKey}
               open={modal === 'online'}
               autoCreate={createSalon}
               setupTurn={setupTurn}
@@ -2620,7 +2650,7 @@ export default function App() {
                 onlineSession.current = session;
               }}
               onLeave={() => {
-                setOnlineResume(null);
+                setOnlineResume(loadOnlineResume());
                 setResumeRequest(undefined);
                 setCreateSalon(false);
                 onlineSession.current = null;

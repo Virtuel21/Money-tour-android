@@ -206,15 +206,55 @@ it('animates the alliance choice before creating the deal', async () => {
   expect(scene.latest!.alliance).toEqual({ beneficiaryId: 'a', targetId: 'b' });
 });
 
-it('keeps both the casino choice and the result inside physical cards', async () => {
+it.each([
+  ['roulette', false],
+  ['roulette', true],
+  ['slots', false],
+  ['slots', true],
+] as const)(
+  'keeps one casino card through %s play and result (mobile=%s)',
+  async (casino, mobile) => {
+    const state = game();
+    state.phase = 'casino';
+    state.players[0]!.position = 7;
+    state.casino = { tile: 7, game: casino, chance: 50 };
+    await mount(state, mobile);
+    const dialog = card();
+    const motion = dialog.querySelector('.drawn-card-motion');
+    const play = button(casino === 'roulette' ? 'Choisir rouge' : 'Lancer les rouleaux', dialog);
+    await act(() => {
+      play.click();
+      play.click();
+    });
+    expect(scene.actions.map((action) => action.type)).toEqual([
+      casino === 'roulette' ? 'casino_red' : 'casino_spin',
+    ]);
+    expect(scene.latest!.phase).toBe('end');
+    expect(card()).toBe(dialog);
+    expect(card().querySelector('.drawn-card-motion')).toBe(motion);
+    expect(dialog.classList.contains('is-leaving')).toBe(false);
+    expect(dialog.querySelector('.casino-playing')).not.toBeNull();
+    expect(dialog.querySelector('.casino-revealed')).toBeNull();
+    expect(dialog.querySelector('.casino-card-actions')).toBeNull();
+    await act(() => vi.advanceTimersByTime(1900));
+    expect(card()).toBe(dialog);
+    expect(dialog.querySelector('.casino-revealed')).not.toBeNull();
+    await click('Passer l’animation', dialog);
+    expect(dialog.classList.contains('is-leaving')).toBe(true);
+    await finishDeparture();
+    expect(host.querySelector('.action-card-dialog')).toBeNull();
+    expect(scene.actions).toHaveLength(1);
+  },
+);
+
+it('still animates the departure when the player skips the casino', async () => {
   const state = game();
   state.phase = 'casino';
   state.players[0]!.position = 7;
   state.casino = { tile: 7, game: 'roulette', chance: 50 };
   await mount(state);
-  await expectDeferred('Choisir rouge', 'casino_red');
-  expect(card().querySelector('.casino-playing')).not.toBeNull();
-  expect(scene.latest!.phase).toBe('end');
+  await expectDeferred('Passer mon tour au casino', 'finish');
+  expect(host.querySelector('.casino-playing')).toBeNull();
 });
 
 it('animates use of Squatteur while keeping the rent and held-card rules intact', async () => {

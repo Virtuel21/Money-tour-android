@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { loadLocal, newLocal, persistLocal } from '../src/game/local';
 import App from '../src/App';
+import type { SessionView } from '../src/network/session';
 
 const lobby = vi.hoisted(() => ({ props: null as Record<string, unknown> | null }));
 vi.mock('../src/game/preview', () => ({ previewScenario: () => null }));
@@ -31,6 +32,7 @@ afterEach(async () => {
   await act(() => root?.unmount());
   document.body.innerHTML = '';
   localStorage.clear();
+  history.replaceState(null, '', '/');
   lobby.props = null;
 });
 async function mount() {
@@ -102,3 +104,49 @@ it('makes local play primary only in solo and starts with the selected bots', as
     true,
   ]);
 });
+
+it.each(['local', 'online'])(
+  'can start a fresh %s game after returning home from an online game',
+  async (target) => {
+    await mount();
+    await click('Créer un salon en ligne');
+    const close = vi.fn();
+    const state = newLocal({
+      players: [
+        { id: 'a', name: 'Alice' },
+        { id: 'b', name: 'Bob' },
+      ],
+    }).state;
+    const view: SessionView = {
+      state,
+      members: [{ id: 'a', name: 'Alice', key: {}, order: 0 }],
+      host: 'a',
+      self: 'a',
+      connected: ['a'],
+      busy: false,
+      status: 'Salon prêt',
+      incidents: [],
+      hash: '',
+      epoch: 0,
+      events: [],
+      blocked: false,
+    };
+    await act(() => {
+      (lobby.props!.onSession as (session: unknown) => void)({ close });
+      (lobby.props!.onView as (view: SessionView) => void)(view);
+    });
+    history.replaceState(null, '', `/#room=${'c'.repeat(32)}`);
+    await act(() =>
+      document.querySelector<HTMLButtonElement>('[aria-label="Money Tour, accueil"]')!.click(),
+    );
+    await click('Accueil et sauvegarde');
+    const label = target === 'online' ? 'Créer un salon en ligne' : 'Jouer sur cet appareil';
+    expect(button(label).disabled).toBe(false);
+    await click(label);
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(location.hash).toBe('');
+    if (target === 'online')
+      expect(lobby.props).toMatchObject({ autoCreate: true, resume: undefined, open: true });
+    else expect(loadLocal()?.state.players).toHaveLength(4);
+  },
+);

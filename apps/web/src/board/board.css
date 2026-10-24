@@ -1,0 +1,11 @@
+/* The floating-market city stays visible and inspectable while unavailable. */
+.board-hit-polygons polygon.market-reserved {
+  fill: #879397;
+  fill-opacity: 0.88;
+}
+
+.board-hit-polygons polygon.market-reserved:hover,
+.board-hit-polygons polygon.market-reserved:focus-visible {
+  fill: #879397;
+  fill-opacity: 0.75;
+}

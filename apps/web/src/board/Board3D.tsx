@@ -21,6 +21,7 @@ import { advanceScenery, lagoonScale } from './lagoon';
 import { festivalFlag, lagoonBoat } from './scenery';
 import { projectTileLabels, tileDecorationPoint, type TileLabelAnchors } from './tileLabels';
 import { TileLabel } from './TileLabel';
+import './board.css';
 
 import { boardShape, tileFrame, tilePoint, wealthPoints } from './layout';
 const up = new THREE.Vector3(0, 1, 0);
@@ -422,7 +423,7 @@ export default function Board({
           textureLoader.loadAsync(import.meta.env.BASE_URL + 'textures/architecture-regional.svg'),
           textureLoader.loadAsync(import.meta.env.BASE_URL + 'textures/expansion-v1.webp'),
           textureLoader.loadAsync(import.meta.env.BASE_URL + 'textures/lost-island-v1.webp'),
-          textureLoader.loadAsync(import.meta.env.BASE_URL + 'textures/festival-stage-v1.webp'),
+          textureLoader.loadAsync(import.meta.env.BASE_URL + 'textures/festival-stage-v2.webp'),
           textureLoader.loadAsync(import.meta.env.BASE_URL + 'textures/chance-tile-v2.webp'),
           textureLoader.loadAsync(import.meta.env.BASE_URL + 'textures/tax-tile-v2.webp'),
           textureLoader.loadAsync(import.meta.env.BASE_URL + 'textures/insurance-tile-v2.webp'),
@@ -564,8 +565,9 @@ export default function Board({
             });
           }
           if (tile.type === 'championship') {
-            const concert = concertSprite(festivalArt, 3.1);
-            concert.sprite.position.set(p.x - 0.3, 0.29, p.z - 0.3);
+            const concert = concertSprite(festivalArt, 2.65);
+            // Leave the front of the corner clear for its horizontal name strip.
+            concert.sprite.position.set(p.x - 0.5, 0.29, p.z - 0.5);
             resources.add(concert.sprite);
             concertBeats.push(concert.beat);
           }
@@ -1238,7 +1240,7 @@ export default function Board({
                     ) +
                     translate(auctionTile === t.id ? ' · Aux enchères' : '')
                   }
-                  className={
+                  className={`${reservedCity(state, t.id) ? 'market-reserved ' : ''}${
                     auctionTile === t.id
                       ? 'auction-highlight'
                       : strategicTiles.includes(t.id) && !selecting
@@ -1262,7 +1264,8 @@ export default function Board({
                               : selecting
                                 ? 'choice-dimmed'
                                 : ''
-                  }
+                  }`}
+                  data-market-reserved={reservedCity(state, t.id) || undefined}
                   style={
                     {
                       '--insurance-color':
@@ -1383,8 +1386,6 @@ export default function Board({
                       : selecting && !choices.includes(t.id))
                   }
                   conditions={[
-                    ...(reservedCity(state, t.id) ? ['Enchère T10'] : []),
-
                     ...(state.properties[t.id]?.roachTurns
                       ? [`−50 % · ${state.properties[t.id]?.roachTurns} tours`]
                       : []),

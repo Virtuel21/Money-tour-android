@@ -5,12 +5,17 @@ import { createRoot, type Root } from 'react-dom/client';
 import OnlineLobby from '../src/network/OnlineLobby';
 import type { SessionView } from '../src/network/session';
 import { loadTurnPreferences, saveTurnPreferences } from '../src/network/turnSettings';
+import { loadOnlineResume } from '../src/network/storage';
+import { newLocal } from '../src/game/local';
 
 vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
 const mocked = vi.hoisted(() => ({
   joins: vi.fn(),
   closes: vi.fn(),
-  instances: [] as { onChange: (view: SessionView) => void }[],
+  instances: [] as {
+    onChange: (view: SessionView) => void;
+    onPersist: (value: unknown) => void;
+  }[],
   transports: vi.fn(),
 }));
 vi.mock('../src/network/trystero', () => ({
@@ -27,7 +32,7 @@ vi.mock('../src/network/crypto', () => ({
 vi.mock('../src/network/session', () => ({
   Session: class {
     onChange = (_view: SessionView) => {};
-    onPersist = () => {};
+    onPersist = (_value: unknown) => {};
     constructor(
       _transport: unknown,
       _user: unknown,
@@ -302,6 +307,147 @@ it('accepts an invitation link instead of exposing a room code field', async () 
       .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })),
   );
   expect(mocked.joins).toHaveBeenCalledWith(code, 'Camille', false);
+});
+
+it.each(['close', 'escape'])(
+  'cancels room creation with %s and removes its recovery and URL',
+  async (action) => {
+    history.replaceState(null, '', '/money-tour/?lang=fr');
+    const onLeave = vi.fn();
+    const onClose = vi.fn();
+    const element = await mountTurnLobby({
+      setupTurn: false,
+      autoCreate: true,
+      onLeave,
+      onClose,
+    });
+    const room = 'f'.repeat(32);
+    expect(loadOnlineResume()?.code).toBe(room);
+    expect(location.hash).toBe(`#room=${room}`);
+    await act(() =>
+      mocked.instances[0]!.onChange({
+        state: null,
+        members: [{ id: 'guest-id', name: 'Camille', key: {}, order: 0 }],
+        host: 'guest-id',
+        self: 'guest-id',
+        connected: ['guest-id'],
+        busy: false,
+        status: 'Salon prêt : invitez vos amis.',
+        incidents: [],
+        hash: '',
+        epoch: 0,
+        events: [],
+        blocked: false,
+      }),
+    );
+    await act(() => {
+      if (action === 'escape')
+        element.querySelector('dialog')!.dispatchEvent(new Event('cancel', { cancelable: true }));
+      else element.querySelector<HTMLButtonElement>('[aria-label="Fermer le salon"]')!.click();
+    });
+    expect(mocked.closes).toHaveBeenCalledTimes(1);
+    expect(onLeave).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(location.pathname + location.search + location.hash).toBe('/money-tour/?lang=fr');
+    expect(loadOnlineResume()).toBeNull();
+    // A completed task from the cancelled session must not restore its resume entry.
+    await act(() => mocked.instances[0]!.onPersist({ frames: [] }));
+    expect(loadOnlineResume()).toBeNull();
+  },
+);
+
+it('invalidates an unfinished join when creation is cancelled', async () => {
+  history.replaceState(null, '', '/');
+  let finishJoin!: () => void;
+  mocked.joins.mockImplementationOnce(() => new Promise<void>((resolve) => (finishJoin = resolve)));
+  const onSession = vi.fn();
+  const onView = vi.fn();
+  const onLeave = vi.fn();
+  const element = await mountTurnLobby({
+    setupTurn: false,
+    autoCreate: true,
+    onSession,
+    onView,
+    onLeave,
+  });
+  expect(mocked.joins).toHaveBeenCalledTimes(1);
+  await act(() =>
+    element.querySelector<HTMLButtonElement>('[aria-label="Fermer le salon"]')!.click(),
+  );
+  await act(() => finishJoin());
+  expect(onSession).not.toHaveBeenCalled();
+  expect(onView).not.toHaveBeenCalled();
+  expect(onLeave).toHaveBeenCalledTimes(1);
+  expect(loadOnlineResume()).toBeNull();
+  expect(location.hash).toBe('');
+});
+
+it('dismisses a stale invitation after reload without leaving its room in the URL', async () => {
+  history.replaceState(null, '', `/#room=${'e'.repeat(32)}&turn=manual&relay=1`);
+  const onLeave = vi.fn();
+  const element = await mountTurnLobby({ setupTurn: false, onLeave });
+  expect(element.textContent).toContain('Vous êtes invité à une partie');
+  await act(() =>
+    element.querySelector<HTMLButtonElement>('[aria-label="Fermer le salon"]')!.click(),
+  );
+  expect(onLeave).toHaveBeenCalledTimes(1);
+  expect(location.hash).toBe('');
+  expect(mocked.joins).not.toHaveBeenCalled();
+});
+
+it('keeps a started game when its dialog closes and returns home only after leaving the room', async () => {
+  history.replaceState(null, '', '/');
+  const onClose = vi.fn();
+  const onLeave = vi.fn();
+  const element = await mountTurnLobby({ setupTurn: false, autoCreate: true, onClose, onLeave });
+  const state = newLocal({
+    players: [
+      { id: 'guest-id', name: 'Camille' },
+      { id: 'bot-id', name: 'Lou', bot: true },
+    ],
+  }).state;
+  await act(() =>
+    mocked.instances[0]!.onChange({
+      state,
+      members: [{ id: 'guest-id', name: 'Camille', key: {}, order: 0 }],
+      host: 'guest-id',
+      self: 'guest-id',
+      connected: ['guest-id'],
+      busy: false,
+      status: 'Salon prêt',
+      incidents: [],
+      hash: '',
+      epoch: 0,
+      events: [],
+      blocked: false,
+    }),
+  );
+  await act(() =>
+    element.querySelector<HTMLButtonElement>('[aria-label="Fermer le salon"]')!.click(),
+  );
+  expect(onClose).toHaveBeenCalledTimes(1);
+  expect(onLeave).not.toHaveBeenCalled();
+  expect(mocked.closes).not.toHaveBeenCalled();
+  expect(loadOnlineResume()).not.toBeNull();
+  const originalConfirm = window.confirm;
+  window.confirm = () => true;
+  try {
+    await act(() =>
+      [...element.querySelectorAll('button')]
+        .find((button) => button.textContent === 'Quitter ce salon')!
+        .click(),
+    );
+  } finally {
+    window.confirm = originalConfirm;
+  }
+  expect(onLeave).toHaveBeenCalledTimes(1);
+  // App's onClose returns to the board, whereas onLeave returns to the home screen.
+  expect(onClose.mock.invocationCallOrder.at(-1)).toBeLessThan(
+    onLeave.mock.invocationCallOrder[0]!,
+  );
+  expect(mocked.closes).toHaveBeenCalledTimes(1);
+  expect(location.hash).toBe('');
+  expect(loadOnlineResume()).toBeNull();
 });
 
 it('shares only the complete invitation link and keeps the room alive while its dialog is closed', async () => {

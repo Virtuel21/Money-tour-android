@@ -328,9 +328,19 @@ async function runCase(fixture, language, width, height, reducedMotion = false, 
       await finishEntrance(dialog);
     }
     const button = await pickAction(dialog, fixture, language);
+    const casinoPlay = ['casino', 'slots'].includes(fixture.name);
+    const casinoIdentity = casinoPlay
+      ? await dialog.evaluateHandle((element) => ({
+          card: element,
+          motion: element.querySelector('.drawn-card-motion'),
+          arrival: element
+            .getAnimations({ subtree: true })
+            .find((animation) => animation.animationName === 'drawn-card-arrive'),
+        }))
+      : null;
     const before = actionStateSignature(await savedState(page));
     await button.scrollIntoViewIfNeeded();
-    if (!reducedMotion)
+    if (!reducedMotion && !casinoPlay)
       await button.evaluate((button) => {
         window.__actionQaDeparture = null;
         button.addEventListener(
@@ -358,7 +368,7 @@ async function runCase(fixture, language, width, height, reducedMotion = false, 
         );
       });
     await button.click();
-    if (!reducedMotion) {
+    if (!reducedMotion && !casinoPlay) {
       // Snapshot at 180ms inside the browser, independent of protocol/host latency.
       const departure = await page.evaluate(async () => {
         while (!window.__actionQaDeparture) await new Promise((resolve) => setTimeout(resolve, 20));
@@ -371,10 +381,30 @@ async function runCase(fixture, language, width, height, reducedMotion = false, 
       if (width === 390 && language === 'fr') await capture(page, name, 'departure');
     }
     await assertAfterAction(page, fixture);
-    if (['casino', 'slots'].includes(fixture.name)) {
+    if (casinoPlay) {
       const resultCard = page.locator(`${cardSelector}:has(.casino-playing)`);
       await resultCard.waitFor({ state: 'visible', timeout: 10000 });
-      await finishEntrance(resultCard);
+      const continuity = await resultCard.evaluate((element, original) => {
+        const arrival = element
+          .getAnimations({ subtree: true })
+          .find((animation) => animation.animationName === 'drawn-card-arrive');
+        return {
+          sameCard: element === original.card,
+          sameMotion: element.querySelector('.drawn-card-motion') === original.motion,
+          sameArrival: arrival === original.arrival,
+          leaving: element.classList.contains('is-leaving'),
+        };
+      }, casinoIdentity);
+      assert.deepEqual(
+        continuity,
+        {
+          sameCard: true,
+          sameMotion: true,
+          sameArrival: true,
+          leaving: false,
+        },
+        'Playing the casino retains the card without repeating its arrival',
+      );
       await geometry(resultCard);
       assert.equal(await page.locator('dialog[open]').count(), 1);
       if (width === 390 && language === 'fr') await capture(page, name, 'casino-result');
@@ -382,11 +412,13 @@ async function runCase(fixture, language, width, height, reducedMotion = false, 
         .getByRole('button', { name: language === 'fr' ? /Passer l’animation/ : /Skip animation/ })
         .evaluate((button) => button.click());
       await resultCard.waitFor({ state: 'detached', timeout: 5000 });
+      await casinoIdentity.dispose();
     }
     results.checks.push({
       name,
       ...bounds,
-      deferredAction: !reducedMotion,
+      deferredAction: !reducedMotion && !casinoPlay,
+      ...(casinoPlay ? { continuousCasinoCard: true } : {}),
       afterAction: true,
       clock: 'real',
     });

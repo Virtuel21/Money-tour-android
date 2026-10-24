@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { Tile } from '@money-tour/engine';
 import { streetSurface } from './surfaces';
+import { tileFrame } from './layout';
 
 /** Blender owns all board geometry; the game only binds artwork and live state. */
 export function boardModel(source: THREE.Group, tiles: Tile[], anisotropy: number) {
@@ -36,6 +37,12 @@ export function boardModel(source: THREE.Group, tiles: Tile[], anisotropy: numbe
       map.flipY = false;
       surface.material = new THREE.MeshStandardMaterial({ map, roughness: 0.95 });
     }
+    if (tile.type === 'resort' || tile.type === 'island') {
+      const material = (surface.material as THREE.MeshStandardMaterial).clone();
+      if (material.map)
+        material.map = shorelineArtwork(material.map, tileFrame(tile.id, count).side);
+      surface.material = material;
+    }
     const backdrop = mesh('backdrop', tile.id);
     backdrop.visible = extra;
     const trim = mesh('trim', tile.id);
@@ -70,6 +77,14 @@ export function boardModel(source: THREE.Group, tiles: Tile[], anisotropy: numbe
     }
   });
   return { root, cells, trims, borders, rentQuays };
+}
+
+/** The sand artwork's top edge is water: turn that edge toward the lagoon. */
+export function shorelineArtwork(texture: THREE.Texture, side: number) {
+  const map = texture.clone();
+  map.center.set(0.5, 0.5);
+  map.rotation = (side * Math.PI) / 2;
+  return map;
 }
 
 /** Existing image files use browser UVs; glTF stores their vertical axis reversed. */

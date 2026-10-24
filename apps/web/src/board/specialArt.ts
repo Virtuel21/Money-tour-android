@@ -38,14 +38,14 @@ export function concertSprite(map: THREE.Texture, size: number) {
       '#include <map_fragment>',
       `
       vec2 concertUv = vMapUv;
-      concertUv = pulseCone(concertUv, vec2(0.138, 0.606));
-      concertUv = pulseCone(concertUv, vec2(0.136, 0.474));
-      concertUv = pulseCone(concertUv, vec2(0.829, 0.536));
-      concertUv = pulseCone(concertUv, vec2(0.829, 0.405));
+      concertUv = pulseCone(concertUv, vec2(0.124, 0.558));
+      concertUv = pulseCone(concertUv, vec2(0.124, 0.450));
+      concertUv = pulseCone(concertUv, vec2(0.877, 0.558));
+      concertUv = pulseCone(concertUv, vec2(0.877, 0.450));
       ${THREE.ShaderChunk.map_fragment.replaceAll('vMapUv', 'concertUv')}
     `,
     );
   };
-  sprite.material.customProgramCacheKey = () => 'festival-cones-v1';
+  sprite.material.customProgramCacheKey = () => 'festival-cones-v2';
   return { sprite, beat };
 }

@@ -2,6 +2,7 @@
 .app .game-layout.play-scene {
   --profile-lane: clamp(228px, 18vw, 304px);
   --scene-inset: 16px;
+  --scene-controls-max: 1120px;
   display: grid;
   grid-template-columns: var(--profile-lane) minmax(0, 1fr) var(--profile-lane);
   grid-template-rows: 56px auto minmax(0, 1fr) auto 64px;
@@ -358,6 +359,14 @@
 .app .play-scene .board-controls .board-nav-label {
   min-height: 0;
   font-size: inherit;
+}
+/* Keep related controls within a comfortable reach on ultrawide displays. */
+.app .play-scene > .shared-game-info,
+.app .play-scene > .game-sidebar,
+.app .play-scene.insurance-selecting > .game-sidebar,
+.app .play-scene > .board-controls {
+  max-width: var(--scene-controls-max);
+  justify-self: center;
 }
 .app .play-scene .board-watermark,
 .app .play-scene .bank-label {

@@ -1,5 +1,5 @@
 import { translate, formatText } from '../i18n/translate';
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { getLegalActions, type GameAction, type GameState } from '@money-tour/engine';
 import type { Cue } from './presentation';
 import { ActionClock } from './ActionClock';
@@ -10,12 +10,27 @@ export function CasinoView({
   state,
   cue,
   act,
+  disabled = false,
 }: {
   state: GameState;
   cue?: Cue;
   act: (a: GameAction) => void;
+  disabled?: boolean;
 }) {
   const [revealed, setRevealed] = useState(false);
+  const [pending, setPending] = useState(false);
+  const actionPending = useRef(false);
+  useEffect(() => {
+    if (disabled) return;
+    actionPending.current = false;
+    setPending(false);
+  }, [cue, disabled, state.seq]);
+  const choose = (action: GameAction) => {
+    if (disabled || actionPending.current) return;
+    actionPending.current = true;
+    setPending(true);
+    act(action);
+  };
   useEffect(() => {
     if (!cue) return;
     const timer = setTimeout(() => setRevealed(true), Math.min(1900, cue.duration * 0.55));
@@ -124,7 +139,12 @@ export function CasinoView({
               {getLegalActions(state)
                 .filter((a) => a.type.startsWith('casino_'))
                 .map((a) => (
-                  <button key={a.type} className={'primary ' + a.type} onClick={() => act(a)}>
+                  <button
+                    key={a.type}
+                    className={'primary ' + a.type}
+                    disabled={disabled || pending}
+                    onClick={() => choose(a)}
+                  >
                     <span>
                       {a.type === 'casino_red'
                         ? translate('Choisir rouge')
@@ -138,7 +158,8 @@ export function CasinoView({
             </div>
             <button
               className="secondary"
-              onClick={() => act({ type: 'finish', playerId: player.id })}
+              disabled={disabled || pending}
+              onClick={() => choose({ type: 'finish', playerId: player.id })}
             >
               {translate('Passer mon tour au casino ')}
               <ActionClock />

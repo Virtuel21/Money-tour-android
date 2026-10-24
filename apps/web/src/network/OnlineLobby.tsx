@@ -106,6 +106,7 @@ export default function OnlineLobby({
   const session = useRef<Session | null>(null),
     dialog = useRef<HTMLDialogElement>(null);
   const attempt = useRef(0);
+  const joinedCode = useRef('');
   const connecting = useRef(false);
   const abort = useRef<AbortController | null>(null);
   const callbacks = useRef({ onSession, onView, onLeave });
@@ -290,6 +291,7 @@ export default function OnlineLobby({
       setName(publicName);
       const creator = resume?.creator ?? create;
       const recovery = { code: roomCode, name: publicName, creator };
+      joinedCode.current = roomCode;
       if (!rememberOnline(recovery, user))
         setError('Stockage désactivé : votre siège ne pourra pas être repris après fermeture.');
       const next = new Session(transport, user, publicName, creator);
@@ -299,6 +301,7 @@ export default function OnlineLobby({
         callbacks.current.onView(value);
       };
       next.onPersist = (value) => {
+        if (request !== attempt.current) return;
         if (!rememberOnline({ ...recovery, name: next.name }, user, value))
           setError(
             'Sauvegarde indisponible : gardez cet onglet ouvert pour conserver votre siège.',
@@ -351,10 +354,16 @@ export default function OnlineLobby({
     session.current?.close();
     session.current = null;
     setView(null);
-    forgetOnlineResume(code);
+    forgetOnlineResume(joinedCode.current || resume?.code || code);
+    joinedCode.current = '';
     history.replaceState(history.state, '', `${location.pathname}${location.search}`);
-    callbacks.current.onLeave();
     onClose();
+    callbacks.current.onLeave();
+  }
+  function close() {
+    // Before the game starts, dismissing creation cancels the room and any pending join.
+    if (!view?.state && !session.current?.state) leave();
+    else onClose();
   }
   async function copy() {
     try {
@@ -372,14 +381,14 @@ export default function OnlineLobby({
       onKeyDown={trapDialogFocus}
       onCancel={(event) => {
         event.preventDefault();
-        onClose();
+        close();
       }}
     >
       <div className="modal-heading">
         <h2 id={titleId}>
           {translate(setupTurn ? 'Configurer le serveur TURN' : 'Le voyage entre amis')}
         </h2>
-        <button className="icon-button" aria-label={translate('Fermer le salon')} onClick={onClose}>
+        <button className="icon-button" aria-label={translate('Fermer le salon')} onClick={close}>
           <GameIcon name="close" />
         </button>
       </div>
