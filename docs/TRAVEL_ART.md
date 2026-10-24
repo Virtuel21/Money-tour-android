@@ -6,7 +6,7 @@ Création originale du 24 octobre 2026 avec l’outil imagegen intégré. Le jou
 
 - Fichier du jeu : `apps/web/public/textures/travel-airport-v1.webp`.
 - Source RGBA : 1536 × 1024 ; même résolution dans l’export WebP, qualité 82, alpha 100, 141 886 octets.
-- L’illustration remplace le modèle d’avion de la case Voyage. Sprite vertical statique, proportions 3:2, placé à l’arrière du coin pour laisser libres le libellé et le passage des personnages.
+- L’illustration remplace le modèle d’avion de la case Voyage. Panneau vertical statique, proportions 3:2, largeur 3,25 unités, centré contre le bord extérieur de la case. Son orientation suit les autres cases, à 45° de l’ancienne pose face caméra, sans incliner le bâtiment. Le sol doré d’origine est conservé.
 - Les pixels hors silhouette ont un alpha nul ; les couleurs RGB présentes sous cette transparence ne constituent pas un fond visible.
 
 ## Prompt exact

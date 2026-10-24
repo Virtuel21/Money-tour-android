@@ -37,13 +37,6 @@ export function boardModel(source: THREE.Group, tiles: Tile[], anisotropy: numbe
       map.flipY = false;
       surface.material = new THREE.MeshStandardMaterial({ map, roughness: 0.95 });
     }
-    if (tile.type === 'travel') {
-      // A cool apron separates the airport's cream and gold artwork from the ground.
-      const material = (surface.material as THREE.MeshStandardMaterial).clone();
-      material.map = null;
-      material.color.set('#477a8c');
-      surface.material = material;
-    }
     if (tile.type === 'resort' || tile.type === 'island') {
       const material = (surface.material as THREE.MeshStandardMaterial).clone();
       if (material.map)
