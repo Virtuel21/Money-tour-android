@@ -79,7 +79,17 @@ const check = async (name, run) => {
   report.checks.push({ name, passed: true, details });
   await write();
 };
+let capturePage;
 const screenshot = async (name) => {
+  if (capturePage && !capturePage.isClosed())
+    await Promise.race([
+      capturePage.evaluate(
+        () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+      ),
+      pause(1500),
+    ]);
+  // DOM readiness can precede Android's first composed WebView frame after Activity creation.
+  await pause(750);
   const filename = `${name}.png`;
   await fs.writeFile(
     path.join(out, filename),
@@ -141,17 +151,18 @@ try {
     noDefaults: true,
   });
   const page = await renderedAppPage(browser);
+  capturePage = page;
   assert(page, 'The Android application contains a WebView page');
   page.setDefaultTimeout(60_000);
   page.on('pageerror', (error) => report.errors.push(error.message));
   const cdp = await page.context().newCDPSession(page);
-  const touch = async (locator) => {
+  const touch = async (locator, session = cdp) => {
     await locator.scrollIntoViewIfNeeded();
     const bounds = await locator.boundingBox();
     assert(bounds, 'Touch target is visible');
     const point = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
+    await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   };
   const save = () => page.evaluate(() => JSON.parse(localStorage.getItem('money-tour.local.v17')));
   await check('Cold launch completely offline', async () => {
@@ -285,6 +296,13 @@ try {
     const stored = await save();
     assert.equal(stored.state.players.length, 2);
     assert.equal(stored.state.players[0].name, 'Android natif');
+    const beginnerHint = page
+      .locator('.context-tip')
+      .getByRole('button', { name: 'Masquer ce conseil', exact: true });
+    if (await beginnerHint.isVisible()) {
+      await touch(beginnerHint);
+      await beginnerHint.waitFor({ state: 'hidden' });
+    }
     await screenshot('03-offline-board');
     return { players: stored.state.players.length, phase: stored.state.phase };
   });
@@ -363,6 +381,7 @@ try {
       noDefaults: true,
     });
     const restoredPage = await renderedAppPage(browser);
+    capturePage = restoredPage;
     restoredPage.setDefaultTimeout(120_000);
     restoredPage.on('pageerror', (error) => report.errors.push(error.message));
     await restoredPage.getByRole('button', { name: /Reprendre ma partie$/ }).waitFor();
@@ -372,7 +391,63 @@ try {
     assert.equal(restored.seed, stored.seed);
     assert.equal(restored.state.seq, stored.state.seq);
     await screenshot('06-restored-home');
-    return { seedPreserved: true, actionsPreserved: true };
+    const restoredCdp = await restoredPage.context().newCDPSession(restoredPage);
+    await touch(restoredPage.getByRole('button', { name: /Reprendre ma partie$/ }), restoredCdp);
+    await restoredPage.locator('.board-canvas canvas').waitFor({ timeout: 180_000 });
+    await restoredPage.locator('.board-loading').waitFor({ state: 'hidden', timeout: 180_000 });
+    assert.equal(
+      await restoredPage.locator('.board-fallback').count(),
+      0,
+      'Restored game renders the real board',
+    );
+    const beginnerHint = restoredPage
+      .locator('.context-tip')
+      .getByRole('button', { name: 'Masquer ce conseil', exact: true });
+    if (await beginnerHint.isVisible()) {
+      await touch(beginnerHint, restoredCdp);
+      await beginnerHint.waitFor({ state: 'hidden' });
+    }
+    const roll = restoredPage.getByRole('button', { name: /^Lancer les dés/ });
+    await roll.waitFor({ timeout: 120_000 });
+    await restoredPage.waitForFunction(
+      () =>
+        [...document.querySelectorAll('button')].some(
+          (button) => /^Lancer les dés/.test(button.textContent.trim()) && !button.disabled,
+        ),
+      undefined,
+      { timeout: 120_000 },
+    );
+    const beforeRoll = await restoredPage.evaluate(() =>
+      JSON.parse(localStorage.getItem('money-tour.local.v17')),
+    );
+    assert.equal(
+      beforeRoll.state.dice.length,
+      0,
+      'The restored opening dice have not been rolled automatically',
+    );
+    await touch(roll, restoredCdp);
+    await restoredPage.waitForFunction(
+      (previousSeq) => {
+        const save = JSON.parse(localStorage.getItem('money-tour.local.v17'));
+        return save?.state.seq > previousSeq && save.state.dice.length === 2;
+      },
+      beforeRoll.state.seq,
+      { timeout: 30000 },
+    );
+    const rolled = await restoredPage.evaluate(() =>
+      JSON.parse(localStorage.getItem('money-tour.local.v17')),
+    );
+    assert(
+      rolled.state.dice.every((die) => Number.isInteger(die) && die >= 1 && die <= 6),
+      'Real touch after process restart produced two valid dice',
+    );
+    await screenshot('07-restored-roll');
+    return {
+      seedPreserved: true,
+      actionsPreserved: true,
+      dice: rolled.state.dice,
+      actionsAdvanced: rolled.state.seq - beforeRoll.state.seq,
+    };
   });
   assert.deepEqual(report.errors, [], 'No JavaScript page errors');
 } catch (error) {
