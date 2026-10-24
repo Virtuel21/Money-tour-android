@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import {
   config,
   legacyConfigV16,
+  legacyConfigV17,
   createGame,
   getLegalActions,
   reduceGame,
@@ -19,7 +20,10 @@ const game = () =>
     seed: 'pacing',
   });
 it('changes only the hotel threshold and rules version from v16', () => {
-  expect(config).toEqual({ ...legacyConfigV16, version: 17, hotelUnlockLaps: 2 });
+  expect(legacyConfigV17).toEqual({ ...legacyConfigV16, version: 17, hotelUnlockLaps: 2 });
+});
+it('opens rival travel destinations in new games while preserving all other v17 rules', () => {
+  expect(config).toEqual({ ...legacyConfigV17, version: 18, travelToRivals: true });
 });
 it('builds three houses without the matching city, but never on another player’s property', () => {
   let state = game();

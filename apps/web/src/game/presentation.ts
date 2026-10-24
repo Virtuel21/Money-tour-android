@@ -8,8 +8,8 @@ export type PresentationPace = 'normal' | 'fast';
 // Shared online budgets include that time even if one viewer disables motion.
 const FAST_CARD_NOTICE_MS = CARD_ARRIVE_MS + 4000;
 const routineNotices = ['alliance_expired', 'crisis_expired', 'roaches_expired'];
-// Insurance is status feedback, so reading it never holds a decision or the shared clock.
-const passiveNotices = ['insurance', 'insured_tile'];
+// Status feedback never holds a decision or the shared clock after its action card leaves.
+const passiveNotices = ['insurance', 'insured_tile', 'duel_cancelled'];
 
 /** One debit for a purchase/construction batch; keep the original events for the journal. */
 function propertyPayment(events: GameEvent[], index: number): number | undefined {

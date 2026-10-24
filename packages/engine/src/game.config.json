@@ -1,5 +1,6 @@
 {
-  "version": 17,
+  "version": 18,
+  "travelToRivals": true,
   "initialCash": 1500,
   "startBonus": 300,
   "durationMs": 1200000,

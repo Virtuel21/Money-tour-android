@@ -7,12 +7,14 @@ import {
   duelCommitment,
   validateState,
   sameRules,
+  legacyConfigV17,
+  type GameConfig,
 } from '../src/index';
 import { sequence } from './helpers';
-const game = () =>
+const game = (rules: GameConfig = config) =>
   createGame({
     config: {
-      ...config,
+      ...rules,
       shuffleStreets: false,
       adventures: false,
       festivalCount: 0,
@@ -45,8 +47,8 @@ it('offers travel on the extra action after landing with a double, and consumes 
   expect(r.state.currentPlayer).toBe(1);
   expect(validateState(r.state)).toEqual([]);
 });
-it('retains ordinary travel for the next turn and never permits a destination owned by a rival', () => {
-  const s = game();
+it('preserves the previous edition’s next-turn travel and its rival destination restriction', () => {
+  const s = game(legacyConfigV17 as GameConfig);
   s.players[0]!.position = 19;
   s.properties[25]!.ownerId = 'b';
   let r = reduceGame(s, { type: 'roll', playerId: 'a' }, sequence(0.2, 0.4));

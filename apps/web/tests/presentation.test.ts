@@ -27,6 +27,17 @@ it('budgets the public monopoly warning in the shared presentation clock', () =>
   expect(frames[0]!.cue.message).toBe(events[0]!.message);
   expect(presentationMs(events)).toBe(frames[0]!.cue.duration);
 });
+it.each(['normal', 'fast'] as const)(
+  'does not block the next action after declining a duel at %s pace',
+  (pace) => {
+    const state = game();
+    const events = [{ type: 'duel_cancelled', message: 'Duel annulé.' }];
+    expect(presentation(state, state, events, false, pace).map((frame) => frame.cue)).toMatchObject(
+      [{ reason: 'duel_cancelled', duration: 0, nonblocking: true }],
+    );
+    expect(presentationMs(events, pace)).toBe(0);
+  },
+);
 it('shows quake damage after the shake, with a bounded network clock and reduced presentation', () => {
   const before = game(),
     after = structuredClone(before);

@@ -75,7 +75,7 @@ import {
 } from './game/local';
 import { MoneyFlight, TurnBanner } from './game/GameFeedback';
 import { purchaseOffer, PurchaseDetails } from './game/PurchaseOffer';
-import { DuelView } from './game/DuelView';
+import { DuelCard, isDuelNotice, useDuelEncounterKey } from './game/DuelCard';
 import { DrawnCard } from './game/DrawnCard';
 import { ActionCard } from './game/ActionCard';
 import { CasinoView } from './game/CasinoView';
@@ -461,8 +461,10 @@ export default function App() {
     setModal(null);
   };
   const decisionPlayer = current.players.find((p) => p.id === getDecisionPlayerId(current))!;
+  const duelEncounterKey = useDuelEncounterKey(save?.seed ?? journey, current);
   const sharedDialog = useSpectatorDialog(
-    `${current.turn}:${current.phase}:${current.duel?.id ?? current.auction?.id ?? ''}:${current.duel?.stage ?? current.auction?.stage ?? ''}:${decisionPlayer.id}`,
+    duelEncounterKey ??
+      `${current.turn}:${current.phase}:${current.auction?.id ?? ''}:${current.auction?.stage ?? ''}:${decisionPlayer.id}`,
     !!online && online.self !== decisionPlayer.id,
   );
   const auctionDialog = useAuctionDialog(
@@ -740,7 +742,9 @@ export default function App() {
                   : current.phase === 'island'
                     ? 'Payez le voyage de retour, utilisez un billet ou tentez un double. Vous sortirez au plus tard à la troisième tentative.'
                     : current.phase === 'travel'
-                      ? `Choisissez une case libre ou alliée. Le voyage coûte ${money(current.config.travelFee, true)} et remplace les dés, même après un double.`
+                      ? current.config.travelToRivals
+                        ? `Choisissez une destination, même chez un adversaire. Le voyage coûte ${money(current.config.travelFee, true)} et remplace les dés, même après un double.`
+                        : `Choisissez une case libre ou alliée. Le voyage coûte ${money(current.config.travelFee, true)} et remplace les dés, même après un double.`
                       : current.phase === 'championship'
                         ? `Choisissez une ville éclairée : ${money(current.config.championshipFee, true)}, loyer ×2 pendant quatre de vos tours.`
                         : current.phase === 'property'
@@ -1013,13 +1017,7 @@ export default function App() {
                   <div className="board-shell">{translate('Préparation de l’archipel…')}</div>
                 }
               >
-                <Board
-                  state={demo}
-                  onTile={setSelected}
-                  reducedMotion
-                  demo
-                  zoomPercent={comfort.boardZoom}
-                />
+                <Board state={demo} onTile={setSelected} reducedMotion demo />
               </Suspense>
               <div className="map-caption">
                 <span>{translate('✦ Créé pour les bons moments')}</span>
@@ -1124,6 +1122,10 @@ export default function App() {
                       setOverview(false);
                       setViewResetKey((key) => key + 1);
                     } else if (mobile) setOverview(!overview);
+                    else {
+                      setComfort((old) => ({ ...old, boardZoom: 100 }));
+                      setViewResetKey((key) => key + 1);
+                    }
                   }}
                 >
                   <GameIcon name={mobile && boardPanned ? 'target' : 'compass'} />
@@ -1191,7 +1193,7 @@ export default function App() {
                     onPanChange={setBoardPanned}
                     viewResetKey={viewResetKey}
                     overview={
-                      overview ||
+                      (mobile && overview) ||
                       paused ||
                       Boolean(inspectedOwner) ||
                       !!current.auction ||
@@ -1941,39 +1943,22 @@ export default function App() {
             />
           </Modal>
         )}
-        {screen === 'game' &&
-          !rolling &&
-          !modal &&
-          !paused &&
-          current.phase === 'duel' &&
-          !sharedDialog.hidden &&
-          current.duel && (
-            <ActionCard
-              cardKey={decisionKey}
-              reducedMotion={reduced}
-              ownerLabel={decisionPlayer.name}
-              icon="target"
-              status={<ActionClock full />}
-              title={translate('Le grand duel')}
-              onClose={sharedDialog.onClose}
-            >
-              {(card) => (
-                <>
-                  <DuelView
-                    key={current.duel!.id}
-                    state={current}
-                    self={online?.self}
-                    act={(action) =>
-                      action.type === 'duel_reveal'
-                        ? act(action)
-                        : card.run(() => dispatchDecision(action))
-                    }
-                    disabled={Boolean(online?.busy || online?.blocked)}
-                  />
-                </>
-              )}
-            </ActionCard>
-          )}
+        {screen === 'game' && !modal && !paused && (
+          <DuelCard
+            journey={save?.seed ?? journey}
+            state={current}
+            liveState={online?.state ?? save?.state ?? current}
+            cue={cinema.frame.cue}
+            busy={rolling}
+            disabled={Boolean(online?.busy || online?.blocked)}
+            self={online?.self}
+            hidden={sharedDialog.hidden}
+            reducedMotion={reduced}
+            onClose={sharedDialog.onClose}
+            act={dispatchDecision}
+            dismissResult={dismissDrawnCard}
+          />
+        )}
         {screen === 'game' &&
           !interactionDisabled &&
           !modal &&
@@ -2170,8 +2155,11 @@ export default function App() {
             </ActionCard>
           )}
         {screen === 'game' && !paused && cinema.notice && (
-          <aside className="routine-notice passive-insurance-notice" role="status">
-            <GameIcon name="shield" />
+          <aside
+            className={`routine-notice ${cinema.notice.reason === 'duel_cancelled' ? 'passive-duel-notice' : 'passive-insurance-notice'}`}
+            role="status"
+          >
+            <GameIcon name={cinema.notice.reason === 'duel_cancelled' ? 'target' : 'shield'} />
             <p>{translate(cinema.notice.message)}</p>
             <button aria-label={translate('Masquer l’information')} onClick={cinema.dismissNotice}>
               <GameIcon name="close" />
@@ -2185,6 +2173,7 @@ export default function App() {
           !cinema.dismissed &&
           cinema.frame.cue.kind === 'notice' &&
           cinema.frame.cue.reason !== 'auction_started' &&
+          !isDuelNotice(cinema.frame.cue) &&
           (['insured_tile', 'alliance_expired', 'crisis_expired', 'roaches_expired'].includes(
             cinema.frame.cue.reason ?? '',
           ) ? (
@@ -2482,7 +2471,9 @@ export default function App() {
                             )
                           : tile.type === 'travel'
                             ? translate(
-                                'Au prochain tour, voyagez pour 50 vers une case libre ou alliée.',
+                                current.config.travelToRivals
+                                  ? 'Au prochain tour, voyagez pour 50 vers n’importe quelle case, y compris chez un adversaire.'
+                                  : 'Au prochain tour, voyagez pour 50 vers une case libre ou alliée.',
                               )
                             : tile.type === 'tax'
                               ? translate(

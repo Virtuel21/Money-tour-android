@@ -49,4 +49,6 @@ textures/expansion-v1.webp: original atlas generated with ChatGPT's integrated i
 
 ## Special spaces and Festival (v15)
 
+`textures/travel-airport-v1.webp`: original airport generated with the built-in imagegen tool on 24 October 2026, option B selected by the game's creator. RGBA sprite at 1536 × 1024, WebP quality 82 with transparency preserved. [Exact prompt and provenance](docs/TRAVEL_ART.md).
+
 Five original illustrations generated with the integrated imagegen tool: `lost-island-v1.webp`, `festival-stage-v1.webp`, `chance-tile-v2.webp`, `tax-tile-v2.webp`, `insurance-tile-v2.webp`. Style reference: our `architecture-v3.webp` atlas. No new third-party assets. Native 1254 × 1254 dioramas and 1024 × 1536 textures; delivered as 768 × 768 and 768 × 1152 WebP. [Exact prompts, provenance and integration](docs/SPECIAL_TILES_ART.md).

@@ -1,0 +1,53 @@
+.money-odometer {
+  position: relative;
+  display: inline-block;
+  vertical-align: middle;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+.money-odometer > .money-odometer-value {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.money-odometer > .money-odometer-visual {
+  display: inline-flex;
+  align-items: center;
+  height: 1.05em;
+  line-height: 1;
+  white-space: nowrap;
+}
+.money-odometer .money-odometer-slot {
+  position: relative;
+  display: inline-block;
+  flex: 0 0 0.6em;
+  width: 0.6em;
+  height: 1em;
+  overflow: hidden;
+  text-align: center;
+  contain: paint;
+}
+.money-odometer .money-odometer-tape {
+  display: block;
+  width: 100%;
+  height: 11em;
+  line-height: 1;
+  backface-visibility: hidden;
+}
+.money-odometer .money-odometer-tape::before {
+  content: '0\a 1\a 2\a 3\a 4\a 5\a 6\a 7\a 8\a 9\a 0';
+  white-space: pre;
+}
+.money-odometer[data-rolling='true'] .money-odometer-tape {
+  will-change: transform;
+}
+.money-odometer .money-odometer-mark {
+  display: inline-block;
+  line-height: 1;
+}

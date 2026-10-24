@@ -98,6 +98,7 @@ async function onlineGame(auto) {
   assert.deepEqual(before[0].frames, before[1].frames);
   const first = before[0].frames[0];
   assert.equal(first.command.type, 'start');
+  assert.equal(first.command.rulesVersion, 18);
   assert.equal(first.command.adventureStart, true);
   assert(first.adventureDeadline > Date.now(), 'The shared deadline is still pending');
   await host.getByRole('button', { name: 'Démarrer l’aventure', exact: true }).click();

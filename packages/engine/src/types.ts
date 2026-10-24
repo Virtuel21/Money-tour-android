@@ -86,6 +86,7 @@ export interface GameConfig {
   bundledPurchase?: boolean;
   duelReplayTies?: boolean;
   travelOnDouble?: boolean;
+  travelToRivals?: boolean;
   casinoMinWin?: number;
   hotelUnlockLaps?: number;
   lineVictory?: boolean;

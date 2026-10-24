@@ -1,0 +1,514 @@
+{
+  "version": 17,
+  "initialCash": 1500,
+  "startBonus": 300,
+  "durationMs": 1200000,
+  "actionTimeoutMs": 30000,
+  "minPlayers": 2,
+  "maxPlayers": 4,
+  "groupsToWin": 3,
+  "diceCount": 2,
+  "diceSides": 6,
+  "doublesToIsland": 3,
+  "maxIslandTurns": 3,
+  "islandFee": 200,
+  "championshipFee": 50,
+  "travelFee": 50,
+  "festivalCount": 3,
+  "festivalMultiplier": 2,
+  "initialMaxLevel": 3,
+  "hotelLevel": 4,
+  "buyoutMultiplier": 2,
+  "resaleRate": 0.5,
+  "taxRate": 0.1,
+  "taxBase": 50,
+  "resortRents": [50, 100, 200, 500],
+  "maxResolutionDepth": 16,
+  "simulationActionLimit": 5000,
+  "botReserve": 250,
+  "board": [
+    {
+      "id": 0,
+      "name": "Départ",
+      "type": "start",
+      "line": 0
+    },
+    {
+      "id": 1,
+      "name": "Lisbonne",
+      "type": "city",
+      "group": "g1",
+      "color": "#bc7051",
+      "line": 0,
+      "price": 100,
+      "rents": [10, 20, 40, 70, 120],
+      "buildCosts": [0, 50, 50, 50, 50]
+    },
+    {
+      "id": 2,
+      "name": "Porto",
+      "type": "city",
+      "group": "g1",
+      "color": "#bc7051",
+      "line": 0,
+      "price": 125,
+      "rents": [13, 25, 50, 88, 150],
+      "buildCosts": [0, 63, 63, 63, 63]
+    },
+    {
+      "id": 3,
+      "name": "Faro",
+      "type": "city",
+      "group": "g1",
+      "color": "#bc7051",
+      "line": 0,
+      "price": 140,
+      "rents": [14, 28, 56, 98, 168],
+      "buildCosts": [0, 70, 70, 70, 70]
+    },
+    {
+      "id": 4,
+      "name": "Bali",
+      "type": "resort",
+      "price": 200,
+      "line": 0
+    },
+    {
+      "id": 5,
+      "name": "Madrid",
+      "type": "city",
+      "group": "g2",
+      "color": "#47735b",
+      "line": 0,
+      "price": 150,
+      "rents": [15, 30, 60, 105, 180],
+      "buildCosts": [0, 75, 75, 75, 75]
+    },
+    {
+      "id": 6,
+      "name": "Barcelone",
+      "type": "city",
+      "group": "g2",
+      "color": "#47735b",
+      "line": 0,
+      "price": 175,
+      "rents": [18, 35, 70, 123, 210],
+      "buildCosts": [0, 88, 88, 88, 88]
+    },
+    {
+      "name": "Casino Riviera",
+      "type": "casino",
+      "id": 7,
+      "line": 0
+    },
+    {
+      "id": 8,
+      "name": "Île perdue",
+      "type": "island",
+      "line": 1
+    },
+    {
+      "id": 9,
+      "name": "Rome",
+      "type": "city",
+      "group": "g3",
+      "color": "#a9cb87",
+      "line": 1,
+      "price": 200,
+      "rents": [20, 40, 80, 140, 240],
+      "buildCosts": [0, 100, 100, 100, 100]
+    },
+    {
+      "id": 10,
+      "name": "Venise",
+      "type": "city",
+      "group": "g3",
+      "color": "#a9cb87",
+      "line": 1,
+      "price": 225,
+      "rents": [23, 45, 90, 158, 270],
+      "buildCosts": [0, 113, 113, 113, 113]
+    },
+    {
+      "name": "Assurance voyage",
+      "type": "insurance",
+      "id": 11,
+      "line": 1
+    },
+    {
+      "id": 12,
+      "name": "Malte",
+      "type": "resort",
+      "price": 200,
+      "line": 1
+    },
+    {
+      "id": 13,
+      "name": "Paris",
+      "type": "city",
+      "group": "g4",
+      "color": "#8296a0",
+      "line": 1,
+      "price": 250,
+      "rents": [25, 50, 100, 175, 300],
+      "buildCosts": [0, 125, 125, 125, 125]
+    },
+    {
+      "id": 14,
+      "name": "Lyon",
+      "type": "city",
+      "group": "g4",
+      "color": "#8296a0",
+      "line": 1,
+      "price": 275,
+      "rents": [28, 55, 110, 193, 330],
+      "buildCosts": [0, 138, 138, 138, 138]
+    },
+    {
+      "id": 15,
+      "name": "La bonne étoile",
+      "type": "chance",
+      "line": 1
+    },
+    {
+      "id": 16,
+      "name": "Festival",
+      "type": "championship",
+      "line": 2
+    },
+    {
+      "id": 17,
+      "name": "Berlin",
+      "type": "city",
+      "group": "g5",
+      "color": "#c2b2a0",
+      "line": 2,
+      "price": 300,
+      "rents": [30, 60, 120, 210, 360],
+      "buildCosts": [0, 150, 150, 150, 150]
+    },
+    {
+      "id": 18,
+      "name": "Munich",
+      "type": "city",
+      "group": "g5",
+      "color": "#c2b2a0",
+      "line": 2,
+      "price": 325,
+      "rents": [33, 65, 130, 228, 390],
+      "buildCosts": [0, 163, 163, 163, 163]
+    },
+    {
+      "id": 19,
+      "name": "Hambourg",
+      "type": "city",
+      "group": "g5",
+      "color": "#c2b2a0",
+      "line": 2,
+      "price": 340,
+      "rents": [34, 68, 136, 238, 408],
+      "buildCosts": [0, 170, 170, 170, 170]
+    },
+    {
+      "id": 20,
+      "name": "Maurice",
+      "type": "resort",
+      "price": 200,
+      "line": 2
+    },
+    {
+      "id": 21,
+      "name": "Londres",
+      "type": "city",
+      "group": "g6",
+      "color": "#e9b794",
+      "line": 2,
+      "price": 350,
+      "rents": [35, 70, 140, 245, 420],
+      "buildCosts": [0, 175, 175, 175, 175]
+    },
+    {
+      "id": 22,
+      "name": "Édimbourg",
+      "type": "city",
+      "group": "g6",
+      "color": "#e9b794",
+      "line": 2,
+      "price": 375,
+      "rents": [38, 75, 150, 263, 450],
+      "buildCosts": [0, 188, 188, 188, 188]
+    },
+    {
+      "name": "Le grand duel",
+      "type": "duel",
+      "id": 23,
+      "line": 2
+    },
+    {
+      "id": 24,
+      "name": "Tour du monde",
+      "type": "travel",
+      "line": 3
+    },
+    {
+      "id": 25,
+      "name": "Tokyo",
+      "type": "city",
+      "group": "g7",
+      "color": "#62bdb6",
+      "line": 3,
+      "price": 400,
+      "rents": [40, 80, 160, 280, 480],
+      "buildCosts": [0, 200, 200, 200, 200]
+    },
+    {
+      "id": 26,
+      "name": "Kyoto",
+      "type": "city",
+      "group": "g7",
+      "color": "#62bdb6",
+      "line": 3,
+      "price": 425,
+      "rents": [43, 85, 170, 298, 510],
+      "buildCosts": [0, 213, 213, 213, 213]
+    },
+    {
+      "id": 27,
+      "name": "La bonne étoile",
+      "type": "chance",
+      "line": 3
+    },
+    {
+      "id": 28,
+      "name": "Santorin",
+      "type": "resort",
+      "price": 200,
+      "line": 3
+    },
+    {
+      "name": "New York",
+      "type": "city",
+      "group": "g8",
+      "color": "#805965",
+      "price": 450,
+      "rents": [45, 90, 180, 315, 540],
+      "buildCosts": [0, 225, 225, 225, 225],
+      "id": 29,
+      "line": 3
+    },
+    {
+      "name": "Boston",
+      "type": "city",
+      "group": "g8",
+      "color": "#805965",
+      "price": 475,
+      "rents": [48, 95, 190, 333, 570],
+      "buildCosts": [0, 238, 238, 238, 238],
+      "id": 30,
+      "line": 3
+    },
+    {
+      "id": 31,
+      "name": "Taxe de séjour",
+      "type": "tax",
+      "line": 3
+    }
+  ],
+  "cards": [
+    {
+      "id": "chance-01",
+      "title": "Prime de quartier",
+      "description": "Recevez 200.",
+      "effect": "cash",
+      "amount": 200
+    },
+    {
+      "id": "chance-02",
+      "title": "Marché du dimanche",
+      "description": "Recevez 100.",
+      "effect": "cash",
+      "amount": 100
+    },
+    {
+      "id": "chance-03",
+      "title": "Belle saison",
+      "description": "Recevez 150.",
+      "effect": "cash",
+      "amount": 150
+    },
+    {
+      "id": "chance-04",
+      "title": "Réparation urgente",
+      "description": "Payez 100.",
+      "effect": "cash",
+      "amount": -100
+    },
+    {
+      "id": "chance-05",
+      "title": "Assurance annuelle",
+      "description": "Payez 150.",
+      "effect": "cash",
+      "amount": -150
+    },
+    {
+      "id": "chance-06",
+      "title": "Travaux de voirie",
+      "description": "Payez 200.",
+      "effect": "cash",
+      "amount": -200
+    },
+    {
+      "id": "chance-07",
+      "title": "Retour en fanfare",
+      "description": "Avancez jusqu'au Départ et recevez sa prime.",
+      "effect": "move_to",
+      "target": 0,
+      "salary": true
+    },
+    {
+      "id": "chance-08",
+      "title": "Courant contraire",
+      "description": "Rejoignez directement l'Île perdue sans prime.",
+      "effect": "move_to",
+      "target": 8,
+      "salary": false
+    },
+    {
+      "id": "chance-09",
+      "title": "Vent favorable",
+      "description": "Avancez de trois cases et résolvez l'arrivée.",
+      "effect": "move_by",
+      "steps": 3,
+      "salary": true
+    },
+    {
+      "id": "chance-10",
+      "title": "Demi-tour",
+      "description": "Reculez de trois cases, sans prime Départ.",
+      "effect": "move_by",
+      "steps": -3,
+      "salary": false
+    },
+    {
+      "id": "chance-11",
+      "title": "Pass festival",
+      "description": "Avancez jusqu'au Festival.",
+      "effect": "move_to",
+      "target": 16,
+      "salary": true
+    },
+    {
+      "id": "chance-12",
+      "title": "Billet d'horizon",
+      "description": "Avancez jusqu'au Tour du monde.",
+      "effect": "move_to",
+      "target": 24,
+      "salary": true
+    },
+    {
+      "id": "chance-13",
+      "title": "Retour au continent",
+      "description": "Conservez cette carte pour quitter l'île gratuitement.",
+      "effect": "escape"
+    },
+    {
+      "id": "chance-14",
+      "title": "Chantier contrarié",
+      "description": "Une maison adverse est retirée. Les hôtels sont protégés.",
+      "effect": "downgrade"
+    },
+    {
+      "id": "chance-15",
+      "title": "Raid sur la banque",
+      "description": "Prenez jusqu’à 100 au rival le plus riche. Ses réserves ne peuvent pas devenir négatives.",
+      "effect": "steal",
+      "amount": 100
+    },
+    {
+      "id": "chance-16",
+      "title": "Coup de filet",
+      "description": "Prenez jusqu’à 50 à chaque adversaire. Vos coéquipiers sont épargnés.",
+      "effect": "levy",
+      "amount": 50
+    },
+    {
+      "id": "chance-17",
+      "title": "Contrôle fiscal",
+      "description": "Payez 120 à la banque.",
+      "effect": "cash",
+      "amount": -120
+    },
+    {
+      "id": "chance-18",
+      "title": "Bourse de voyage",
+      "description": "Recevez 180.",
+      "effect": "cash",
+      "amount": 180
+    },
+    {
+      "id": "chance-19",
+      "title": "Squatteur",
+      "description": "Gardez cette carte. Lors d’une prochaine visite chez un adversaire, utilisez-la pour ne payer aucun loyer.",
+      "effect": "squatter"
+    },
+    {
+      "id": "chance-20",
+      "title": "Expropriation",
+      "description": "Choisissez une ville adverse : elle redevient libre, ses bâtiments disparaissent. Une assurance peut bloquer cette attaque.",
+      "effect": "expropriate"
+    },
+    {
+      "id": "chance-21",
+      "title": "Invasion de cafards",
+      "description": "Choisissez un hôtel adverse. Son loyer est réduit de moitié pendant deux retours du propriétaire.",
+      "effect": "roaches"
+    },
+    {
+      "id": "chance-22",
+      "title": "Fraude fiscale",
+      "description": "Gardez cette carte pour acheter une ville à moitié prix. Jusqu’au prochain passage par Départ, la Taxe vous réclamera deux fois son prix normal.",
+      "effect": "fraud"
+    },
+    {
+      "id": "chance-23",
+      "title": "Alliance temporaire",
+      "description": "Choisissez un joueur. Vous recevez la moitié de ses gains jusqu’à la fin de son prochain tour.",
+      "effect": "alliance"
+    }
+  ],
+  "network": {
+    "hostTimeoutMs": 15000,
+    "commitTimeoutMs": 8000,
+    "revealTimeoutMs": 8000,
+    "reconnectTtlMs": 86400000,
+    "maxRandomRetries": 3
+  },
+  "lineVictory": true,
+  "resortVictory": false,
+  "championshipDuration": 4,
+  "shuffleStreets": true,
+  "casinoBaseChance": 2,
+  "casinoChanceStep": 2,
+  "casinoMaxChance": 50,
+  "karmaAmount": 50,
+  "fraudDiscount": 0.5,
+  "crisisChance": 4,
+  "adventures": true,
+  "buildingRequiresGroup": false,
+  "hotelUnlockLaps": 2,
+  "crisisMinRound": 6,
+  "crisisCooldownRounds": 8,
+  "crisisMaxCount": 2,
+  "pricesFollowPosition": true,
+  "insuranceSingleUse": true,
+  "bundledPurchase": true,
+  "duelReplayTies": true,
+  "travelOnDouble": true,
+  "casinoMinWin": 50,
+  "moneyDivisor": 1000,
+  "singlePropertyDecision": true,
+  "earthquakeChance": 3,
+  "earthquakeMinRound": 4,
+  "earthquakeCooldownRounds": 6,
+  "earthquakeMaxCount": 2
+}

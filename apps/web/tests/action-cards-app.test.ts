@@ -5,6 +5,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
   config,
   createGame,
+  getBuyoutQuote,
+  getRent,
   getPropertyValue,
   type GameAction,
   type GameState,
@@ -173,6 +175,37 @@ it.each([false, true])('picks a travel destination from a card (mobile=%s)', asy
 });
 
 it.each([false, true])(
+  'travels to a rival property and completes its buyout in the real interface (mobile=%s)',
+  async (mobile) => {
+    const state = game();
+    state.phase = 'travel';
+    state.players[0]!.position = 8;
+    state.players[0]!.travelPending = true;
+    state.properties[9]!.level = 1;
+    const alice = state.players[0]!.cash,
+      bob = state.players[1]!.cash;
+    const rent = getRent(state, 9);
+    await mount(state, mobile);
+    await click('Choisir ma destination');
+    await click('Suivant', card());
+    await expectDeferred(state.config.board[9]!.name, 'travel');
+    expect(scene.latest!.phase).toBe('property');
+    const quote = getBuyoutQuote(scene.latest!)!;
+    expect(quote.canBuy).toBe(true);
+    await settle();
+    await click('Racheter');
+    expect(host.querySelector('.purchase-offer')?.textContent).toContain('RACHETER CETTE VILLE');
+    await click('Racheter', host.querySelector('.purchase-offer')!);
+    expect(scene.latest!.properties[9]).toMatchObject({ ownerId: 'a', level: 1 });
+    expect(scene.latest!.players[0]!.cash).toBe(
+      alice - state.config.travelFee - rent - quote.total,
+    );
+    expect(scene.latest!.players[1]!.cash).toBe(bob + rent + quote.land);
+    expect(scene.actions.map((action) => action.type)).toEqual(['travel', 'buyout']);
+  },
+);
+
+it.each([false, true])(
   'places an insurance token from a card without consuming the turn (mobile=%s)',
   async (mobile) => {
     const state = game();
@@ -307,11 +340,91 @@ it.each([false, true])(
   },
 );
 
-it('animates user duel choices while revealing both secrets automatically', async () => {
+it.each([false, true])(
+  'keeps one duel card through offers, stakes, a tie and the final result (mobile=%s)',
+  async (mobile) => {
+    const state = game();
+    state.phase = 'duel';
+    state.duel = {
+      id: 'action-card-duel',
+      challengerId: 'a',
+      amount: 0,
+      stage: 'offer',
+      escrow: false,
+      commitments: {},
+      reveals: {},
+    };
+    await mount(state, mobile);
+    const dialog = card();
+    const motion = dialog.querySelector('.drawn-card-motion');
+    await click('Défier Bob', dialog);
+    expect(scene.latest!.duel!.stage).toBe('accept');
+    expect(card()).toBe(dialog);
+    expect(dialog.classList.contains('is-leaving')).toBe(false);
+    await click('Accepter et miser', dialog);
+    expect(scene.latest!.duel!.stage).toBe('commit');
+    expect(card()).toBe(dialog);
+    await settle();
+    expect(card()).toBe(dialog);
+    await click('Pierre', dialog);
+    expect(scene.latest!.duel!.stage).toBe('commit');
+    await click('Pierre', dialog);
+    expect(scene.latest!.duel!.round).toBe(2);
+    expect(card()).toBe(dialog);
+    expect(dialog.classList.contains('is-leaving')).toBe(false);
+    expect(dialog.textContent).toContain('Égalité');
+    await click('Manche suivante', dialog);
+    await act(() => vi.advanceTimersByTime(100));
+    await click('Pierre', dialog);
+    await click('Ciseaux', dialog);
+    expect(scene.latest!.duel).toBeUndefined();
+    expect(scene.latest!.phase).toBe('end');
+    expect(card()).toBe(dialog);
+    expect(dialog.querySelector('.drawn-card-motion')).toBe(motion);
+    expect(dialog.textContent).toContain('Alice remporte le duel');
+    expect(host.querySelectorAll('.action-card-dialog')).toHaveLength(1);
+    await click('Continuer', dialog);
+    expect(dialog.classList.contains('is-leaving')).toBe(true);
+    await finishDeparture();
+    expect(host.querySelector('.action-card-dialog')).toBeNull();
+  },
+);
+
+it.each(['Passer ce duel', 'Refuser le duel'])(
+  'departs only once when declining a duel with %s',
+  async (choice) => {
+    const state = game();
+    state.phase = 'duel';
+    state.duel = {
+      id: 'cancel-once',
+      challengerId: 'a',
+      amount: 0,
+      stage: 'offer',
+      escrow: false,
+      commitments: {},
+      reveals: {},
+    };
+    await mount(state);
+    const dialog = card();
+    if (choice === 'Refuser le duel') {
+      await click('Défier Bob', dialog);
+      expect(card()).toBe(dialog);
+    }
+    await expectDeferred(choice, choice === 'Passer ce duel' ? 'duel_cancel' : 'duel_decline');
+    expect(scene.latest!.duel).toBeUndefined();
+    expect(host.querySelector('.action-card-dialog')).toBeNull();
+    expect(host.querySelector('.passive-duel-notice')?.textContent).toContain('Duel annulé');
+    expect(button('Fin du tour').disabled).toBe(false);
+    await settle();
+    expect(host.querySelector('.action-card-dialog')).toBeNull();
+  },
+);
+
+it('automatically animates the same duel card out when its result reading time expires', async () => {
   const state = game();
   state.phase = 'duel';
   state.duel = {
-    id: 'action-card-duel',
+    id: 'auto-exit',
     challengerId: 'a',
     targetId: 'b',
     amount: 50,
@@ -321,19 +434,17 @@ it('animates user duel choices while revealing both secrets automatically', asyn
     reveals: {},
   };
   await mount(state);
-  await expectDeferred('Pierre', 'duel_commit');
-  expect(scene.latest!.duel!.stage).toBe('commit');
-  await click('Ciseaux', card());
-  expect(scene.actions.map((action) => action.type)).toEqual(['duel_commit']);
-  await finishDeparture();
-  expect(scene.actions.map((action) => action.type)).toEqual([
-    'duel_commit',
-    'duel_commit',
-    'duel_reveal',
-    'duel_reveal',
-  ]);
+  const dialog = card();
+  await click('Pierre', dialog);
+  await click('Ciseaux', dialog);
   expect(scene.latest!.duel).toBeUndefined();
-  expect(scene.latest!.phase).toBe('end');
+  expect(card()).toBe(dialog);
+  expect(dialog.classList.contains('is-leaving')).toBe(false);
+  await settle();
+  expect(card()).toBe(dialog);
+  expect(dialog.classList.contains('is-leaving')).toBe(true);
+  await finishDeparture();
+  expect(host.querySelector('.action-card-dialog')).toBeNull();
 });
 
 it('cancels an outgoing Festival choice if its decision expires before the card leaves', async () => {

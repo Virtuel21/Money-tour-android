@@ -2,11 +2,13 @@ import type { Tile } from '@money-tour/engine';
 
 /** A visual rename also applies when displaying a preserved historical save. */
 export function tileTitle(tile: Pick<Tile, 'type' | 'name'>) {
-  return tile.type === 'championship' ? 'Festival' : tile.name;
+  return tile.type === 'championship' ? 'Festival' : tile.type === 'duel' ? 'Duel' : tile.name;
 }
 
 export function boardTileTitle(tile: Pick<Tile, 'type' | 'name'>) {
   const titles: Partial<Record<Tile['type'], string>> = {
+    start: '',
+    duel: 'Duel',
     travel: 'Voyage',
     casino: 'Casino',
     chance: 'Chance',

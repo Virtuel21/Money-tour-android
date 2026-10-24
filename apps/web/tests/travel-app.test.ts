@@ -87,7 +87,7 @@ it.each([false, true])(
     const cash = scene.visible!.players[0]!.cash;
     await click('Choisir ma destination');
     expect(document.querySelector('dialog')!.textContent).toContain('Choisir ma destination');
-    expect(document.querySelector('.tile-list')!.textContent).not.toContain('Lisbonne');
+    expect(document.querySelector('.tile-list')!.textContent).toContain('Lisbonne');
     expect(document.querySelector('.tile-list small')!.textContent).toContain('Voyage · 50');
     // Closing the picker must not consume the right or force the extra roll.
     await act(() => document.querySelector<HTMLButtonElement>('[aria-label="Fermer"]')!.click());

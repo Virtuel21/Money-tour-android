@@ -115,6 +115,7 @@ export const commandSchema = z.union([
   z
     .object({
       type: z.literal('start'),
+      rulesVersion: z.literal(18).optional(),
       options: optionsSchema,
       adventureStart: z.literal(true).optional(),
     })
@@ -122,6 +123,7 @@ export const commandSchema = z.union([
   z
     .object({
       type: z.literal('rematch'),
+      rulesVersion: z.literal(18).optional(),
       options: optionsSchema,
       adventureStart: z.literal(true).optional(),
     })

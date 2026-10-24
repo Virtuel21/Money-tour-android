@@ -511,7 +511,9 @@ export function getLegalActions(state: GameState): GameAction[] {
         const destinationOwner = state.properties[tile.id]?.ownerId;
         if (
           tile.id !== player.position &&
-          (!destinationOwner || allies(state, player.id, destinationOwner))
+          (state.config.travelToRivals ||
+            !destinationOwner ||
+            allies(state, player.id, destinationOwner))
         )
           result.push({ type: 'travel', playerId: player.id, tile: tile.id });
       }

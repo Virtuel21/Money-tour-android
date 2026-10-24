@@ -14,6 +14,7 @@ import {
   legacyConfigV14,
   legacyConfigV15,
   legacyConfigV16,
+  legacyConfigV17,
   sameRules,
   type GameConfig,
   createGame,
@@ -102,6 +103,7 @@ export function loadLocal(): LocalSave | null {
       typeof save.seed !== 'string' ||
       !(
         sameRules(save.state.config, config) ||
+        sameRules(save.state.config, legacyConfigV17 as GameConfig) ||
         sameRules(save.state.config, legacyConfigV16 as GameConfig) ||
         sameRules(save.state.config, legacyConfigV15 as GameConfig) ||
         sameRules(save.state.config, legacyConfigV14 as GameConfig) ||

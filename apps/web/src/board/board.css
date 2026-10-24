@@ -9,3 +9,17 @@
   fill: #879397;
   fill-opacity: 0.75;
 }
+
+.board-mouse-controls {
+  user-select: none;
+}
+
+.board-mouse-controls.board-can-pan,
+.board-mouse-controls.board-can-pan .board-hit-polygons polygon {
+  cursor: grab;
+}
+
+.board-mouse-controls.board-is-dragging,
+.board-mouse-controls.board-is-dragging * {
+  cursor: grabbing !important;
+}

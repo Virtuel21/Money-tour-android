@@ -2,12 +2,12 @@ import { useEffect, useId, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { adventureText, getRent, type GameState, type Player } from '@money-tour/engine';
 import { formatText, translate } from '../i18n/translate';
-import { numberLocale } from '../i18n/language';
 import { PlayerInventory, PrivateQuest } from './AdventureHUD';
 import { playerBonuses, type BonusInfo } from './bonuses';
 import { restoreDialogFocus, trapDialogFocus } from './dialogFocus';
 import { GameIcon } from './GameIcon';
 import { colors, money, pawnNames } from './local';
+import { RollingMoney } from './RollingMoney';
 import './player-profiles.css';
 
 interface PlayerProfilesProps {
@@ -33,25 +33,21 @@ function PlayerPortrait({ index }: { index: number }) {
 }
 
 function PlayerBalance({ player }: { player: Player }) {
-  const amount = money(player.cash, true).replace(' 💵', '');
-  const compactAmount = new Intl.NumberFormat(numberLocale(), {
-    notation: 'compact',
-    maximumFractionDigits: 0,
-  }).format(player.cash);
+  const amount = money(player.cash).replace(' 💵', '');
   return (
     <span
       className={`player-panel-money${amount.length > 10 ? ' player-panel-money-long' : ''}${!player.eliminated && Math.abs(player.cash) >= 10000 ? ' player-panel-money-compactable' : ''}`}
-      title={player.eliminated ? translate('Faillite') : money(player.cash, true)}
+      title={player.eliminated ? translate('Faillite') : money(player.cash)}
     >
       <span className="player-panel-money-label">{translate('Argent')}</span>
       <strong>
         {!player.eliminated && <GameIcon name="coin" />}
         <span className="player-panel-money-full">
-          {player.eliminated ? translate('Faillite') : amount}
+          {player.eliminated ? translate('Faillite') : <RollingMoney value={player.cash} />}
         </span>
         {!player.eliminated && (
           <span className="player-panel-money-compact" aria-hidden="true">
-            {compactAmount}
+            <RollingMoney value={player.cash} compact />
           </span>
         )}
       </strong>

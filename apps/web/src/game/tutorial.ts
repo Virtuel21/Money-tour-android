@@ -137,7 +137,7 @@ export const lessons = [
   {
     id: 'travel',
     title: 'Choisir votre destination',
-    text: 'Le Tour du monde propose un voyage au prochain tour, ou dès votre action supplémentaire sur un double : 50 à la place des dés. Touchez une destination libre ou alliée parmi les cases éclairées. Vous pouvez aussi rester et lancer normalement.',
+    text: 'Le Tour du monde propose un voyage au prochain tour, ou dès votre action supplémentaire sur un double : 50 à la place des dés. Touchez une destination parmi les cases éclairées, même chez un adversaire pour tenter un rachat après le loyer. Vous pouvez aussi rester et lancer normalement.',
     task: 'Choisissez Madrid sur le plateau ou dans la liste.',
     target: 'board',
   },

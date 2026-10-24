@@ -13,6 +13,7 @@ import {
   legacyConfigV14,
   legacyConfigV15,
   legacyConfigV16,
+  legacyConfigV17,
   type GameConfig,
 } from '@money-tour/engine';
 import { applyLocal, loadLocal, newLocal, persistLocal } from '../src/game/local';
@@ -27,6 +28,17 @@ describe('local session', () => {
     });
   });
   afterEach(() => vi.unstubAllGlobals());
+  it('resumes v17 with its original travel destinations and opens rival travel in a new game', () => {
+    const players = [
+      { id: 'a', name: 'A' },
+      { id: 'b', name: 'B' },
+    ];
+    const save = newLocal({ config: legacyConfigV17 as GameConfig, players });
+    data.set('money-tour.local.v17', JSON.stringify(save));
+    expect(loadLocal()).toEqual(save);
+    expect(loadLocal()!.state.config.travelToRivals).toBeUndefined();
+    expect(newLocal({ players }).state.config.travelToRivals).toBe(true);
+  });
   it('keeps the five-lap hotel rule when resuming v16 but uses two laps in new games', () => {
     const players = [
       { id: 'a', name: 'A' },

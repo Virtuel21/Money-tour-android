@@ -70,7 +70,7 @@ export function TileLabel({
   );
   return (
     <>
-      {frame(anchors.name, 60, 'name', name, 46, true)}
+      {name && frame(anchors.name, 60, 'name', name, 46, true)}
       {conditions.length > 0 &&
         frame(anchors.condition, 36, 'condition', conditions.join(' · '), 23, true)}
       {translate(

@@ -4,12 +4,14 @@ import {
   isLegalPlayerAction,
   getDecisionPlayerId,
   config,
+  legacyConfigV17,
   createGame,
   createRng,
   reduceGame,
   type GameAction,
   type GameEvent,
   type GameState,
+  type GameConfig,
 } from '@money-tour/engine';
 import {
   Ceremony,
@@ -41,7 +43,7 @@ import { DISCONNECT_GRACE_MS } from './policy';
 import { TAUNT_COOLDOWN, taunts, type Taunt, type TauntKind } from '../game/taunts';
 
 const ZERO = '0'.repeat(64);
-const SESSION_PROTOCOL = 2;
+const SESSION_PROTOCOL = 3;
 export const ADVENTURE_START_TIMEOUT_MS = 20000;
 class NeedsRandom extends Error {}
 export function execute(
@@ -55,6 +57,11 @@ export function execute(
         throw new NeedsRandom();
       };
   if (command.type === 'start' || command.type === 'rematch') {
+    // Releases before v18 did not sign a rules version. Their authenticated history
+    // must replay with the exact v17 config that originally produced its state hashes.
+    if (command.rulesVersion !== undefined && command.rulesVersion !== 18)
+      throw new Error('Unsupported rules version');
+    const rules = command.rulesVersion === 18 ? config : (legacyConfigV17 as GameConfig);
     if (command.type === 'start' && state) throw new Error('Already started');
     if (command.type === 'rematch') {
       if (!state?.winner) throw new Error('Game not finished');
@@ -67,7 +74,7 @@ export function execute(
       if (canonical(expected) !== canonical(command.options))
         throw new Error('Rematch settings changed');
     }
-    return { state: createGame(command.options, rng), events: [] };
+    return { state: createGame({ ...command.options, config: rules }, rng), events: [] };
   }
   if (!state) throw new Error('Not started');
   if (command.type === 'adventure_release') return { state, events: [] };
@@ -745,6 +752,7 @@ export class Session {
       await this.propose(
         commandSchema.parse({
           type: 'start',
+          rulesVersion: 18,
           adventureStart: true,
           options: {
             randomFirstPlayer: true,
@@ -770,6 +778,7 @@ export class Session {
       await this.propose(
         commandSchema.parse({
           type: 'rematch',
+          rulesVersion: 18,
           options,
           adventureStart: true,
         }),

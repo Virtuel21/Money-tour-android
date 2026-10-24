@@ -6,6 +6,7 @@ import { tauntAsset, type Taunt } from '../game/taunts';
 import { scaledAmount } from '@money-tour/engine';
 import { cameraFrustum, cameraZoom, followPlayer, zoomFrustum } from './camera';
 import { bindPinchZoom } from './pinchZoom';
+import { bindMouseControls } from './mouseControls';
 import { panFocus } from './cameraPan';
 import { useEffect, useId, useRef, useState } from 'react';
 import * as THREE from 'three';
@@ -16,7 +17,7 @@ import type { Cue } from '../game/presentation';
 import { boardModel, boardArtwork } from './boardModel';
 import { colors } from '../game/local';
 import { boardTileTitle, tileTitle } from '../game/tileTitle';
-import { concertSprite, festivalBeat } from './specialArt';
+import { concertSprite, festivalBeat, illustratedSprite } from './specialArt';
 import { advanceScenery, lagoonScale } from './lagoon';
 import { festivalFlag, lagoonBoat } from './scenery';
 import { projectTileLabels, tileDecorationPoint, type TileLabelAnchors } from './tileLabels';
@@ -187,6 +188,15 @@ export default function Board({
   useEffect(() => {
     if (!mobile || demo || !onZoomChange || !shell.current) return;
     return bindPinchZoom(
+      shell.current,
+      () => live.current.zoomPercent,
+      (value) => zoomCallback.current?.(value),
+      { enabled: () => panEnabled.current, move: (dx, dy) => pan.current(dx, dy) },
+    );
+  }, [mobile, demo, Boolean(onZoomChange)]);
+  useEffect(() => {
+    if (mobile || demo || !onZoomChange || !shell.current) return;
+    return bindMouseControls(
       shell.current,
       () => live.current.zoomPercent,
       (value) => zoomCallback.current?.(value),
@@ -444,6 +454,7 @@ export default function Board({
           chanceArt,
           taxArt,
           insuranceArt,
+          airportArt,
         ] = await Promise.all([
           textureLoader.loadAsync(import.meta.env.BASE_URL + 'textures/travelers-v3.webp'),
           textureLoader.loadAsync(import.meta.env.BASE_URL + 'textures/architecture-v3.webp'),
@@ -454,6 +465,7 @@ export default function Board({
           textureLoader.loadAsync(import.meta.env.BASE_URL + 'textures/chance-tile-v2.webp'),
           textureLoader.loadAsync(import.meta.env.BASE_URL + 'textures/tax-tile-v2.webp'),
           textureLoader.loadAsync(import.meta.env.BASE_URL + 'textures/insurance-tile-v2.webp'),
+          textureLoader.loadAsync(import.meta.env.BASE_URL + 'textures/travel-airport-v1.webp'),
         ]);
         const loadedTextures = [
           travelers,
@@ -465,6 +477,7 @@ export default function Board({
           chanceArt,
           taxArt,
           insuranceArt,
+          airportArt,
         ];
         if (disposed) {
           loadedTextures.forEach((texture) => texture.dispose());
@@ -598,6 +611,13 @@ export default function Board({
             resources.add(concert.sprite);
             concertBeats.push(concert.beat);
           }
+          if (tile.type === 'travel') {
+            const airport = illustratedSprite(airportArt, 2.6, 0.08);
+            airport.scale.y = 2.6 / 1.5;
+            // Keep the airport at the rear; travelers and the name use the front lane.
+            airport.position.set(p.x - 0.35, 0.29, p.z - 0.65);
+            resources.add(airport);
+          }
           if (tile.type === 'resort') {
             const palm = clone('palm');
             palm.scale.setScalar(0.9);
@@ -619,6 +639,7 @@ export default function Board({
               'duel',
               'championship',
               'insurance',
+              'travel',
             ].includes(tile.type)
           ) {
             const model =
@@ -693,7 +714,7 @@ export default function Board({
               const labels = projectTileLabels(
                 t.id,
                 live.current.state.config.board.length,
-                t.type === 'start' || t.type === 'championship',
+                t.type === 'start' || t.type === 'championship' || t.type === 'travel',
                 (point) => {
                   const v = new THREE.Vector3(point.x, 0.29, point.z).project(camera);
                   return {
@@ -826,7 +847,9 @@ export default function Board({
           );
           manualView.current = {
             focus: next,
-            zoomBase: previous?.zoomBase ?? camera.zoom / (live.current.zoomPercent / 100),
+            zoomBase:
+              previous?.zoomBase ??
+              (live.current.mobile ? camera.zoom / (live.current.zoomPercent / 100) : 1),
           };
           if (!previous) panCallback.current?.(true);
         };
@@ -866,7 +889,7 @@ export default function Board({
             pawn.visible = !player.eliminated;
             const walkingPoint = (id: number) => {
               const point = tilePoint(id, game.config.board.length);
-              return game.config.board[id]?.type === 'championship'
+              return ['championship', 'travel'].includes(game.config.board[id]?.type ?? '')
                 ? { x: point.x + 0.68, z: point.z + 0.68 }
                 : point;
             };
@@ -901,13 +924,15 @@ export default function Board({
                   : 0;
             const offsetZ = peers.length > 2 ? (slot < 2 ? 0.15 : 0.6) : 0.35;
             const frame = tileFrame(player.position, game.config.board.length);
-            const atFestival = game.config.board[player.position]?.type === 'championship';
+            const atLandmark = ['championship', 'travel'].includes(
+              game.config.board[player.position]?.type ?? '',
+            );
             pawn.position.set(
               point.x +
-                (atFestival ? offsetX * 1.5 + offsetZ * 0.4 : offsetX + frame.normal.x * 0.25),
+                (atLandmark ? offsetX * 1.5 + offsetZ * 0.4 : offsetX + frame.normal.x * 0.25),
               height,
               point.z +
-                (atFestival ? -offsetX * 1.5 + offsetZ * 0.4 : offsetZ + frame.normal.z * 0.25),
+                (atLandmark ? -offsetX * 1.5 + offsetZ * 0.4 : offsetZ + frame.normal.z * 0.25),
             );
             // A crowded cell remains readable: the active traveler stays solid; companions become translucent.
             pawn.traverse((node) => {
@@ -947,9 +972,14 @@ export default function Board({
             Boolean(game.winner);
           const zoomTarget = manualView.current
             ? (manualView.current.zoomBase * live.current.zoomPercent) / 100
-            : cameraZoom(framingHalfWidth, following, live.current.zoomPercent, frameAll);
+            : cameraZoom(
+                framingHalfWidth,
+                following,
+                live.current.zoomPercent,
+                live.current.mobile && frameAll,
+              );
           camera.zoom = THREE.MathUtils.lerp(camera.zoom, zoomTarget, factor);
-          panEnabled.current = live.current.mobile && !demo && !frameAll && camera.zoom > 1.01;
+          panEnabled.current = !demo && (!live.current.mobile || (!frameAll && camera.zoom > 1.01));
           element.parentElement?.classList.toggle('board-can-pan', panEnabled.current);
           camera.position.copy(cameraOffset).add(focus);
           camera.lookAt(focus);
@@ -957,23 +987,22 @@ export default function Board({
           camera.updateMatrixWorld();
           // The character art sits above DOM labels. Project it every frame so hops and
           // camera transitions stay as smooth as the original WebGL billboards.
-          if (!demo)
-            pawns.forEach((pawn, i) => {
-              const foreground = foregroundPawns.current[i];
-              const character = pawn.children[0] as THREE.Sprite;
-              character.visible = !foreground;
-              if (!foreground) return;
-              const v = pawn.position.clone().project(camera);
-              foreground.style.left = (v.x + 1) * 50 + '%';
-              foreground.style.top = (1 - v.y) * 50 + '%';
-              foreground.style.width =
-                ((2.55 * pawn.scale.x * camera.zoom) / (camera.right - camera.left)) * 100 + '%';
-              foreground.style.height =
-                ((2.55 * pawn.scale.y * camera.zoom) / (camera.top - camera.bottom)) * 100 + '%';
-              foreground.style.opacity = String(character.material.opacity);
-              foreground.style.visibility = pawn.visible ? 'visible' : 'hidden';
-              foreground.style.zIndex = game.currentPlayer === i ? '10' : String(i);
-            });
+          pawns.forEach((pawn, i) => {
+            const foreground = foregroundPawns.current[i];
+            const character = pawn.children[0] as THREE.Sprite;
+            character.visible = !foreground;
+            if (!foreground) return;
+            const v = pawn.position.clone().project(camera);
+            foreground.style.left = (v.x + 1) * 50 + '%';
+            foreground.style.top = (1 - v.y) * 50 + '%';
+            foreground.style.width =
+              ((2.55 * pawn.scale.x * camera.zoom) / (camera.right - camera.left)) * 100 + '%';
+            foreground.style.height =
+              ((2.55 * pawn.scale.y * camera.zoom) / (camera.top - camera.bottom)) * 100 + '%';
+            foreground.style.opacity = String(character.material.opacity);
+            foreground.style.visibility = pawn.visible ? 'visible' : 'hidden';
+            foreground.style.zIndex = game.currentPlayer === i ? '10' : String(i);
+          });
           const pawnKey = [
             camera.right,
             camera.top,
@@ -1187,7 +1216,7 @@ export default function Board({
   return (
     <div
       ref={shell}
-      className={`board-shell board-3d ${mobile && !demo && onZoomChange ? 'board-pinch-zoom' : ''} ${demo ? 'board-demo' : ''} ${cue?.reason === 'earthquake' && !reducedMotion ? 'board-earthquake' : ''}`}
+      className={`board-shell board-3d ${!demo && onZoomChange ? (mobile ? 'board-pinch-zoom' : 'board-mouse-controls') : ''} ${demo ? 'board-demo' : ''} ${cue?.reason === 'earthquake' && !reducedMotion ? 'board-earthquake' : ''}`}
     >
       <div
         ref={host}
@@ -1200,23 +1229,21 @@ export default function Board({
       )}
       {ready && (
         <>
-          {!demo && (
-            <div className="pawn-foreground-layer" aria-hidden="true">
-              {state.players.map((player, i) => (
-                <span
-                  key={player.id}
-                  ref={(element) => {
-                    foregroundPawns.current[i] = element;
-                  }}
-                  className="pawn-foreground"
-                  style={{
-                    backgroundImage: `url(${import.meta.env.BASE_URL}textures/travelers-v3.webp)`,
-                    backgroundPosition: `${i % 2 ? 100 : 0}% ${i < 2 ? 0 : 100}%`,
-                  }}
-                />
-              ))}
-            </div>
-          )}
+          <div className="pawn-foreground-layer" aria-hidden="true">
+            {state.players.map((player, i) => (
+              <span
+                key={player.id}
+                ref={(element) => {
+                  foregroundPawns.current[i] = element;
+                }}
+                className="pawn-foreground"
+                style={{
+                  backgroundImage: `url(${import.meta.env.BASE_URL}textures/travelers-v3.webp)`,
+                  backgroundPosition: `${i % 2 ? 100 : 0}% ${i < 2 ? 0 : 100}%`,
+                }}
+              />
+            ))}
+          </div>
           {insuranceFocus && choices.length > 0 && (
             <svg
               className="insurance-spotlight"

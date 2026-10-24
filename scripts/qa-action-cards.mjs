@@ -329,7 +329,8 @@ async function runCase(fixture, language, width, height, reducedMotion = false, 
     }
     const button = await pickAction(dialog, fixture, language);
     const casinoPlay = ['casino', 'slots'].includes(fixture.name);
-    const casinoIdentity = casinoPlay
+    const continuousCard = casinoPlay || fixture.name === 'duel';
+    const casinoIdentity = continuousCard
       ? await dialog.evaluateHandle((element) => ({
           card: element,
           motion: element.querySelector('.drawn-card-motion'),
@@ -340,7 +341,7 @@ async function runCase(fixture, language, width, height, reducedMotion = false, 
       : null;
     const before = actionStateSignature(await savedState(page));
     await button.scrollIntoViewIfNeeded();
-    if (!reducedMotion && !casinoPlay)
+    if (!reducedMotion && !continuousCard)
       await button.evaluate((button) => {
         window.__actionQaDeparture = null;
         button.addEventListener(
@@ -368,7 +369,7 @@ async function runCase(fixture, language, width, height, reducedMotion = false, 
         );
       });
     await button.click();
-    if (!reducedMotion && !casinoPlay) {
+    if (!reducedMotion && !continuousCard) {
       // Snapshot at 180ms inside the browser, independent of protocol/host latency.
       const departure = await page.evaluate(async () => {
         while (!window.__actionQaDeparture) await new Promise((resolve) => setTimeout(resolve, 20));
@@ -381,6 +382,18 @@ async function runCase(fixture, language, width, height, reducedMotion = false, 
       if (width === 390 && language === 'fr') await capture(page, name, 'departure');
     }
     await assertAfterAction(page, fixture);
+    if (fixture.name === 'duel') {
+      const continuity = await dialog.evaluate(
+        (element, original) => ({
+          sameCard: element === original.card,
+          sameMotion: element.querySelector('.drawn-card-motion') === original.motion,
+          leaving: element.classList.contains('is-leaving'),
+        }),
+        casinoIdentity,
+      );
+      assert.deepEqual(continuity, { sameCard: true, sameMotion: true, leaving: false });
+      await casinoIdentity.dispose();
+    }
     if (casinoPlay) {
       const resultCard = page.locator(`${cardSelector}:has(.casino-playing)`);
       await resultCard.waitFor({ state: 'visible', timeout: 10000 });
@@ -417,7 +430,7 @@ async function runCase(fixture, language, width, height, reducedMotion = false, 
     results.checks.push({
       name,
       ...bounds,
-      deferredAction: !reducedMotion && !casinoPlay,
+      deferredAction: !reducedMotion && !continuousCard,
       ...(casinoPlay ? { continuousCasinoCard: true } : {}),
       afterAction: true,
       clock: 'real',
