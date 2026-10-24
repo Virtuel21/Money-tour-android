@@ -146,6 +146,28 @@ async function open(page, save) {
   }
 }
 async function boardTap(page, tile) {
+  // A cold WebGL scene can still be easing into its final projection. Sample
+  // the same visible polygon across frames before sending a precise touch.
+  await page.evaluate(
+    (tile) =>
+      new Promise((resolve) => {
+        let previous;
+        let stable = 0;
+        const started = performance.now();
+        const check = () => {
+          const points = document
+            .querySelectorAll('.board-hit-polygons polygon')
+            .item(tile)
+            ?.getAttribute('points');
+          stable = points && points === previous ? stable + 1 : 0;
+          previous = points;
+          if (stable >= 3 || performance.now() - started > 4000) resolve();
+          else requestAnimationFrame(check);
+        };
+        check();
+      }),
+    tile,
+  );
   await page.evaluate(() => {
     window.__androidQaBoardEvents = [];
     for (const type of ['pointerdown', 'pointerup', 'click'])
@@ -316,7 +338,8 @@ async function purchase(page, name, variant) {
   }
   await tap(dialog.getByRole('button', { name: /^2 maisons :/ }));
   const quote = getPurchaseQuote(initial, 2);
-  await capture(page, name, 'two-houses');
+  const quoteText = await dialog.locator('.purchase-cta').innerText();
+  assert(quoteText.includes(String(quote.total)), 'Purchase displays the exact total');
   await tap(dialog.locator('.purchase-cta'));
   const next = await changed(page, (s) => s.properties[tile].ownerId === 'p1', 'Purchase is saved');
   assert.equal(next.properties[tile].level, 2);
@@ -325,7 +348,8 @@ async function purchase(page, name, variant) {
     initial.players[0].cash - quote.total,
     'Land and houses paid once',
   );
-  return { bought: tile, level: 2, charged: quote.total };
+  await capture(page, name, 'purchase-completed');
+  return { bought: tile, level: 2, charged: quote.total, quoteText };
 }
 async function action(page, name, kind) {
   const fixture = createActionFixture(kind);
@@ -523,7 +547,10 @@ async function propertyEconomy(page, name, kind) {
         : getPurchaseQuote(s, level, true);
   assert(quote.canBuy);
   await tap(dialog.getByRole('button', { name: level === 4 ? /^Hôtel :/ : /^2 maisons :/ }));
-  await capture(page, name, 'quote');
+  const quoteText = await dialog
+    .locator(kind === 'fraud' ? '.purchase-fraud' : '.purchase-cta')
+    .innerText();
+  assert(quoteText.includes(String(quote.total)), 'Property decision displays the exact total');
   await tap(dialog.locator(kind === 'fraud' ? '.purchase-fraud' : '.purchase-cta'));
   const next = await changed(
     page,
@@ -543,7 +570,15 @@ async function propertyEconomy(page, name, kind) {
     assert.equal(next.players[0].heldCards.length, 0, 'Fraud card consumed once');
   }
   assert.notEqual(next.phase, 'property', 'One construction or purchase per visit');
-  return { kind, level, charged: quote.total, exactQuote: true, singleVisitDecision: true };
+  await capture(page, name, 'property-decision-completed');
+  return {
+    kind,
+    level,
+    charged: quote.total,
+    quoteText,
+    exactQuote: true,
+    singleVisitDecision: true,
+  };
 }
 async function profilesAndPause(page, name) {
   const fixture = createPlayerFixture('two');

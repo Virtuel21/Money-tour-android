@@ -2,11 +2,11 @@
 
 Application Android issue de [Virtuel21/money-tour](https://github.com/Virtuel21/money-tour), avec le moteur, les règles, le plateau 3D, les musiques et les illustrations d’origine. Le dépôt web d’origine n’est pas modifié.
 
-**[Télécharger la version Android de test](https://github.com/Virtuel21/Money-tour-android/releases)** · [Documentation du jeu web](README-WEB.md)
+**[Télécharger l’APK Android](https://raw.githubusercontent.com/Virtuel21/Money-tour-android/9fb3bf711b6ca263355b2ee2fcbeec410f10099b/Money-Tour-Android-0.1.0-debug.apk)** · [Versions et notes de livraison](https://github.com/Virtuel21/Money-tour-android/releases) · [Documentation du jeu web](README-WEB.md)
 
 ## Installer sur votre téléphone
 
-1. Ouvrir la [page des versions](https://github.com/Virtuel21/Money-tour-android/releases) sur le téléphone et télécharger `Money-Tour-Android-0.1.0-debug.apk` dans les fichiers joints.
+1. Ouvrir le [téléchargement direct de l’APK](https://raw.githubusercontent.com/Virtuel21/Money-tour-android/9fb3bf711b6ca263355b2ee2fcbeec410f10099b/Money-Tour-Android-0.1.0-debug.apk) sur le téléphone. Les [notes de version](https://github.com/Virtuel21/Money-tour-android/releases) regroupent aussi les liens de téléchargement.
 2. Ouvrir le fichier téléchargé. Si Android le demande, autoriser l’installation pour le navigateur ou l’application Fichiers, puis choisir **Installer**.
 3. Ouvrir **Money Tour**. Choisir **Solo & bots** pour jouer seul, ou **Entre amis → Jouer sur cet appareil** pour partager le téléphone. Les salons en ligne nécessitent Internet.
 

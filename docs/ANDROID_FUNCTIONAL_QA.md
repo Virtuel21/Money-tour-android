@@ -4,13 +4,30 @@ Recette du 24 octobre 2026. Le moteur, les règles, les modèles 3D et les resso
 
 ## Périmètre et niveaux de preuve
 
-La recette distingue les tests du moteur et du protocole, les interactions tactiles dans Chromium à taille de téléphone, puis les vérifications propres à l’APK. Une fenêtre de navigateur redimensionnée ne représente ni un téléphone physique ni les services Android. La recette visuelle détaillée est dans [ANDROID_VISUAL_QA.md](ANDROID_VISUAL_QA.md).
+La recette distingue les tests du moteur et du protocole, les interactions tactiles dans Chromium à taille de téléphone, puis les vérifications propres à l’APK. Une fenêtre de navigateur redimensionnée ne représente ni un téléphone physique ni les services Android. La recette visuelle détaillée est dans [ANDROID_VISUAL_QA.md](ANDROID_VISUAL_QA.md) ; les essais de vrais canaux WebRTC sont dans [ANDROID_NETWORK_QA.md](ANDROID_NETWORK_QA.md).
 
 Le contrôle initial a passé **933 tests dans 92 fichiers**, avec une couverture du moteur de **97,34 % des lignes, 93,60 % des branches, 96,50 % des instructions et 99,36 % des fonctions**. Ces tests incluent les parties simulées, les règles historiques, les tirages et les échanges réseau en mémoire. Les tests de l’intégration native ajoutés pendant la conversion sont vérifiés séparément par le contrôle final du dépôt.
 
+## Résultat de la recette navigateur
+
+**52 cas uniques acceptés : 26 scénarios sur deux formats, zéro exception JavaScript et aucun cas restant à valider.** Le reçu consolidé est `artifacts/android-qa/functional-summary.json`, dans les preuves jointes à la préversion. Il associe chaque scénario à son rapport et à ses captures.
+
+La série principale de 50 cas a produit 46 réussites immédiates et quatre échecs en portrait : achat, construction, rachat et sélection du Festival. Ces quatre cas ont ensuite été rejoués avec succès ; deux scénarios supplémentaires ont contrôlé le journal public en portrait et en paysage. Les rapports d’échec initiaux restent disponibles : le reçu est une consolidation après correction, et ne présente pas la première série comme entièrement réussie.
+
+Le contrôle a révélé que le chargement initial du plateau pouvait consommer le délai de décision local. Le chrono et les bots attendent maintenant le plateau prêt ; des tests de chargement retardé de plus de 60 secondes et un nouveau parcours d’achat ont vérifié ce correctif. Pour les interactions chronométrées, le script vérifie le prix affiché avant confirmation et prend sa capture après l’action, afin que le coût de la capture logicielle ne remplace pas le temps du joueur. La sélection tactile attend aussi la stabilisation des projections du plateau.
+
+| Lot de preuve                         | Résultat retenu                                                                |
+| ------------------------------------- | ------------------------------------------------------------------------------ |
+| `functional/results.json`             | 50 cas : 46 réussis au premier passage, quatre rejoués ensuite                 |
+| `cold-load-regression/results.json`   | Achat et construction après correctif de chargement ; journal portrait : 3/3   |
+| `decision-regression/results.json`    | Festival portrait réussi ; premier nouvel essai du rachat conservé comme échec |
+| `buyout-regression/results.json`      | Rachat portrait avec devis vérifié et transfert exact : 1/1                    |
+| `landscape-regression/results.json`   | Rachat et journal paysage : 2/2                                                |
+| `board-touch-regression/results.json` | Festival paysage, vrai toucher sur la case ciblée : 1/1                        |
+
 ## Reproduire les contrôles
 
-Prérequis : Node.js 22.12+, Corepack/pnpm de la version épinglée dans `package.json`, Java 21 et les outils Android documentés dans le guide Android.
+Prérequis : Node.js 22.12+, Corepack/pnpm de la version épinglée dans `package.json`, Java 21 et les outils Android documentés dans le [guide Android](ANDROID.md).
 
 ```sh
 corepack pnpm install --frozen-lockfile
@@ -66,6 +83,7 @@ Les captures et les résultats JSON sont enregistrés dans `artifacts/android-qa
 | Appel d’offres                        | Montant secret saisi, engagement, refus de l’autre joueur, dépouillement automatique, adjudication et débit exacts          |
 | Profils et objectifs                  | Profil, règle spéciale, afficher/masquer un objectif, consultation d’un bien sans mutation de propriété                     |
 | Pause                                 | Chrono réellement figé puis repris                                                                                          |
+| Journal public                        | Déplier/replier le résumé, trois actions récentes, ouvrir les 80 entrées, défilement interne et fermeture                   |
 | Victoire et revanche                  | Bilan lisible, nouveau jeu sans victoire résiduelle, mêmes joueurs et même durée                                            |
 | Invitation invalide                   | Message explicite, aucune fausse entrée en salon                                                                            |
 | 23 cartes Chance et événements        | Tests du moteur : paquet sans remise, effets, assurances, séisme, crise et rétrocompatibilité                               |
