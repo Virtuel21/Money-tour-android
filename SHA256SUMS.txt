@@ -1,1 +1,2 @@
 39d4c86205cdfc172763381607ba9f8786811789355e22aeefadbb8d4d8939f4  Money-Tour-Android-0.1.0-debug.apk
+f9b87de4322cf0f896cf5b19774be8b5af4505d40b5645a2b1377e29060dabb9  Money-Tour-Android-0.1.0-recette.zip
