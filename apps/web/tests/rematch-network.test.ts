@@ -25,6 +25,8 @@ it('replays a signed rematch in the same salon and preserves seats, settings and
     await host.start(2, false, 120000, 'fast');
     await host.idle();
     await flush();
+    await Promise.all(sessions.map((s) => s.readyAdventure()));
+    await flush();
     const table = host.state!.players.map((p) => [p.id, p.name, p.bot]);
     const initialFrames = host.frames.length;
     await host.rematch();

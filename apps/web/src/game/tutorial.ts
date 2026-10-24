@@ -172,8 +172,8 @@ export const lessons = [
   {
     id: 'controls',
     title: 'Se repérer pendant la partie',
-    text: 'Touchez un compte pour repérer les biens de ce joueur. Vue globale recadre le plateau ; Explorer les cases permet de les lire sur petit écran. Le chrono laisse 30 secondes par décision, après les animations. En ligne, un bot peut prendre le relais ; Reprendre mon siège rend la main dans le même navigateur. Les réglages contrôlent son et animations ; la pause est réservée au local.',
-    task: 'Essayez Vue globale ou Explorer les cases.',
+    text: 'Touchez un compte pour repérer les biens de ce joueur et une case du plateau pour la lire. Vue globale se trouve dans la barre du haut. Le chrono laisse 30 secondes par décision, après les animations. En ligne, un bot peut prendre le relais ; Reprendre mon siège rend la main dans le même navigateur. Les réglages contrôlent son et animations ; la pause est réservée au local.',
+    task: 'Essayez Vue globale ou touchez une case du plateau.',
     target: 'action',
   },
   {

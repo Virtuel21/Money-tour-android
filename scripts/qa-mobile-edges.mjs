@@ -341,7 +341,7 @@ try {
         await capture(page, `${name}-pan`);
         const panEdges = await edgePixels(page, `${name}-pan`);
         // HUD remains above the full-screen renderer and receives a real touch.
-        await page.getByRole('button', { name: 'Journal des actions', exact: true }).tap();
+        await page.getByRole('button', { name: 'Réglages de la partie', exact: true }).tap();
         await page.locator('dialog[open]').waitFor();
         await page.keyboard.press('Escape');
         await page.locator('dialog[open]').waitFor({ state: 'hidden' });

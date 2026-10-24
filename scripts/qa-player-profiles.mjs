@@ -217,9 +217,7 @@ async function boardGeometry(page) {
       .filter((button) => button.width && button.height);
     const artwork = document.querySelector('.archipelago-backdrop__art');
     const navigation = [
-      ...document.querySelectorAll(
-        '.board-controls > button, .game-sidebar .actions > button.primary',
-      ),
+      ...document.querySelectorAll('.game-tools > button, .game-sidebar .actions > button.primary'),
     ]
       .map((button) => {
         const rect = button.getBoundingClientRect();
@@ -315,7 +313,7 @@ async function boardGeometry(page) {
       button.width >= 43 && button.height >= 43,
       `${button.name}: profile action has a 44px touch target`,
     );
-  assert(value.navigation.length >= 4, 'The primary action and board navigation remain present');
+  assert(value.navigation.length >= 4, 'The top toolbar and primary game action remain present');
   for (const button of value.navigation) {
     assert(button.fits, `${button.name}: primary/navigation action fits the viewport`);
     assert(

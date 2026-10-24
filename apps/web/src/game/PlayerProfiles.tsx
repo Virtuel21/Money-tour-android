@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
-import { getRent, type GameState, type Player } from '@money-tour/engine';
+import { adventureText, getRent, type GameState, type Player } from '@money-tour/engine';
 import { formatText, translate } from '../i18n/translate';
 import { numberLocale } from '../i18n/language';
 import { PlayerInventory, PrivateQuest } from './AdventureHUD';
@@ -328,6 +328,7 @@ function PlayerDetails({
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const titleId = useId();
+  const specialRule = adventureText(state);
   useEffect(() => {
     const opener = document.activeElement;
     const dialog = dialogRef.current;
@@ -394,6 +395,15 @@ function PlayerDetails({
             }}
           />
           {showPrivateQuest && <PrivateQuest state={state} player={player} self={self} />}
+          {specialRule && (
+            <section
+              className="player-details-rule"
+              aria-label={translate('Règle spéciale de cette partie')}
+            >
+              <h3>{translate('Règle spéciale de cette partie')}</h3>
+              <p>{translate(specialRule)}</p>
+            </section>
+          )}
           <button
             className="player-details-locate"
             aria-pressed={inspectedOwner === player.id}

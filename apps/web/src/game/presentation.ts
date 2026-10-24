@@ -7,7 +7,9 @@ export type PresentationPace = 'normal' | 'fast';
 // Animated cards spend 1.5 seconds arriving before their front is fully readable.
 // Shared online budgets include that time even if one viewer disables motion.
 const FAST_CARD_NOTICE_MS = CARD_ARRIVE_MS + 4000;
-const routineNotices = ['insured_tile', 'alliance_expired', 'crisis_expired', 'roaches_expired'];
+const routineNotices = ['alliance_expired', 'crisis_expired', 'roaches_expired'];
+// Insurance is status feedback, so reading it never holds a decision or the shared clock.
+const passiveNotices = ['insurance', 'insured_tile'];
 
 /** One debit for a purchase/construction batch; keep the original events for the journal. */
 function propertyPayment(events: GameEvent[], index: number): number | undefined {
@@ -59,6 +61,7 @@ export interface Cue {
   casinoReels?: number[];
   jackpot?: boolean;
   message?: string;
+  nonblocking?: boolean;
   duration: number;
   amount?: number;
   payerId?: string;
@@ -195,7 +198,12 @@ export function presentation(
       add({
         kind: 'notice',
         reason: event.type,
-        duration: event.type === 'auction_started' ? 1800 : (reduced ? 800 : 2600) + 5000,
+        duration: passiveNotices.includes(event.type)
+          ? 0
+          : event.type === 'auction_started'
+            ? 1800
+            : (reduced ? 800 : 2600) + 5000,
+        ...(passiveNotices.includes(event.type) ? { nonblocking: true } : {}),
         playerId: event.playerId,
         tile: event.tile,
         message: notice[event.type],
@@ -295,13 +303,15 @@ export function presentation(
     const highlights = celebrations.filter((celebration) => celebration.eventIndex === index);
     if (highlights.length && frames[firstFrame]) frames[firstFrame]!.cue.celebrations = highlights;
   }
-  if (frames.length) frames.push({ state: next, cue: { kind: 'settle', duration: 50 } });
+  if (frames.some((frame) => !frame.cue.nonblocking))
+    frames.push({ state: next, cue: { kind: 'settle', duration: 50 } });
   return frames;
 }
 
 export function presentationMs(events: GameEvent[], pace: PresentationPace = 'normal'): number {
   if (pace === 'fast')
     return events.reduce((ms, event, index) => {
+      if (passiveNotices.includes(event.type)) return ms;
       const propertyAmount = propertyPayment(events, index);
       if (propertyAmount !== undefined)
         return ms + (propertyAmount > 0 ? 650 : 0) + (event.type === 'build' ? 350 : 150);
@@ -335,6 +345,7 @@ export function presentationMs(events: GameEvent[], pace: PresentationPace = 'no
       );
     }, 0);
   return events.reduce((ms, e, index) => {
+    if (passiveNotices.includes(e.type)) return ms;
     const propertyAmount = propertyPayment(events, index);
     if (propertyAmount !== undefined)
       return ms + (propertyAmount > 0 ? 1000 : 0) + (e.type === 'build' ? 350 : 250);

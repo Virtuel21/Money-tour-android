@@ -29,6 +29,7 @@ import {
 export interface LocalSave {
   stats?: GameStats;
   history?: string[];
+  adventureStartDeadline?: number;
   version: 1;
   seed: string;
   state: GameState;
@@ -72,6 +73,11 @@ export function loadLocal(): LocalSave | null {
       localStorage.getItem('money-tour.local.v4');
     if (!raw) return null;
     const save = JSON.parse(raw) as LocalSave;
+    if (
+      save.adventureStartDeadline !== undefined &&
+      (!Number.isSafeInteger(save.adventureStartDeadline) || save.adventureStartDeadline <= 0)
+    )
+      delete save.adventureStartDeadline;
     if (!validGameStats(save.stats) || save.stats.lastSeq !== save.state?.seq) delete save.stats;
     if (save?.version === 1 && save.state?.config?.version === 4) {
       const oldConfig: GameConfig = { ...legacyConfig, version: 4 } as GameConfig;

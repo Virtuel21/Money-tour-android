@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GameEvent, GameState } from '@money-tour/engine';
-import { presentation, type PresentationPace, type SceneFrame } from './presentation';
+import { presentation, type Cue, type PresentationPace, type SceneFrame } from './presentation';
+
+const PASSIVE_NOTICE_MS = 4000;
 
 export function usePresentation(
   initial: GameState,
@@ -19,6 +21,8 @@ export function usePresentation(
   });
   const [dismissed, setDismissed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<Cue | null>(null);
+  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const authoritative = useRef(initial),
     latest = useRef(initial);
   const queue = useRef<SceneFrame[]>([]),
@@ -32,7 +36,17 @@ export function usePresentation(
     setDismissed(false);
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
-    const next = queue.current.shift();
+    let next = queue.current.shift();
+    // Reveal feedback at its chronological position, then continue the scene immediately.
+    while (next?.cue.nonblocking) {
+      if (noticeTimer.current) clearTimeout(noticeTimer.current);
+      setNotice(next.cue);
+      noticeTimer.current = setTimeout(() => {
+        noticeTimer.current = null;
+        setNotice(null);
+      }, PASSIVE_NOTICE_MS);
+      next = queue.current.shift();
+    }
     if (!next) {
       running.current = false;
       setBusy(false);
@@ -56,6 +70,9 @@ export function usePresentation(
   const reset = useCallback((state: GameState) => {
     setDismissed(false);
     if (timer.current) clearTimeout(timer.current);
+    if (noticeTimer.current) clearTimeout(noticeTimer.current);
+    noticeTimer.current = null;
+    setNotice(null);
     timer.current = null;
     remaining.current = 0;
     queue.current = [];
@@ -88,6 +105,7 @@ export function usePresentation(
   useEffect(
     () => () => {
       if (timer.current) clearTimeout(timer.current);
+      if (noticeTimer.current) clearTimeout(noticeTimer.current);
     },
     [],
   );
@@ -96,5 +114,10 @@ export function usePresentation(
     if (onlineRef.current) setDismissed(true);
     else advance();
   }, [advance]);
-  return { frame, busy, present, reset, advance, dismiss, dismissed };
+  const dismissNotice = useCallback(() => {
+    if (noticeTimer.current) clearTimeout(noticeTimer.current);
+    noticeTimer.current = null;
+    setNotice(null);
+  }, []);
+  return { frame, busy, present, reset, advance, dismiss, dismissed, notice, dismissNotice };
 }

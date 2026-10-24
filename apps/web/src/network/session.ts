@@ -41,6 +41,8 @@ import { DISCONNECT_GRACE_MS } from './policy';
 import { TAUNT_COOLDOWN, taunts, type Taunt, type TauntKind } from '../game/taunts';
 
 const ZERO = '0'.repeat(64);
+const SESSION_PROTOCOL = 2;
+export const ADVENTURE_START_TIMEOUT_MS = 20000;
 class NeedsRandom extends Error {}
 export function execute(
   state: GameState | null,
@@ -68,6 +70,7 @@ export function execute(
     return { state: createGame(command.options, rng), events: [] };
   }
   if (!state) throw new Error('Not started');
+  if (command.type === 'adventure_release') return { state, events: [] };
   const result = reduceGame(state, command.action, rng);
   if (result.error) throw new Error(result.error);
   return result;
@@ -82,6 +85,7 @@ export function needsRandom(state: GameState | null, command: Command): boolean 
   }
 }
 export interface SessionView {
+  startGate?: AdventureStartGate | null;
   stats?: GameStats;
   taunts?: Taunt[];
   state: GameState | null;
@@ -96,6 +100,16 @@ export interface SessionView {
   epoch: number;
   events: GameEvent[];
   blocked: boolean;
+}
+export interface AdventureStartGate {
+  id: string;
+  deadline: number;
+  participants: string[];
+  ready: string[];
+}
+interface AdventureReady {
+  gate: string;
+  signatures: Record<string, string>;
 }
 interface Round {
   ceremony: Ceremony;
@@ -114,10 +128,13 @@ export interface SavedSession {
   host: string;
   epoch: number;
   frames: Frame[];
+  adventureReady?: AdventureReady;
 }
 
 /** All received messages are authenticated and processed in one serial queue. */
 export class Session {
+  private startGate: AdventureStartGate | null = null;
+  private adventureSignatures: Record<string, string> = {};
   stats: GameStats | undefined;
   taunts: Taunt[] = [];
   private tauntTimes = new Map<string, number>();
@@ -169,6 +186,7 @@ export class Session {
   }
   get view(): SessionView {
     return {
+      startGate: this.startGate,
       stats: this.stats,
       taunts: this.taunts,
       state: this.state,
@@ -227,6 +245,7 @@ export class Session {
       this.epoch = saved.epoch;
       for (const member of this.members) this.identities.set(member.id, member.key);
       for (const frame of saved.frames) await this.acceptFrame(frame, false);
+      await this.acceptAdventureReady(saved.adventureReady);
     } else if (this.creator) {
       this.host = this.user.id;
       this.members = [
@@ -330,22 +349,26 @@ export class Session {
   private async hello(): Promise<void> {
     await this.send({
       type: 'hello',
+      protocol: SESSION_PROTOCOL,
       name: this.name,
       creator: this.creator,
       epoch: this.epoch,
       index: this.frames.length,
       head: this.head,
+      adventureReady: this.savedAdventureReady(),
     });
     if (this.isHost) await this.statusMessage();
   }
   private async statusMessage(): Promise<void> {
     await this.send({
       type: 'status',
+      protocol: SESSION_PROTOCOL,
       host: this.host,
       epoch: this.epoch,
       members: this.members,
       index: this.frames.length,
       head: this.head,
+      adventureReady: this.savedAdventureReady(),
     });
   }
   private persist(): void {
@@ -355,6 +378,79 @@ export class Session {
       host: this.host,
       epoch: this.epoch,
       frames: this.frames,
+      adventureReady: this.savedAdventureReady(),
+    });
+  }
+  private savedAdventureReady(): AdventureReady | undefined {
+    return this.startGate
+      ? { gate: this.startGate.id, signatures: { ...this.adventureSignatures } }
+      : undefined;
+  }
+  private adventureReadyPayload(gate: string, playerId: string) {
+    return { domain: 'money-tour-adventure-ready-v1', room: this.room, gate, playerId };
+  }
+  private async validAdventureReady(
+    gate: AdventureStartGate,
+    signatures: Record<string, string>,
+  ): Promise<boolean> {
+    for (const [playerId, signature] of Object.entries(signatures)) {
+      const key = this.identities.get(playerId);
+      if (
+        !gate.participants.includes(playerId) ||
+        !key ||
+        !(await verify(key, this.adventureReadyPayload(gate.id, playerId), signature))
+      )
+        return false;
+    }
+    return true;
+  }
+  private async acceptAdventureReady(ready?: AdventureReady): Promise<void> {
+    const gate = this.startGate;
+    if (
+      !ready ||
+      !gate ||
+      ready.gate !== gate.id ||
+      !(await this.validAdventureReady(gate, ready.signatures))
+    )
+      return;
+    if (
+      Object.entries(ready.signatures).every(
+        ([playerId, signature]) => this.adventureSignatures[playerId] === signature,
+      )
+    )
+      return;
+    this.adventureSignatures = { ...this.adventureSignatures, ...ready.signatures };
+    this.startGate = {
+      ...gate,
+      ready: gate.participants.filter((id) => this.adventureSignatures[id]),
+    };
+    this.persist();
+    this.emit();
+  }
+  async readyAdventure(): Promise<void> {
+    this.enqueue(async () => {
+      const gate = this.startGate;
+      if (!gate?.participants.includes(this.user.id) || this.adventureSignatures[this.user.id])
+        return;
+      const signature = await sign(
+        this.user.privateKey,
+        this.adventureReadyPayload(gate.id, this.user.id),
+      );
+      await this.acceptAdventureReady({ gate: gate.id, signatures: { [this.user.id]: signature } });
+      await this.send({ type: 'adventure_ready', gate: gate.id, signature });
+      await this.releaseAdventure();
+    });
+    await this.idle();
+  }
+  private async releaseAdventure(): Promise<void> {
+    const gate = this.startGate;
+    if (!this.isHost || !gate) return;
+    if (this.now() < gate.deadline && gate.ready.length !== gate.participants.length) return;
+    await this.propose({
+      type: 'adventure_release',
+      gate: gate.id,
+      at: this.now(),
+      ready: { ...this.adventureSignatures },
     });
   }
   private recovered(): void {
@@ -385,6 +481,10 @@ export class Session {
     const body = bodySchema.parse(message.body),
       from = message.from;
     if (body.type === 'hello') {
+      if (body.protocol !== SESSION_PROTOCOL) {
+        this.incident('Version du jeu incompatible : actualisez la page sur tous les appareils.');
+        return;
+      }
       if (body.head === this.head && body.index === this.frames.length && !this.round) {
         this.exclusions.delete(from);
         this.unavailableSince.delete(from);
@@ -406,15 +506,24 @@ export class Session {
           this.persist();
         }
         if (this.members.some((m) => m.id === from)) {
+          await this.acceptAdventureReady(body.adventureReady);
           await this.statusMessage();
           if (body.index !== this.frames.length || body.head !== this.head)
-            await this.send({ type: 'snapshot', frames: this.frames }, peer);
+            await this.send(
+              { type: 'snapshot', frames: this.frames, adventureReady: this.savedAdventureReady() },
+              peer,
+            );
+          await this.releaseAdventure();
         }
       }
       this.emit();
       return;
     }
     if (body.type === 'status') {
+      if (body.protocol !== SESSION_PROTOCOL) {
+        this.incident('Version du jeu incompatible : actualisez la page sur tous les appareils.');
+        return;
+      }
       if (
         this.recovering &&
         body.epoch > this.epoch &&
@@ -447,6 +556,7 @@ export class Session {
       }
       if (body.index > this.frames.length) await this.send({ type: 'sync' }, peer);
       if (body.index === this.frames.length && body.head === this.head) {
+        await this.acceptAdventureReady(body.adventureReady);
         this.recovered();
         if (this.state) this.status = 'Partie synchronisée.';
       }
@@ -458,6 +568,11 @@ export class Session {
       return;
     }
     if (!this.members.some((m) => m.id === from)) return;
+    if (body.type === 'adventure_ready') {
+      await this.acceptAdventureReady({ gate: body.gate, signatures: { [from]: body.signature } });
+      await this.releaseAdventure();
+      return;
+    }
     if (body.type === 'taunt') {
       this.acceptTaunt(from, body.kind, body.targetId, stamp);
       return;
@@ -468,7 +583,10 @@ export class Session {
       return;
     }
     if (body.type === 'sync' && this.isHost) {
-      await this.send({ type: 'snapshot', frames: this.frames }, peer);
+      await this.send(
+        { type: 'snapshot', frames: this.frames, adventureReady: this.savedAdventureReady() },
+        peer,
+      );
       return;
     }
     if (body.type === 'snapshot' && from === this.host) {
@@ -481,6 +599,7 @@ export class Session {
         }
       for (const frame of body.frames.slice(this.frames.length))
         await this.acceptFrame(frame, false);
+      await this.acceptAdventureReady(body.adventureReady);
       this.status = 'Partie synchronisée.';
       this.recovered();
       this.persist();
@@ -626,6 +745,7 @@ export class Session {
       await this.propose(
         commandSchema.parse({
           type: 'start',
+          adventureStart: true,
           options: {
             randomFirstPlayer: true,
             players,
@@ -647,7 +767,13 @@ export class Session {
           ? !this.connected().includes(player.id)
           : true,
       }));
-      await this.propose(commandSchema.parse({ type: 'rematch', options }));
+      await this.propose(
+        commandSchema.parse({
+          type: 'rematch',
+          options,
+          adventureStart: true,
+        }),
+      );
     });
   }
   private async permitted(command: Command): Promise<boolean> {
@@ -667,6 +793,16 @@ export class Session {
         !this.state &&
         this.members.every((m) => command.options.players.some((p) => p.id === m.id && !p.bot))
       );
+    if (command.type === 'adventure_release') {
+      const gate = this.startGate;
+      return (
+        !!gate &&
+        command.gate === gate.id &&
+        (command.at >= gate.deadline || gate.participants.every((id) => command.ready[id])) &&
+        (await this.validAdventureReady(gate, command.ready))
+      );
+    }
+    if (this.startGate) return false;
     if (command.auth)
       return (
         (await this.validIntent(command.auth, command.auth.playerId)) &&
@@ -840,6 +976,9 @@ export class Session {
       proof,
       result: await hash(result.state),
       signer: this.user.id,
+      ...((command.type === 'start' || command.type === 'rematch') && command.adventureStart
+        ? { adventureDeadline: this.now() + ADVENTURE_START_TIMEOUT_MS }
+        : {}),
     };
     const frame = { ...unsigned, signature: await sign(this.user.privateKey, unsigned) };
     await this.acceptFrame(frame, true);
@@ -860,6 +999,12 @@ export class Session {
     if (!key || !(await verify(key, unsigned, signature)))
       throw new Error('Signature d’action invalide');
     if (!(await this.permitted(frame.command))) throw new Error('Auteur de l’intention invalide');
+    if (
+      (frame.command.type === 'start' || frame.command.type === 'rematch') &&
+      frame.command.adventureStart &&
+      frame.adventureDeadline === undefined
+    )
+      throw new Error('Délai de démarrage manquant');
     let seed: string | undefined;
     if (frame.proof) {
       if (
@@ -902,9 +1047,11 @@ export class Session {
     const result = execute(this.state, frame.command, seed);
     if ((await hash(result.state)) !== frame.result) throw new Error('Hash d’état invalide');
     this.stats =
-      frame.command.type === 'action' && this.state
-        ? accumulateStats(this.stats, this.state, result.state, result.events)
-        : newGameStats(result.state);
+      frame.command.type === 'adventure_release'
+        ? this.stats
+        : frame.command.type === 'action' && this.state
+          ? accumulateStats(this.stats, this.state, result.state, result.events)
+          : newGameStats(result.state);
     if (frame.command.type === 'rematch') {
       this.taunts = [];
       this.tauntTimes.clear();
@@ -914,6 +1061,25 @@ export class Session {
       this.lastTick = this.now();
     }
     this.state = result.state;
+    if (frame.command.type === 'start' || frame.command.type === 'rematch') {
+      this.adventureSignatures = {};
+      this.startGate =
+        frame.adventureDeadline === undefined
+          ? null
+          : {
+              id: await hash(frame),
+              deadline: frame.adventureDeadline,
+              participants: result.state.players
+                .filter((player) => !player.bot)
+                .map((player) => player.id),
+              ready: [],
+            };
+    } else if (frame.command.type === 'adventure_release') {
+      this.startGate = null;
+      this.adventureSignatures = {};
+      this.lastTick = this.now();
+      this.lastBot = this.now();
+    }
     if (
       frame.command.type === 'action' &&
       frame.command.action.type === 'set_control' &&
@@ -1015,6 +1181,12 @@ export class Session {
       return;
     }
     if (!this.state || this.state.winner) return;
+    if (this.startGate) {
+      this.lastTick = now;
+      this.lastBot = now;
+      await this.releaseAdventure();
+      return;
+    }
     // Give humans their entire decision window after the shared presentation,
     // just as local play already does. Heartbeats and recovery still run above.
     if (now < this.presentationUntil) {

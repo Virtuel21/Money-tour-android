@@ -1,0 +1,56 @@
+.app .modal.adventure-start {
+  width: min(500px, calc(100vw - 28px));
+  max-height: calc(100dvh - 28px);
+  padding: clamp(20px, 4vw, 32px);
+  text-align: center;
+  overflow-y: auto;
+}
+.adventure-start > * {
+  flex: 0 0 auto;
+}
+.adventure-start .adventure-start-emblem {
+  display: block;
+  width: 56px;
+  height: 56px;
+  color: #087fae;
+  margin: 0 auto 4px;
+}
+.adventure-start h2 {
+  margin: 8px 0 16px;
+}
+.app .modal.adventure-start .adventure-start-rule {
+  font-size: calc(1rem * var(--ui-text-scale, 1));
+  color: #173d4d;
+  line-height: 1.65;
+  text-wrap: pretty;
+}
+.adventure-start-players {
+  list-style: none;
+  display: grid;
+  gap: 8px;
+  margin: 20px 0;
+  padding: 0;
+  text-align: left;
+}
+.adventure-start-players li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: #eaf6f5;
+}
+.adventure-start-players li span:last-child {
+  color: #176079;
+  font-weight: 700;
+}
+.adventure-start > .primary {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 8px;
+}
+.adventure-start-time {
+  margin: 12px 0 0;
+  color: #53686f;
+  font-size: 0.875rem;
+}

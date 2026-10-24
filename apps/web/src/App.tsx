@@ -2,7 +2,6 @@ import { translate, formatText } from './i18n/translate';
 import { LanguagePicker, useLanguage } from './i18n/LanguagePicker';
 import { useAuctionDialog } from './game/useAuctionDialog';
 import { StrategyProgress } from './game/StrategyProgress';
-import { publicVictoryProgress } from './game/strategy';
 import { PropertyInsight } from './game/PropertyInsight';
 import { GameIcon } from './game/GameIcon';
 import { BuildingIllustration } from './game/BuildingIllustration';
@@ -19,7 +18,6 @@ import { GameResults } from './game/GameResults';
 import { rematchOptions } from './game/gameStats';
 import { useAuctionReveal } from './game/useAuctionReveal';
 import { useSpectatorDialog } from './game/useSpectatorDialog';
-import { victoryThreats } from '@money-tour/engine';
 import { tileTitle, festivalText, propertyRulesText } from './game/tileTitle';
 import { TauntMenu } from './game/TauntMenu';
 import {
@@ -35,7 +33,9 @@ import { MobileTiles } from './game/MobileTiles';
 import { useMobile } from './game/useMobile';
 import { MobilePocket } from './game/MobilePocket';
 import { AuctionView } from './game/AuctionView';
-import { AdventureBanner } from './game/AdventureHUD';
+import { SharedGameInfo } from './game/AdventureHUD';
+import { AdventureStart } from './game/AdventureStart';
+import { prepareLocalAdventure, releaseLocalAdventure } from './game/adventureIntro';
 import { PlayerProfiles } from './game/PlayerProfiles';
 import { useOwnerInspectionDismissal } from './game/useOwnerInspectionDismissal';
 import { ArchipelagoBackdrop } from './game/ArchipelagoBackdrop';
@@ -282,6 +282,8 @@ export default function App() {
   const [lobbyKey, setLobbyKey] = useState(0);
   const [setupTurn, setSetupTurn] = useState(false);
   const [online, setOnline] = useState<SessionView | null>(null);
+  const localStartDeadline = online ? undefined : save?.adventureStartDeadline;
+  const adventureHeld = screen === 'game' && Boolean(online?.startGate || localStartDeadline);
   const [onlineResume, setOnlineResume] = useState(() => loadOnlineResume());
   const [resumeRequest, setResumeRequest] = useState<OnlineResume | undefined>(() => {
     const code = invitationCode(location.hash);
@@ -408,10 +410,12 @@ export default function App() {
       void onlineSession.current.rematch();
       return;
     }
-    const next = newLocal({
-      ...rematchOptions(current),
-      presentationPace: comfort.pace,
-    });
+    const next = prepareLocalAdventure(
+      newLocal({
+        ...rematchOptions(current),
+        presentationPace: comfort.pace,
+      }),
+    );
     cinema.reset(next.state);
     setSave(next);
     setHistory(['Nouveau voyage ! ' + adventureText(next.state)]);
@@ -433,11 +437,10 @@ export default function App() {
   const current =
     screen === 'game' ? (rolling ? display : (online?.state ?? save?.state ?? demo)) : demo;
   const active = current.players[current.currentPlayer]!;
-  const victoryProgress = publicVictoryProgress(current, online?.self ?? active.id);
-  const warnings = victoryThreats(current);
   const humans = current.players.filter((p) => !p.bot && !p.eliminated);
   const canTaunt =
     !paused &&
+    !adventureHeld &&
     !current.winner &&
     (online ? humans.some((p) => p.id === online.self) : humans.length > 0);
   const sendTaunt = (kind: TauntKind) => {
@@ -473,7 +476,7 @@ export default function App() {
   );
   const legal = screen === 'game' ? getLegalActions(current) : [];
   const act = (action: GameAction) => {
-    if (screen !== 'game' || (paused && action.type !== 'quit')) return;
+    if (screen !== 'game' || ((paused || adventureHeld) && action.type !== 'quit')) return;
     if (action.type !== 'tick') setInspectedOwner(null);
     if (['roll', 'attempt_escape', 'travel'].includes(action.type)) setOverview(false);
     if (onlineSession.current) {
@@ -524,12 +527,25 @@ export default function App() {
     if (save && !previewScenario() && !persistLocal(save))
       setNotice('Le navigateur ne permet pas la sauvegarde locale. Gardez cet onglet ouvert.');
   }, [save]);
+  const readyLocalAdventure = () => {
+    const previous = localSaveRef.current;
+    if (!previous?.adventureStartDeadline) return;
+    const next = releaseLocalAdventure(previous);
+    localSaveRef.current = next;
+    setSave(next);
+  };
+  useEffect(() => {
+    if (screen !== 'game' || !localStartDeadline) return;
+    const timer = setTimeout(readyLocalAdventure, Math.max(0, localStartDeadline - Date.now()));
+    return () => clearTimeout(timer);
+  }, [screen, localStartDeadline]);
   useEffect(() => {
     if (
       (previewScenario() && new URLSearchParams(location.search).get('clock') !== '1') ||
       online ||
       screen !== 'game' ||
       paused ||
+      adventureHeld ||
       rolling ||
       current.winner
     )
@@ -542,28 +558,38 @@ export default function App() {
       dispatchRef.current({ type: 'tick', elapsedMs });
     }, 1000);
     return () => clearInterval(timer);
-  }, [screen, paused, rolling, Boolean(current.winner), Boolean(online)]);
+  }, [screen, paused, adventureHeld, rolling, Boolean(current.winner), Boolean(online)]);
   useEffect(() => {
-    if (online || screen !== 'game' || paused || rolling || current.winner || !decisionPlayer.bot)
+    if (
+      online ||
+      screen !== 'game' ||
+      paused ||
+      adventureHeld ||
+      rolling ||
+      current.winner ||
+      !decisionPlayer.bot
+    )
       return;
     const timer = setTimeout(() => dispatchRef.current(chooseBotAction(current)), 650);
     return () => clearTimeout(timer);
-  }, [save, screen, paused, rolling, Boolean(online)]);
+  }, [save, screen, paused, adventureHeld, rolling, Boolean(online)]);
   const start = () => {
     if (!validMinutes(minutes)) return;
     detachOnline();
-    const next = newLocal({
-      randomFirstPlayer: true,
-      players: Array.from({ length: count }, (_, i) => ({
-        id: `p${i + 1}`,
-        name: names[i]!.trim() || `Joueur ${i + 1}`,
-        bot: bots[i],
-        ...(mode === 'teams' ? { team: i % 2 } : {}),
-      })),
-      mode: mode === 'teams' ? 'teams' : 'free-for-all',
-      durationMs: minutes * 60000,
-      presentationPace: comfort.pace,
-    });
+    const next = prepareLocalAdventure(
+      newLocal({
+        randomFirstPlayer: true,
+        players: Array.from({ length: count }, (_, i) => ({
+          id: `p${i + 1}`,
+          name: names[i]!.trim() || `Joueur ${i + 1}`,
+          bot: bots[i],
+          ...(mode === 'teams' ? { team: i % 2 } : {}),
+        })),
+        mode: mode === 'teams' ? 'teams' : 'free-for-all',
+        durationMs: minutes * 60000,
+        presentationPace: comfort.pace,
+      }),
+    );
     cinema.reset(next.state);
     setSave(next);
     setHistory(['Bon voyage ! ' + adventureText(next.state)]);
@@ -637,6 +663,7 @@ export default function App() {
   const property = selected === null ? undefined : current.properties[selected];
   const interactionDisabled =
     paused ||
+    adventureHeld ||
     rolling ||
     decisionPlayer.bot ||
     Boolean(current.winner) ||
@@ -739,7 +766,7 @@ export default function App() {
     <GameProviders
       value={{
         state: screen === 'game' ? current : null,
-        held: paused || rolling,
+        held: paused || adventureHeld || rolling,
       }}
     >
       <div
@@ -1071,6 +1098,37 @@ export default function App() {
                   {translate(duration(current.durationMs - current.elapsedMs))}
                 </span>
                 <button
+                  className="icon-button board-view-control"
+                  aria-label={
+                    inspectedOwner
+                      ? translate('Tout afficher')
+                      : mobile && boardPanned
+                        ? translate('Recentrer mon pion')
+                        : mobile && overview
+                          ? translate('Suivre mon pion')
+                          : translate('Vue globale')
+                  }
+                  title={
+                    inspectedOwner
+                      ? translate('Tout afficher')
+                      : mobile && boardPanned
+                        ? translate('Recentrer mon pion')
+                        : mobile && overview
+                          ? translate('Suivre mon pion')
+                          : translate('Vue globale')
+                  }
+                  aria-pressed={mobile ? overview || boardPanned : undefined}
+                  onClick={() => {
+                    if (inspectedOwner) setInspectedOwner(null);
+                    else if (mobile && boardPanned) {
+                      setOverview(false);
+                      setViewResetKey((key) => key + 1);
+                    } else if (mobile) setOverview(!overview);
+                  }}
+                >
+                  <GameIcon name={mobile && boardPanned ? 'target' : 'compass'} />
+                </button>
+                <button
                   className="subtle"
                   onClick={togglePause}
                   aria-pressed={paused}
@@ -1092,16 +1150,7 @@ export default function App() {
                 </button>
               </div>
             </div>
-            <div className="shared-game-info">
-              <AdventureBanner state={current} />
-              {!!warnings.length && (
-                <div className="victory-watch" role="status">
-                  {warnings.map((w) => (
-                    <p key={w.key}>⚠ {translate(w.message)}</p>
-                  ))}
-                </div>
-              )}
-            </div>
+            <SharedGameInfo key={online ? journey : save?.seed} state={current} mobile={mobile} />
             <PlayerProfiles
               state={current}
               self={online?.self}
@@ -1476,9 +1525,7 @@ export default function App() {
                   </p>
                 )}
                 <small className="action-help">
-                  {translate(
-                    'La règle spéciale de cette partie est affichée au-dessus du plateau.',
-                  )}
+                  {translate('Retrouvez la règle spéciale de cette partie dans votre profil.')}
                 </small>
               </section>
               <details className="live-actions">
@@ -1501,105 +1548,6 @@ export default function App() {
                 </p>
               </div>
             </aside>
-            <div className="board-controls">
-              <button
-                className="strategy-button icon-label"
-                aria-label={formatText(
-                  'Ma stratégie · {0}/{1} collections',
-                  victoryProgress.completed,
-                  victoryProgress.target,
-                )}
-                onClick={() => setModal('strategy')}
-              >
-                <span className="board-nav-symbol">
-                  <GameIcon name="target" />
-                  <small aria-hidden="true">
-                    {victoryProgress.completed}/{victoryProgress.target}
-                  </small>
-                </span>
-                <span className="board-nav-label">
-                  {mobile ? translate('Stratégie') : translate('Ma stratégie')}
-                </span>
-              </button>
-              <button
-                className="icon-label"
-                aria-label={translate('Journal des actions')}
-                onClick={() => setModal('journal')}
-              >
-                <GameIcon name="journal" />
-                <span className="board-nav-label">
-                  {mobile ? translate('Journal') : translate('Journal des actions')}
-                </span>
-              </button>
-              <button
-                className="icon-label"
-                aria-label={
-                  mobile && options.length && !interactionDisabled
-                    ? translate('Choisir une case')
-                    : translate('Explorer les cases')
-                }
-                onClick={() => setModal('tiles')}
-              >
-                <GameIcon name="map" />
-                <span className="board-nav-label">
-                  {mobile
-                    ? options.length && !interactionDisabled
-                      ? translate('Choisir')
-                      : translate('Escales')
-                    : translate('Explorer les cases')}
-                </span>
-              </button>
-              {mobile ? (
-                <>
-                  <button
-                    className="icon-label"
-                    aria-label={
-                      inspectedOwner
-                        ? translate('Tout afficher')
-                        : boardPanned
-                          ? translate('Recentrer mon pion')
-                          : overview
-                            ? translate('Suivre mon pion')
-                            : translate('Vue globale')
-                    }
-                    aria-pressed={overview || boardPanned}
-                    onClick={() => {
-                      if (inspectedOwner) setInspectedOwner(null);
-                      else if (boardPanned) {
-                        setOverview(false);
-                        setViewResetKey((key) => key + 1);
-                      } else setOverview(!overview);
-                    }}
-                  >
-                    <GameIcon name={boardPanned ? 'target' : 'compass'} />
-                    <span className="board-nav-label">
-                      {inspectedOwner
-                        ? translate('Tout voir')
-                        : boardPanned
-                          ? translate('Recentrer')
-                          : overview
-                            ? translate('Suivre')
-                            : translate('Vue globale')}
-                    </span>
-                  </button>
-                  <button
-                    className="icon-label"
-                    aria-label={translate('Mon carnet')}
-                    onClick={() => setModal('pocket')}
-                  >
-                    <GameIcon name="book" />
-                    <span className="board-nav-label">{translate('Carnet')}</span>
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button className="icon-label" onClick={() => setInspectedOwner(null)}>
-                    <GameIcon name="map" />
-                    {translate('Vue globale')}
-                  </button>
-                </>
-              )}
-            </div>
           </main>
         )}
         <footer>
@@ -2221,6 +2169,15 @@ export default function App() {
               )}
             </ActionCard>
           )}
+        {screen === 'game' && !paused && cinema.notice && (
+          <aside className="routine-notice passive-insurance-notice" role="status">
+            <GameIcon name="shield" />
+            <p>{translate(cinema.notice.message)}</p>
+            <button aria-label={translate('Masquer l’information')} onClick={cinema.dismissNotice}>
+              <GameIcon name="close" />
+            </button>
+          </aside>
+        )}
         {screen === 'game' &&
           !modal &&
           !tile &&
@@ -2687,6 +2644,20 @@ export default function App() {
             />
           )}
         </Suspense>
+        {adventureHeld && (
+          <AdventureStart
+            key={online?.startGate?.id ?? save?.seed}
+            state={online?.state ?? save!.state}
+            deadline={online?.startGate?.deadline ?? localStartDeadline!}
+            participants={online?.startGate?.participants}
+            ready={online?.startGate?.ready}
+            self={online?.self}
+            onReady={() => {
+              if (onlineSession.current) void onlineSession.current.readyAdventure();
+              else readyLocalAdventure();
+            }}
+          />
+        )}
         {screen === 'game' && current.winner && !rolling && (
           <ActionCard
             cardKey={`winner:${current.turn}`}

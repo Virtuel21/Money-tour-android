@@ -29,6 +29,8 @@ it('accepts the invited seat, keeps choices concealed in signed frames, and agre
     await host.start(2, false, 1200000);
     await host.idle();
     await flush();
+    await Promise.all(sessions.map((s) => s.readyAdventure()));
+    await flush();
     for (const s of sessions) {
       // This fixture places the host on the duel tile independently of the opening draw.
       s.state!.currentPlayer = 0;

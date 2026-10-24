@@ -122,6 +122,7 @@ try {
       assert.equal(await page.locator('.online-modal[open]').count(), 0);
       assert.equal(new URL(page.url()).hash, '');
       await local.click();
+      await page.getByRole('button', { name: 'Démarrer l’aventure', exact: true }).click();
       await readyBoard(page);
       assert.equal(await page.locator('.play-scene').count(), 1);
       await capture(page, 'local-game-after-room-cancel');
@@ -152,14 +153,23 @@ try {
             return { x, y, width, height };
           };
           return {
-            controls: box('.board-controls'),
+            toolbar: box('.game-tools'),
             sidebar: box('.game-sidebar'),
             info: box('.shared-game-info'),
             board: box('.board-viewport'),
             overflow: document.documentElement.scrollWidth > innerWidth,
           };
         });
-        for (const target of ['controls', 'sidebar', 'info']) {
+        assert.equal(
+          await page.locator('.board-controls').count(),
+          0,
+          'Bottom navigation is removed',
+        );
+        for (const target of ['toolbar', 'sidebar', 'info']) {
+          if (!geometry[target].width) {
+            assert.equal(target, 'info', 'Only transient game information may collapse');
+            continue;
+          }
           assert(geometry[target].width <= 1121, `${target}: ${geometry[target].width}px`);
           if (width >= 1280 || height > width)
             assert(Math.abs(geometry[target].x + geometry[target].width / 2 - width / 2) < 2);
@@ -176,7 +186,7 @@ try {
         assert.equal(await page.locator('.profile-highlight').count(), 0);
         assert.equal(await page.locator('dialog[open]').count(), 0);
         await locate(page);
-        const control = page.getByRole('button', { name: 'Journal des actions', exact: true });
+        const control = page.getByRole('button', { name: 'Réglages de la partie', exact: true });
         const snapshot = () =>
           page.evaluate(() => {
             const { phase, players, dice, currentPlayer, turn } = JSON.parse(
@@ -193,6 +203,10 @@ try {
           before,
           'A dismiss click must not also activate a game control',
         );
+        await control.click();
+        await page.locator('dialog[open]').waitFor();
+        await page.keyboard.press('Escape');
+        await page.locator('dialog[open]').waitFor({ state: 'hidden' });
         await locate(page);
         await page.keyboard.press('Escape');
         assert.equal(await page.locator('.profile-highlight').count(), 0);

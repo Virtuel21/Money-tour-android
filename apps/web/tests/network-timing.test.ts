@@ -17,6 +17,7 @@ it('does not spend the human decision clock while presenting an online purchase'
     await session.join('clock-room', undefined, false);
     await session.start(2, false, 1200000);
     await session.idle();
+    await session.readyAdventure();
     const state = session.state!;
     // Exercise the host's purchase regardless of which seat won the opening draw.
     state.currentPlayer = 0;

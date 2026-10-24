@@ -184,6 +184,14 @@ it.each([false, true])(
     expect(scene.latest!.players[0]!.insurance).toEqual({ tile: 1 });
     expect(scene.latest!.phase).toBe('roll');
     expect(scene.latest!.currentPlayer).toBe(0);
+    expect(host.querySelector('.passive-insurance-notice')?.textContent).toContain(
+      'Cette propriété est maintenant assurée.',
+    );
+    expect(host.querySelector('.action-card-dialog')).toBeNull();
+    expect(button('Lancer les dés').disabled).toBe(false);
+    await click('Lancer les dés');
+    expect(scene.actions.at(-1)?.type).toBe('roll');
+    expect(host.querySelector('.passive-insurance-notice')).not.toBeNull();
   },
 );
 

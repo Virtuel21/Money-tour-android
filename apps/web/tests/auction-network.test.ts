@@ -29,6 +29,8 @@ it('keeps signed bids sealed until everyone commits and resolves the same winnin
     await host.start(2, false, 1200000);
     await host.idle();
     await flush();
+    await Promise.all(sessions.map((s) => s.readyAdventure()));
+    await flush();
     for (const s of sessions) {
       s.state!.phase = 'auction';
       s.state!.properties[5]!.ownerId = null;

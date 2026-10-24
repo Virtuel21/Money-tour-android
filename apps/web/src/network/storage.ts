@@ -1,7 +1,7 @@
 import { config } from '@money-tour/engine';
 import { z } from 'zod';
 import type { Identity } from './crypto';
-import { frameSchema, memberSchema } from './schema';
+import { adventureReadySchema, frameSchema, memberSchema } from './schema';
 import type { SavedSession } from './session';
 
 const resumeKey = 'money-tour.online-resume.v1';
@@ -18,6 +18,7 @@ const savedSchema = z.object({
   epoch: z.number().int().nonnegative(),
   members: z.array(memberSchema).max(4),
   frames: z.array(frameSchema).max(15000),
+  adventureReady: adventureReadySchema.optional(),
 });
 function fresh(at: number): boolean {
   return at <= Date.now() && Date.now() - at < config.network.reconnectTtlMs;

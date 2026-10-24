@@ -1,17 +1,49 @@
 import { translate, formatText } from '../i18n/translate';
 import { scaledAmount } from '@money-tour/engine';
 import { playerBonuses, type BonusInfo } from './bonuses';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   adventureText,
   questRules,
   getRent,
+  victoryThreats,
   type GameState,
   type Player,
 } from '@money-tour/engine';
 import { money } from './local';
 import { estateGroups } from './estate';
 import { GameIcon } from './GameIcon';
+
+const VICTORY_WARNING_MS = 30_000;
+
+function VictoryWarning({ message }: { message: string }) {
+  const [visible, setVisible] = useState(true);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setVisible(false), VICTORY_WARNING_MS);
+    return () => window.clearTimeout(timer);
+  }, []);
+  if (!visible) return null;
+  return (
+    <div className="victory-watch" role="status">
+      <p>⚠ {translate(message)}</p>
+    </div>
+  );
+}
+
+export function SharedGameInfo({ state, mobile }: { state: GameState; mobile: boolean }) {
+  const firstRoundCompleted = state.adventure
+    ? state.adventure.round >= 2
+    : state.turn > state.players.length;
+  return (
+    <div className="shared-game-info">
+      {(!mobile || !firstRoundCompleted) && <AdventureBanner state={state} />}
+      {victoryThreats(state).map((warning) => (
+        <VictoryWarning key={warning.key} message={warning.message} />
+      ))}
+    </div>
+  );
+}
+
 export function AdventureBanner({ state }: { state: GameState }) {
   return (
     <section className="adventure-banner" aria-label={translate('Règle spéciale de cette partie')}>

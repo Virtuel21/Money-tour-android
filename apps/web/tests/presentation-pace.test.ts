@@ -139,7 +139,7 @@ it('keeps short routine notices and the auction introduction separate from card 
   const frames = presentation(state, state, events, false, 'fast');
   expect(
     frames.filter((frame) => frame.cue.kind === 'notice').map((frame) => frame.cue.duration),
-  ).toEqual([2200, 2200, 1800]);
+  ).toEqual([0, 2200, 1800]);
   expect(presentationMs(events, 'fast') + 100).toBeGreaterThanOrEqual(
     frames.reduce((ms, frame) => ms + frame.cue.duration, 0),
   );

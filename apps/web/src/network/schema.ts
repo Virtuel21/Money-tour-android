@@ -112,8 +112,28 @@ export const authSchema = z
   })
   .strict();
 export const commandSchema = z.union([
-  z.object({ type: z.literal('start'), options: optionsSchema }).strict(),
-  z.object({ type: z.literal('rematch'), options: optionsSchema }).strict(),
+  z
+    .object({
+      type: z.literal('start'),
+      options: optionsSchema,
+      adventureStart: z.literal(true).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('rematch'),
+      options: optionsSchema,
+      adventureStart: z.literal(true).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('adventure_release'),
+      gate: z.string().length(64),
+      at: natural,
+      ready: z.record(id, z.string().length(128)),
+    })
+    .strict(),
   z
     .object({ type: z.literal('action'), action: actionSchema, auth: authSchema.optional() })
     .strict(),
@@ -151,6 +171,7 @@ export const frameSchema = z
     result: z.string().length(64),
     signer: id,
     signature: z.string().length(128),
+    adventureDeadline: natural.optional(),
   })
   .strict();
 export type Frame = z.infer<typeof frameSchema>;
@@ -163,7 +184,16 @@ export const memberSchema = z
   })
   .strict();
 export type Member = z.infer<typeof memberSchema>;
+export const adventureReadySchema = z.object({
+  gate: z.string().length(64),
+  signatures: z.record(id, z.string().length(128)),
+});
 export const bodySchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('adventure_ready'),
+    gate: z.string().length(64),
+    signature: z.string().length(128),
+  }),
   z
     .object({
       type: z.literal('taunt'),
@@ -178,19 +208,23 @@ export const bodySchema = z.discriminatedUnion('type', [
   }),
   z.object({
     type: z.literal('hello'),
+    protocol: natural.optional(),
     name: z.string().min(1).max(20),
     creator: z.boolean(),
     epoch: natural,
     index: natural,
     head: z.string().length(64),
+    adventureReady: adventureReadySchema.optional(),
   }),
   z.object({
     type: z.literal('status'),
+    protocol: natural.optional(),
     host: id,
     epoch: natural,
     members: z.array(memberSchema).max(4),
     index: natural,
     head: z.string().length(64),
+    adventureReady: adventureReadySchema.optional(),
   }),
   z.object({ type: z.literal('intent'), intent: authSchema }),
   z.object({ type: z.literal('round'), context: contextSchema, command: commandSchema }),
@@ -202,7 +236,11 @@ export const bodySchema = z.discriminatedUnion('type', [
   }),
   z.object({ type: z.literal('frame'), frame: frameSchema }),
   z.object({ type: z.literal('sync') }),
-  z.object({ type: z.literal('snapshot'), frames: z.array(frameSchema).max(15000) }),
+  z.object({
+    type: z.literal('snapshot'),
+    frames: z.array(frameSchema).max(15000),
+    adventureReady: adventureReadySchema.optional(),
+  }),
   z.object({ type: z.literal('abort'), nonce: z.string().length(64), missing: z.array(id).max(4) }),
   z.object({
     type: z.literal('migration'),

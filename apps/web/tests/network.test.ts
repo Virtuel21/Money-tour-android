@@ -76,6 +76,7 @@ async function setup(count = 3, names?: string[]) {
     for (let n = 0; n < 8; n++) {
       await network.flush();
       await Promise.all(sessions.map((s) => s.idle()));
+      await Promise.all(sessions.map((s) => s.readyAdventure()));
     }
   }
   await flush();

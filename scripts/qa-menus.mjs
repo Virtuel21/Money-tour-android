@@ -199,6 +199,25 @@ async function open(page, label) {
   await page.locator('dialog[open]').last().waitFor();
   return button;
 }
+async function openProfile(page) {
+  const opener = page.locator('.player-panel.is-active .player-panel-heading').first();
+  await opener.click();
+  await page.locator('.player-details-dialog[open]').waitFor();
+  return opener;
+}
+async function openHistory(page) {
+  const history = page.locator('.live-actions');
+  if ((await history.getAttribute('open')) === null) await history.locator('summary').click();
+  return open(page, /Toutes les actions/);
+}
+async function openTile(page, name) {
+  const opener = page
+    .locator('.board-hit-polygons')
+    .getByRole('button', { name: `Voir ${name}`, exact: true });
+  await opener.click();
+  await page.getByRole('dialog', { name, exact: true }).waitFor();
+  return opener;
+}
 async function close(page, opener) {
   const nativeSearch = await page.evaluate(
     () =>
@@ -333,7 +352,12 @@ async function menus(browser, name, width, height, large = false) {
     await page.goto(server.url + '/?scenario=menu-review');
     await ready(page);
     if (width < 1000) {
-      const targets = await page.locator('.board-controls > button').evaluateAll((elements) =>
+      assert.equal(
+        await page.locator('.board-controls').count(),
+        0,
+        'Bottom navigation is removed',
+      );
+      const targets = await page.locator('.game-tools > button').evaluateAll((elements) =>
         elements.map((e) => ({
           name: e.getAttribute('aria-label') ?? e.textContent,
           width: e.getBoundingClientRect().width,
@@ -341,22 +365,28 @@ async function menus(browser, name, width, height, large = false) {
         })),
       );
       assert(
-        targets.every((t) => t.width >= 44 && t.height >= 48),
-        `${name}: management navigation touch targets ${JSON.stringify(targets)}`,
+        targets.length === 4 && targets.every((t) => t.width >= 44 && t.height >= 44),
+        `${name}: top toolbar touch targets ${JSON.stringify(targets)}`,
       );
       await capture(page, name, 'navigation');
     }
     if (large) await page.addStyleTag({ content: 'html { font-size: 200% !important; }' });
     for (const [key, label] of [
-      ['strategie', /Ma stratégie/],
-      ['journal', 'Journal des actions'],
-      ['escales', 'Explorer les cases'],
-      ...(width < 1000 ? [['carnet', 'Mon carnet']] : []),
+      ['profil', null],
+      ['journal', null],
+      ['fiche-plateau', null],
       ['reglages-partie', 'Réglages de la partie'],
       ['quitter', 'Quitter la partie'],
     ]) {
-      if (large && !['escales', 'carnet', 'reglages-partie'].includes(key)) continue;
-      const opener = await open(page, label);
+      if (large && !['profil', 'fiche-plateau', 'reglages-partie'].includes(key)) continue;
+      const opener =
+        key === 'profil'
+          ? await openProfile(page)
+          : key === 'journal'
+            ? await openHistory(page)
+            : key === 'fiche-plateau'
+              ? await openTile(page, 'Lisbonne')
+              : await open(page, label);
       await capture(page, name, key + (large ? '-200' : ''), audit);
       if (key === 'journal') {
         assert.equal(await page.locator('.action-history li').count(), 80);
@@ -365,45 +395,27 @@ async function menus(browser, name, width, height, large = false) {
           .evaluate((e) => (e.scrollTop = e.scrollHeight));
         await capture(page, name, 'journal-bas');
       }
-      if (key === 'escales' && width < 1000) {
-        await page.getByRole('searchbox', { name: 'Rechercher une escale' }).fill('edimbourg');
-        await page.locator('.mobile-tile-list button').first().click();
-        await capture(page, name, 'fiche-escale' + (large ? '-200' : ''), audit);
-        await page.getByRole('button', { name: 'Retour aux escales', exact: true }).click();
-        await page.waitForFunction(() =>
-          document.activeElement?.matches('.mobile-tile-list button'),
-        );
+      if (key === 'fiche-plateau') {
         assert.equal(
-          await page.getByRole('searchbox', { name: 'Rechercher une escale' }).inputValue(),
-          'edimbourg',
+          await page.locator('dialog[open] .property-neighbours').getAttribute('role'),
+          'group',
         );
-        await page.getByRole('searchbox', { name: 'Rechercher une escale' }).fill('aucuneville');
-        await page.getByText('Aucune escale trouvée.', { exact: false }).waitFor();
-        await capture(page, name, 'escales-vide' + (large ? '-200' : ''));
       }
-      if (key === 'carnet' && !large) {
-        await page.locator('.pocket-owners button').nth(1).click();
-        const next = page.getByRole('button', { name: 'Rue suivante', exact: true });
-        if (await next.count()) await next.click();
-        const owner = await page.locator('.pocket-owners button[aria-pressed="true"]').innerText();
-        const group = await page.locator('.pocket-cities h3').innerText();
-        await page.locator('.pocket-cities button').first().click();
-        await capture(page, name, 'fiche-carnet', audit);
-        await page.getByRole('button', { name: 'Retour au carnet', exact: true }).click();
-        await page.waitForFunction(() => document.activeElement?.matches('.pocket-cities button'));
-        assert.equal(
-          await page.locator('.pocket-owners button[aria-pressed="true"]').innerText(),
-          owner,
-        );
-        assert.equal(await page.locator('.pocket-cities h3').innerText(), group);
-        for (const tab of ['Bonus', 'Objectif', 'Partie', 'Victoire']) {
-          const button = page
-            .locator('.mobile-pocket nav')
-            .getByRole('button', { name: tab, exact: true });
-          if (await button.count()) {
-            await button.click();
-            await capture(page, name, 'carnet-' + tab.toLowerCase(), audit);
-          }
+      if (key === 'profil') {
+        const dialog = page.locator('.player-details-dialog[open]');
+        const properties = await dialog.locator('.mini-property b').allTextContents();
+        assert(properties.length > 3, 'The profile retains properties beyond the compact preview');
+        assert.equal(await dialog.locator('.player-details-rule').count(), 1);
+        await dialog.locator('.player-details-rule').scrollIntoViewIfNeeded();
+        await capture(page, name, 'regle-dans-profil' + (large ? '-200' : ''), audit);
+        if (!large) {
+          await dialog.locator('.mini-property').first().click();
+          await page.getByRole('dialog', { name: properties[0], exact: true }).waitFor();
+          await capture(page, name, 'fiche-profil', audit);
+          await close(page);
+          await opener.click();
+          await dialog.waitFor();
+          assert.deepEqual(await dialog.locator('.mini-property b').allTextContents(), properties);
         }
       }
       if (key === 'reglages-partie' && !large) {
@@ -439,9 +451,7 @@ async function properties(browser, name) {
     const page = await context.newPage();
     await page.goto(server.url + '/?scenario=menu-review');
     await ready(page);
-    await open(page, 'Explorer les cases');
-    await page.getByRole('searchbox', { name: 'Rechercher une escale' }).fill('Lisbonne');
-    await page.locator('.mobile-tile-list button').first().click();
+    await openTile(page, 'Lisbonne');
     assert.equal(
       await page
         .locator('dialog[open]')
@@ -451,17 +461,13 @@ async function properties(browser, name) {
       'group',
     );
     await capture(page, name, 'fiche-escale', true);
-    await page.getByRole('button', { name: 'Retour aux escales', exact: true }).click();
     await close(page);
-    await open(page, 'Mon carnet');
-    await page.locator('.pocket-owners button').nth(1).click();
-    const next = page.getByRole('button', { name: 'Rue suivante', exact: true });
-    if (await next.count()) await next.click();
-    await page.locator('.pocket-cities button').first().click();
-    await capture(page, name, 'fiche-carnet', true);
+    await openProfile(page);
+    await page.locator('.player-details-dialog .mini-property').first().click();
+    await capture(page, name, 'fiche-profil', true);
     result.checks.push({
       browser: name,
-      test: 'property collection has a named group; stacked property dialogs rechecked after semantic correction',
+      test: 'property collection has a named group; board tiles and profile inventory open the real property details',
       pass: true,
     });
   } finally {
@@ -491,7 +497,7 @@ async function decisions(browser, name) {
       await ready(page);
       if (scenario === 'auction')
         await page.locator('dialog[open] .auction-seals').waitFor({ timeout: 10000 });
-      if (scenario === 'travel') await open(page, 'Choisir une case');
+      if (scenario === 'travel') await open(page, 'Choisir ma destination');
       if (scenario === 'hotel-purchase') {
         const hotel = page.getByRole('button', { name: /^Hôtel : loyer/ });
         await hotel.click();
@@ -615,7 +621,9 @@ async function preferences(browser, name) {
     await open(page, 'Réglages de la partie');
     await capture(page, name, 'systeme-sombre', true);
     await close(page);
-    await open(page, 'Explorer les cases');
+    await page.goto(server.url + '/?scenario=travel');
+    await ready(page);
+    await open(page, 'Choisir ma destination');
     await page.getByRole('searchbox', { name: 'Rechercher une escale' }).fill('Lisbonne');
     await page.setViewportSize({ width: 390, height: 460 });
     await capture(page, name, 'hauteur-clavier', true);
@@ -650,17 +658,14 @@ async function revisions(browser, name) {
         (large) => (document.documentElement.style.fontSize = large ? '200%' : ''),
         large,
       );
-      await open(page, 'Mon carnet');
-      await page
-        .locator('.mobile-pocket nav')
-        .getByRole('button', { name: 'Partie', exact: true })
-        .click();
-      await capture(page, name, large ? 'carnet-partie-200' : 'carnet-partie-revision', true);
+      const profile = await openProfile(page);
+      await page.locator('.player-details-dialog .player-details-rule').scrollIntoViewIfNeeded();
+      await capture(page, name, large ? 'profil-regle-200' : 'profil-regle-revision', true);
       assert.equal(
         await page.getByRole('button', { name: 'Ouvrir les réactions', exact: true }).count(),
         0,
       );
-      await close(page);
+      await close(page, profile);
       await page
         .getByRole('button', { name: 'Taunts de Alexandre de la Mer', exact: true })
         .click();
@@ -672,7 +677,7 @@ async function revisions(browser, name) {
     }
     result.checks.push({
       browser: name,
-      test: 'reactions via pawn click; no carnet shortcut or additional selectors; no reaction sent',
+      test: 'special rule retained in profile; reactions via pawn click; no reaction sent',
       pass: true,
     });
     if (process.env.MENU_QA_REACTIONS_ONLY) return;
