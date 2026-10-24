@@ -1191,7 +1191,7 @@ export default function App() {
               mobile={mobile}
               inspectedOwner={inspectedOwner}
               onInspectOwner={setInspectedOwner}
-              onTile={chooseTile}
+              onTile={browseTile}
               onBonus={showBonus}
             />
             <section className="board-area">

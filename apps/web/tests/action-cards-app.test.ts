@@ -211,6 +211,33 @@ it.each([false, true])(
   },
 );
 
+it.each(['championship', 'travel'] as const)(
+  'inspects a side-panel property without confirming the %s board choice',
+  async (phase) => {
+    const state = game();
+    state.phase = phase;
+    state.players[0]!.position = phase === 'travel' ? 24 : 16;
+    if (phase === 'travel') state.players[0]!.travelPending = true;
+    const cash = state.players[0]!.cash;
+    const position = state.players[0]!.position;
+    await mount(state);
+    const preview = host.querySelector<HTMLButtonElement>('.player-property-preview-item');
+    expect(preview).not.toBeNull();
+    await act(() => preview!.click());
+    const details = host.querySelector<HTMLDialogElement>('dialog[open]');
+    expect(details).not.toBeNull();
+    expect(details!.textContent).toContain(state.config.board[1]!.name);
+    expect(scene.actions).toEqual([]);
+    expect(scene.latest!.phase).toBe(phase);
+    expect(scene.latest!.players[0]!.cash).toBe(cash);
+    expect(scene.latest!.players[0]!.position).toBe(position);
+    await click('Retour au plateau', details!);
+    await finishDeparture();
+    expect(host.querySelector('dialog')).toBeNull();
+    expect(scene.actions).toEqual([]);
+  },
+);
+
 it.each(['funds', 'property'] as const)(
   'keeps the Festival decline available without enough %s',
   async (missing) => {

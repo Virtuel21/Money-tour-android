@@ -212,6 +212,36 @@ async function openFixture(page, fixture, language) {
   if ((await understood.count()) && (await understood.isVisible())) await understood.click();
 }
 
+async function inspectSidePreview(page, current, language, name) {
+  const own = current.config.board.find((tile) => current.properties[tile.id]?.ownerId === 'p1');
+  assert(own, 'The active player has a property preview to inspect');
+  const signature = actionStateSignature(current);
+  const propertyName = text(own.name, language);
+  const preview = page
+    .locator('[data-bank="p1"] .player-property-preview-item')
+    .filter({ hasText: propertyName })
+    .first();
+  await preview.click();
+  const dialog = page.getByRole('dialog', { name: propertyName, exact: true });
+  await dialog.waitFor();
+  assert.equal(
+    actionStateSignature(await state(page)),
+    signature,
+    'A side property preview only inspects: phase, cash, position and ownership stay unchanged',
+  );
+  await geometry(page);
+  await capture(page, name, 'side-property-inspection');
+  await dialog
+    .getByRole('button', { name: text('Retour au plateau', language), exact: true })
+    .click();
+  await dialog.waitFor({ state: 'hidden' });
+  assert.equal(
+    actionStateSignature(await state(page)),
+    signature,
+    'Closing property inspection preserves the pending board decision',
+  );
+}
+
 async function debt(page, fixture, profile, name) {
   const { language, width } = profile;
   const mobile = width < 1000;
@@ -327,6 +357,7 @@ async function festival(page, fixture, profile, name, variant) {
   const { language, width } = profile;
   const mobile = width < 1000;
   const initial = await state(page);
+  if (!mobile && !variant) await inspectSidePreview(page, initial, language, name);
   assert.equal(
     await page.locator('.action-card-dialog[open]').count(),
     0,
@@ -415,6 +446,7 @@ async function festival(page, fixture, profile, name, variant) {
     directBoardSelection: true,
     input: mobile ? 'tap' : 'keyboard Enter',
     boardAccess: access,
+    sidePreviewInspected: !mobile,
   };
 }
 
@@ -456,6 +488,7 @@ async function island(page, fixture, profile, name) {
 async function travel(page, fixture, profile, name) {
   const { language, width } = profile;
   const initial = await state(page);
+  if (width >= 1000) await inspectSidePreview(page, initial, language, name);
   assert.equal(
     await page.locator('.action-card-dialog[open]').count(),
     0,
@@ -522,6 +555,7 @@ async function travel(page, fixture, profile, name) {
     directBoardSelection: true,
     input: width < 1000 ? 'tap' : 'keyboard Enter',
     boardAccess: access,
+    sidePreviewInspected: width >= 1000,
   };
 }
 
