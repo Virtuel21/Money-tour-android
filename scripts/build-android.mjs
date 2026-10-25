@@ -17,7 +17,8 @@ if (result.error) throw result.error;
 if (result.status !== 0) process.exit(result.status ?? 1);
 
 const destination = join(root, 'artifacts/android');
-const apkName = 'Money-Tour-Android-0.1.0-debug.apk';
+const { version } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+const apkName = `Money-Tour-Android-${version}-debug.apk`;
 mkdirSync(destination, { recursive: true });
 copyFileSync(
   join(root, 'android/app/build/outputs/apk/debug/app-debug.apk'),

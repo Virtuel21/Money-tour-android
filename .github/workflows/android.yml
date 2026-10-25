@@ -82,7 +82,6 @@ jobs:
     timeout-minutes: 20
     env:
       ANDROID_QA_ALLOW_RESET: '1'
-      ANDROID_QA_APK: artifacts/android/Money-Tour-Android-0.1.0-debug.apk
       ANDROID_DEVICE_QA_OUT: artifacts/android-qa/device
     steps:
       - uses: actions/checkout@v4

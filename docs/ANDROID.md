@@ -4,7 +4,7 @@
 
 Le monorepo d’origine est conservé : moteur TypeScript pur dans `packages/engine`, client React/Vite/Three.js dans `apps/web`. Capacitor 8.5.3 embarque `apps/web/dist` dans l’APK ; aucune page distante n’est chargée pour jouer. Les plugins App, Clipboard et Share sont utilisés uniquement sur la plateforme native, avec le comportement navigateur existant comme repli.
 
-Identifiant : `com.moneytour.android`. Version : `0.1.0`. SDK minimum 24 ; compilation et cible 36. JDK 21, AGP 8.13.0 et Gradle 8.14.3. L’APK utilise le WebView fourni par Android et ne contient pas de bibliothèque native propre à un processeur.
+Identifiant : `com.moneytour.android`. Version : `0.1.1`, code local `2`. SDK minimum 24 ; compilation et cible 36. JDK 21, AGP 8.13.0 et Gradle 8.14.3. L’APK utilise le WebView fourni par Android et ne contient pas de bibliothèque native propre à un processeur. Le nom de version Android et le nom du fichier APK suivent le champ `version` du `package.json` racine ; augmenter aussi le code Android pour chaque livraison.
 
 La WebView s’exécute sur l’origine sécurisée `https://localhost` pour les API cryptographiques et WebRTC. Les requêtes en clair sont désactivées. Seule l’autorisation Internet est déclarée par le jeu. La sauvegarde Android vers le cloud est désactivée pour ne pas copier l’identité privée des salons. Les barres système, découpes d’écran et le clavier sont pris en compte nativement ; le champ de texte actif est recentré s’il est masqué après redimensionnement ; l’HTML embarqué déclare `viewport-fit=contain` avant le premier affichage.
 
@@ -20,11 +20,11 @@ corepack pnpm android:build
 
 Configurer `JAVA_HOME` vers un JDK complet et `ANDROID_HOME` vers le SDK. Installer `platform-tools`, `platforms;android-36`, `build-tools;35.0.0` et `build-tools;36.0.0` via Android Studio ou `sdkmanager`. Le wrapper Gradle vérifie l’empreinte de sa distribution. La synchronisation modifie uniquement l’HTML copié dans Android ; le build navigateur conserve son réglage de viewport.
 
-Sortie : `artifacts/android/Money-Tour-Android-0.1.0-debug.apk` et `SHA256SUMS.txt`. Vérifier et installer :
+Sortie : `artifacts/android/Money-Tour-Android-0.1.1-debug.apk` et `SHA256SUMS.txt`. Vérifier et installer :
 
 ```sh
-apksigner verify --verbose --print-certs artifacts/android/Money-Tour-Android-0.1.0-debug.apk
-adb install -r artifacts/android/Money-Tour-Android-0.1.0-debug.apk
+apksigner verify --verbose --print-certs artifacts/android/Money-Tour-Android-0.1.1-debug.apk
+adb install -r artifacts/android/Money-Tour-Android-0.1.1-debug.apk
 ```
 
 ## Firebase Analytics
@@ -71,6 +71,8 @@ Après validation des balises et déclencheurs, publier la version dans GTM. Les
 ## Signature et mises à jour
 
 Le build debug utilise la clé du poste (`~/.android/debug.keystore`). Le workflow peut restaurer la même clé via le secret `ANDROID_DEBUG_KEYSTORE_BASE64`, pour permettre les mises à jour sans désinstallation. Cette clé de test n’est pas destinée à Google Play. Les fichiers de clés sont exclus de Git.
+
+La livraison `0.1.1` du 25 octobre utilise une nouvelle clé debug, différente de celle de la `0.1.0` archivée. Installer cette version à la place de la précédente nécessite une désinstallation et efface les sauvegardes locales. `adb install -r` ne remplace pas une application signée avec une autre clé ; les mises à jour suivantes devront conserver la clé de la `0.1.1`.
 
 Une copie privée de la clé de test est conservée hors du dépôt dans `/workspace/shared/money-tour-android-signing/`. La connexion GitHub utilisée pour cette livraison ne permet pas de créer des secrets Actions (erreur 403). La première APK est donc signée avec la clé locale conservée dans l’environnement de travail. Les builds Actions sans ce secret produisent des APK de contrôle avec une autre clé temporaire ; leur publication automatique est désactivée. Pour automatiser les mises à jour de cette APK, il faudra ajouter sa clé de test au secret du dépôt depuis un accès GitHub autorisé. Aucune clé n’a été mise dans le dépôt public.
 

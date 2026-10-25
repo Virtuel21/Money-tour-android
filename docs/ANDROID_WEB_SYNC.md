@@ -26,17 +26,20 @@ Les adaptations Android sont conservées : Retour et fermeture des fenêtres, li
 
 Les contrôles de format et de différences Git sont exécutés séparément. Les preuves locales se trouvent dans `artifacts/android-qa/updated-functional/`, `artifacts/android-qa/updated-visual/`, `artifacts/android-qa/updated-landscape/`, `coverage/` et `android/app/build/reports/`. Vite émet un avertissement sur le paquet principal de 773 ko ; la compilation réussit et le budget des ressources statiques reste respecté.
 
-## APK de développement
+## APK 0.1.1 publiée
 
-Le commit Firebase Analytics `1ee5bdc`, ajouté sur `main` pendant la synchronisation, est conservé. L’APK a été recompilée après cette intégration ; Android Lint et la vérification de signature ont de nouveau réussi.
+Les commits Firebase Analytics `1ee5bdc` et Google Tag Manager `a80f67a`, ajoutés sur `main` pendant la préparation, sont conservés. L’APK a été recompilée après cette intégration ; Android Lint et la vérification de signature ont de nouveau réussi.
 
-Fichier : `artifacts/android/Money-Tour-Android-0.1.0-debug.apk`.
+Fichier : `artifacts/android/Money-Tour-Android-0.1.1-debug.apk`.
 
-- Taille : 23 662 693 octets.
-- SHA-256 : `52758120a6c54645178cb8b463777d4dd936313f20043238b2509b732f0714a9`.
-- Signature : APK v2, clé debug locale à cet environnement. Ce build ne fournit pas la clé stable de la livraison précédente ; il ne certifie pas une mise à jour par-dessus cette livraison avec conservation des données.
+- Taille : 26 254 965 octets.
+- SHA-256 : `455ec2329d9a4d0ffecdfbcd859077480dfc32085989c602432a0d7480cfd2dd`.
+- Version Android : `0.1.1`, code `2`, application `com.moneytour.android`.
+- Signature : APK v2, certificat SHA-256 `a1ba3cc19d8fdb59d4bdc71c722bc5ade1e203fa562bc2de013073f2e5ba8b8c`. Cette clé debug diffère de celle de la `0.1.0` publiée. La publication avec cette nouvelle signature a été choisie explicitement : il faut désinstaller la version précédente, avec perte des sauvegardes locales, avant l’installation.
 
-L’APK et les rapports générés sont ignorés par Git. Aucune nouvelle release ni mise à jour du lien de téléchargement historique n’est publiée par cette synchronisation.
+L’APK et les rapports générés restent hors de la branche du code source. La branche `android-downloads` conserve la livraison historique et distribue `Money-Tour-Android-0.1.1-debug.apk`, ses empreintes et l’alias `Money-Tour-Android-latest.apk` utilisé par le lien du README. Les versions sont aussi inscrites dans le manifeste Android, pas seulement dans le nom du fichier.
+
+La compilation et les tâches Lint réussissent. Le journal Lint signale toutefois des métadonnées Kotlin `2.4.0` dans Firebase, supérieures à celles reconnues par son lecteur `2.2.0` ; aucun contrôle n’a été désactivé et le rapport final ne contient aucune erreur. Cela ne valide pas les événements Firebase sur un appareil réel.
 
 ## Limites de cette validation
 

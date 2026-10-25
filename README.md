@@ -2,17 +2,17 @@
 
 Application Android issue de [Virtuel21/money-tour](https://github.com/Virtuel21/money-tour), avec le moteur, les règles, le plateau 3D, les musiques et les illustrations d’origine. Le dépôt web d’origine n’est pas modifié.
 
-**[Télécharger l’APK Android](https://raw.githubusercontent.com/Virtuel21/Money-tour-android/b65c078e021fcc9fbed7c255d2d31063f2e63f5f/Money-Tour-Android-0.1.0-debug.apk)** · [Versions et notes de livraison](https://github.com/Virtuel21/Money-tour-android/releases) · [Documentation du jeu web](README-WEB.md)
+**[Télécharger l’APK Android 0.1.1 · 25 octobre 2026](https://raw.githubusercontent.com/Virtuel21/Money-tour-android/android-downloads/Money-Tour-Android-latest.apk)** · [Versions et notes de livraison](https://github.com/Virtuel21/Money-tour-android/blob/android-downloads/README.md) · [Documentation du jeu web](README-WEB.md)
 
 ## Installer sur votre téléphone
 
-1. Ouvrir le [téléchargement direct de l’APK](https://raw.githubusercontent.com/Virtuel21/Money-tour-android/b65c078e021fcc9fbed7c255d2d31063f2e63f5f/Money-Tour-Android-0.1.0-debug.apk) sur le téléphone. Les [notes de version](https://github.com/Virtuel21/Money-tour-android/releases) regroupent aussi les liens de téléchargement.
+1. Ouvrir le [téléchargement direct de l’APK](https://raw.githubusercontent.com/Virtuel21/Money-tour-android/android-downloads/Money-Tour-Android-latest.apk) sur le téléphone. Les [notes de version](https://github.com/Virtuel21/Money-tour-android/blob/android-downloads/README.md) regroupent aussi les liens de téléchargement.
 2. Ouvrir le fichier téléchargé. Si Android le demande, autoriser l’installation pour le navigateur ou l’application Fichiers, puis choisir **Installer**.
 3. Ouvrir **Money Tour**. Choisir **Solo & bots** pour jouer seul, ou **Entre amis → Jouer sur cet appareil** pour partager le téléphone. Les salons en ligne nécessitent Internet.
 
 L’APK est une version de test signée, installable directement ; il n’est pas distribué sur Google Play. Minimum déclaré : Android 7.0 (API 24), avec Android System WebView/Chrome 111 ou supérieur et WebGL 2. Mettre à jour Android System WebView/Chrome si l’application le demande.
 
-Les mises à jour avec la même signature conservent les sauvegardes. Désinstaller l’application ou effacer ses données supprime les parties locales et l’identité de reprise en ligne. Les sauvegardes du navigateur ne sont pas automatiquement transférées dans l’application.
+**Passage de 0.1.0 à 0.1.1 : la signature a changé.** Désinstaller la version précédente avant d’installer celle-ci ; cette opération efface les sauvegardes locales. Les mises à jour ultérieures avec la même signature pourront conserver les sauvegardes. Désinstaller l’application ou effacer ses données supprime les parties locales et l’identité de reprise en ligne. Les sauvegardes du navigateur ne sont pas automatiquement transférées dans l’application.
 
 ## Adaptations Android
 
@@ -29,7 +29,7 @@ En ligne, Android peut suspendre une application en arrière-plan. La partie des
 
 Le code intègre les mises à jour web du **25 octobre 2026**, jusqu’au commit `b8a1720` : accueil **Entre amis / En ligne / Solo & bots**, configuration des parties sur cet appareil dans une fenêtre, recherche de parties et création de salons publics. Un joueur peut rejoindre une partie publique en reprenant une place IA disponible ; les nouvelles parties sont chacun pour soi et les sauvegardes en équipes restent lisibles. Voir [le protocole public](docs/PUBLIC_NETWORK.md).
 
-Ces changements nécessitent une nouvelle compilation Android. Le lien de téléchargement en tête de page reste celui de la livraison du 24 octobre et ne contient pas cette synchronisation. Les contrôles et les limites du nouveau build sont consignés dans [la validation de synchronisation](docs/ANDROID_WEB_SYNC.md).
+La version Android **0.1.1**, code **2**, contient cette synchronisation, Firebase Analytics et Google Tag Manager. Le lien de téléchargement en tête de page pointe vers cette APK publiée sur la branche `android-downloads` ; la version du 24 octobre reste archivée séparément. Les contrôles et les limites du nouveau build sont consignés dans [la validation de synchronisation](docs/ANDROID_WEB_SYNC.md).
 
 ## Recette et preuves
 

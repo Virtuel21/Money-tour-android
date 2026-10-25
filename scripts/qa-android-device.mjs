@@ -21,8 +21,11 @@ const appId = 'com.moneytour.android';
 const activity = `${appId}/.MainActivity`;
 const port = Number(process.env.ANDROID_QA_CDP_PORT ?? 9223);
 const out = path.resolve(process.env.ANDROID_DEVICE_QA_OUT ?? 'artifacts/android-qa/device');
+const { version } = JSON.parse(
+  await fs.readFile(new URL('../package.json', import.meta.url), 'utf8'),
+);
 const apk = path.resolve(
-  process.env.ANDROID_QA_APK ?? 'artifacts/android/Money-Tour-Android-0.1.0-debug.apk',
+  process.env.ANDROID_QA_APK ?? `artifacts/android/Money-Tour-Android-${version}-debug.apk`,
 );
 const report = {
   startedAt: new Date().toISOString(),

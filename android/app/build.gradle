@@ -1,7 +1,8 @@
 apply plugin: 'com.android.application'
 apply plugin: 'com.google.gms.google-services'
 
-def requestedVersionCode = System.getenv('ANDROID_VERSION_CODE') ?: '1'
+def requestedVersionCode = System.getenv('ANDROID_VERSION_CODE') ?: '2'
+def appVersion = new groovy.json.JsonSlurper().parse(rootProject.file('../package.json')).version
 if (!(requestedVersionCode ==~ /[1-9][0-9]{0,9}/) || requestedVersionCode.toLong() > 2100000000L) {
     throw new GradleException('ANDROID_VERSION_CODE must be an integer between 1 and 2100000000')
 }
@@ -14,7 +15,7 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode = requestedVersionCode.toInteger()
-        versionName = "0.1.0"
+        versionName = appVersion
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
