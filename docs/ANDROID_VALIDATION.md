@@ -1,5 +1,7 @@
 # Livraison Android 0.1.0 — recette du 24 octobre 2026
 
+Ce rapport concerne l’APK déjà publiée le 24 octobre. La [synchronisation web du 25 octobre](ANDROID_WEB_SYNC.md) possède un build et des résultats distincts ; elle n’est pas incluse dans le téléchargement historique ci-dessous.
+
 ## Installer
 
 [Télécharger l’APK signée](https://raw.githubusercontent.com/Virtuel21/Money-tour-android/b65c078e021fcc9fbed7c255d2d31063f2e63f5f/Money-Tour-Android-0.1.0-debug.apk), puis ouvrir le fichier sur le téléphone et autoriser son installation si Android le demande. Aucun compte supplémentaire n’est nécessaire. Les parties locales et le tutoriel utilisent les ressources incluses dans l’APK.

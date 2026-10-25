@@ -170,6 +170,9 @@ export interface Winner {
   netWorth: number;
 }
 export interface GameState {
+  /** Public-room control grants are part of the authenticated state hash. */
+  publicGame?: boolean;
+  publicSeats?: Record<string, string>;
   presentationPace?: 'normal' | 'fast';
   earthquakeHistory?: { count: number; lastRound: number };
   crisisHistory?: { count: number; lastRound: number };

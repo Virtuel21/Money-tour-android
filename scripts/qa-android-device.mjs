@@ -199,6 +199,8 @@ try {
     assert(await page.locator('.landing').isVisible());
   });
   await check('Native keyboard keeps the name field reachable', async () => {
+    await touch(page.getByRole('button', { name: 'Jouer sur cet appareil', exact: true }));
+    await page.getByRole('dialog', { name: 'Jouer sur cet appareil', exact: true }).waitFor();
     const originalHeight = await page.evaluate(() => innerHeight);
     const input = page.getByLabel('Nom du joueur 1', { exact: true });
     await touch(input);
@@ -273,14 +275,17 @@ try {
     await page.waitForFunction((height) => innerHeight >= height - 10, originalHeight, {
       timeout: 30000,
     });
-    assert(await page.locator('.landing').isVisible(), 'Back dismisses only the keyboard');
+    assert(
+      await page.getByRole('dialog', { name: 'Jouer sur cet appareil', exact: true }).isVisible(),
+      'Back dismisses only the keyboard and keeps local setup open',
+    );
     return geometry;
   });
   await check('Offline hot-seat game, real WebGL board and local save', async () => {
     await page.getByRole('combobox', { name: /^Voyageurs/ }).selectOption('2');
     await page.getByLabel('Nom du joueur 1', { exact: true }).fill('Android natif');
     await page.getByLabel('Type du joueur 2', { exact: true }).selectOption('human');
-    await touch(page.getByRole('button', { name: /^Jouer sur cet appareil/ }));
+    await touch(page.getByRole('button', { name: 'Lancer la partie', exact: true }));
     const intro = page.getByRole('button', { name: 'Démarrer l’aventure', exact: true });
     await intro.waitFor({ timeout: 120_000 });
     await touch(intro);

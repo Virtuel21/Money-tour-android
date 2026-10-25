@@ -1,0 +1,47 @@
+.public-home-actions {
+  display: grid;
+  gap: 10px;
+}
+.app .public-home-actions > button {
+  width: 100%;
+  min-height: 48px;
+}
+.public-home-intro {
+  margin: 0 0 8px;
+  color: #3f6068;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+.public-match-status {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+  margin: 18px 0;
+  border: 1px solid #b6d6ce;
+  border-radius: 14px;
+  background: #edf5ee;
+  color: #173d4d;
+}
+.public-match-status h3,
+.public-match-status p {
+  margin: 0;
+}
+.public-match-status p,
+.public-game-note,
+.public-player-kind {
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+.public-game-note {
+  margin: 3px 0 0;
+  color: #3f6068;
+}
+.public-player-kind {
+  margin: 5px 0;
+  font-weight: 650;
+}
+.public-disclosure {
+  margin: 12px 0;
+  color: #3f6068;
+  line-height: 1.5;
+}

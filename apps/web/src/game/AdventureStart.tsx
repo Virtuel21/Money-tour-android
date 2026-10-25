@@ -9,6 +9,7 @@ export function AdventureStart({
   state,
   deadline,
   participants,
+  participantNames,
   ready = [],
   self,
   onReady,
@@ -16,6 +17,7 @@ export function AdventureStart({
   state: GameState;
   deadline: number;
   participants?: string[];
+  participantNames?: Record<string, string>;
   ready?: string[];
   self?: string;
   onReady: () => void;
@@ -66,7 +68,11 @@ export function AdventureStart({
         <ul className="adventure-start-players" aria-label={translate('Joueurs prêts')}>
           {participants.map((id) => (
             <li key={id}>
-              <span>{state.players.find((player) => player.id === id)?.name ?? id}</span>
+              <span>
+                {participantNames?.[id] ??
+                  state.players.find((player) => player.id === id)?.name ??
+                  id}
+              </span>
               <span>{translate(ready.includes(id) ? 'Prêt' : 'En attente')}</span>
             </li>
           ))}

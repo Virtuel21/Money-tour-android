@@ -70,13 +70,14 @@ async function snapshot(page) {
 async function onlineGame(auto) {
   const host = await makePage();
   await host.goto(app.url);
-  await host.getByLabel('Nom du joueur 1', { exact: true }).fill('HoteQA');
   await host.getByRole('button', { name: 'Créer un salon en ligne', exact: true }).click();
   const invitation = host.getByLabel('Lien d’invitation', { exact: true });
   await host.waitForFunction(() =>
     document.querySelector('input[readonly]')?.value.includes('#room='),
   );
   const link = await invitation.inputValue();
+  await host.getByLabel('Votre nom dans le salon', { exact: true }).fill('HoteQA');
+  await host.getByRole('button', { name: 'Enregistrer mon nom', exact: true }).click();
   const guest = await makePage();
   await guest.goto(link);
   await guest.getByLabel('Votre nom', { exact: true }).fill('InviteQA');

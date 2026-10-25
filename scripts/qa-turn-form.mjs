@@ -151,6 +151,7 @@ try {
     await page.getByRole('button', { name: 'Fermer le salon', exact: true }).click();
     await page.getByRole('button', { name: 'Entre amis', exact: true }).click();
     await page.getByRole('button', { name: /Jouer sur cet appareil/ }).click();
+    await page.getByRole('button', { name: 'Lancer la partie', exact: true }).click();
     await page.getByRole('button', { name: 'Réglages de la partie', exact: true }).waitFor();
     await page.keyboard.press('F2');
     assert.equal(await page.locator('[class*="debug"]').count(), 0);

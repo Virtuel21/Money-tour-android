@@ -35,6 +35,12 @@ vi.mock('../src/board/Board3D', () => ({
 vi.mock('../src/network/OnlineLobby', () => ({
   default: (props: Record<string, unknown>) => {
     native.lobby = props;
+    useEffect(
+      () => () => {
+        native.lobby = null;
+      },
+      [],
+    );
     return null;
   },
 }));
@@ -120,6 +126,39 @@ it('keeps the Android home lightweight and routes Back through the leave dialog 
   await act(() => expect(native.callbacks!.onBack()).toBe(true));
   expect(document.querySelector('dialog[open]')).toBeNull();
   expect(document.querySelector('.game-layout')).not.toBeNull();
+});
+
+it('closes the local setup with Android Back without starting or replacing a saved game', async () => {
+  const saved = saveGame();
+  await mount();
+  await act(() => button('Nouvelle partie sur cet appareil').click());
+  expect(document.querySelector('dialog[open]')?.textContent).toContain('Jouer sur cet appareil');
+  expect(document.querySelector('[aria-label="Nom du joueur 1"]')).not.toBeNull();
+  await act(() => expect(native.callbacks!.onBack()).toBe(true));
+  expect(document.querySelector('dialog[open]')).toBeNull();
+  expect(document.querySelector('.game-layout')).toBeNull();
+  expect(loadLocal()?.seed).toBe(saved.seed);
+  expect(native.callbacks!.onBack()).toBe(false);
+});
+
+it('opens public matchmaking from Android home without replacing the local save', async () => {
+  const saved = saveGame();
+  await mount();
+  const modes = document.querySelector('[aria-label="Mode de jeu"]')!;
+  const online = [...modes.querySelectorAll('button')].find((element) =>
+    element.textContent?.includes('En ligne'),
+  )!;
+  await act(() => online.click());
+  await act(async () => {
+    button('Trouver une partie').click();
+    await vi.dynamicImportSettled();
+  });
+  expect(native.lobby?.open).toBe(true);
+  expect(native.lobby?.publicMode).toBe('find');
+  expect(loadLocal()?.seed).toBe(saved.seed);
+  await act(() => expect(native.callbacks!.onBack()).toBe(true));
+  expect(native.lobby).toBeNull();
+  expect(native.callbacks!.onBack()).toBe(false);
 });
 
 it('saves immediately and freezes the local clock across background and foreground transitions', async () => {

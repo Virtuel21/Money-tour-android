@@ -39,6 +39,7 @@ const screens = (process.env.ANDROID_VISUAL_SCREENS ?? '360x640,393x851,412x915,
   .split(',')
   .map((size) => size.split('x').map(Number));
 const cases = process.env.ANDROID_VISUAL_CASES?.split(',');
+let executedChecks = 0;
 if (process.env.ANDROID_VISUAL_APPEND) {
   const previous = JSON.parse(await fs.readFile(path.join(out, 'results.json'), 'utf8'));
   report.startedAt = previous.startedAt;
@@ -47,6 +48,7 @@ if (process.env.ANDROID_VISUAL_APPEND) {
 }
 async function check(name, fn) {
   if (cases && !cases.some((selection) => name.includes(selection))) return;
+  executedChecks++;
   report.checks = report.checks.filter((entry) => entry.name !== name);
   report.failures = report.failures.filter((entry) => entry.name !== name);
   try {
@@ -283,6 +285,10 @@ try {
       try {
         await page.goto(server.url);
         await page.getByRole('button', { name: 'Jouer sur cet appareil', exact: true }).tap();
+        const setup = page.getByRole('dialog', { name: 'Jouer sur cet appareil', exact: true });
+        await setup.waitFor();
+        await capture(page, 'local-setup', { targets: true });
+        await setup.getByRole('button', { name: 'Lancer la partie', exact: true }).tap();
         await page.locator('.adventure-start[open]').waitFor();
         await capture(page, 'adventure-welcome', { targets: true });
         const start = page.getByRole('button', { name: 'Démarrer l’aventure', exact: true });
@@ -293,41 +299,6 @@ try {
         );
         await start.tap();
         await page.locator('.adventure-start[open]').waitFor({ state: 'hidden' });
-      } finally {
-        await context.close();
-      }
-    });
-    await check(`tutorial-${size}`, async () => {
-      const context = await contextFor(width, height);
-      const page = await context.newPage();
-      try {
-        await page.goto(server.url);
-        await page.getByRole('button', { name: /Comment jouer/ }).tap();
-        await page
-          .getByRole('button', { name: 'Démarrer le tutoriel interactif', exact: true })
-          .tap();
-        await page.getByRole('dialog', { name: 'Partie guidée', exact: true }).waitFor();
-        await readyBoard(page);
-        await capture(page, 'tutorial-start', { targets: true });
-        await page.getByRole('button', { name: 'Toutes les leçons (27)', exact: true }).tap();
-        const lessons = await page
-          .getByLabel('Choisir une leçon', { exact: true })
-          .locator('option')
-          .evaluateAll((entries) =>
-            entries.map((entry) => ({ value: entry.value, title: entry.textContent })),
-          );
-        for (const lesson of width === 393
-          ? lessons
-          : [lessons[4], lessons[7], lessons[14], lessons.at(-1)]) {
-          await page.getByLabel('Choisir une leçon', { exact: true }).selectOption(lesson.value);
-          await page
-            .getByRole('heading', { name: lesson.title.replace(/^\d+\.\s*/, ''), exact: true })
-            .waitFor();
-          await readyBoard(page);
-          await capture(page, `tutorial-lesson-${lesson.value}`, { targets: true });
-        }
-        await page.getByRole('button', { name: 'Quitter le tutoriel', exact: true }).tap();
-        await page.getByRole('dialog', { name: 'Comment jouer', exact: true }).waitFor();
       } finally {
         await context.close();
       }
@@ -468,6 +439,7 @@ try {
       }
     });
   }
+  assert(executedChecks > 0, 'At least one Android visual check must execute');
   assert.deepEqual(report.pageErrors, [], 'No uncaught application errors');
   assert.deepEqual(report.failures, [], 'All Android visual checks pass');
 } finally {

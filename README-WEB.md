@@ -1,8 +1,10 @@
 # Money Tour
 
-Un jeu de plateau original dans un archipel ensoleillé : acheter des villes, construire, réunir des collections et faire fortune. Objectif : 2 à 4 joueurs, solo contre bots, hot-seat et salons WebRTC, avec mode 2v2.
+Documentation du jeu web synchronisée jusqu’au commit `b8a1720` du 25 octobre 2026. Pour ce portage Android, voir [le guide Android](README.md) et [sa validation de synchronisation](docs/ANDROID_WEB_SYNC.md).
 
-**[Jouer à Money Tour](https://virtuel21.github.io/money-tour/)** — version bêta, solo/bots, hot-seat et salons WebRTC, équipes 2v2. La recette sur quatre réseaux différents reste ouverte.
+Un jeu de plateau original dans un archipel ensoleillé : acheter des villes, construire, réunir des collections et faire fortune. Objectif : 2 à 4 joueurs, solo contre bots, hot-seat et salons WebRTC.
+
+**[Jouer à Money Tour](https://virtuel21.github.io/money-tour/)** — version bêta, solo/bots, hot-seat et salons WebRTC. La recette sur quatre réseaux différents reste ouverte.
 
 Prérequis : Node.js 22.12 ou supérieur et pnpm 10.32.1.
 
@@ -38,7 +40,7 @@ Festival et Voyage se choisissent directement sur les cases éclairées du plate
 - [Direction artistique et inventaire prévu](ART_DIRECTION.md)
 - [Crédits](CREDITS.md)
 
-Architecture : monorepo pnpm, moteur TypeScript pur, React/Vite, scène Three.js avec modèles Blender/glTF et Trystero pour WebRTC. Le site est statique, sans serveur de jeu à maintenir. Les réseaux restrictifs peuvent nécessiter un TURN facultatif ; les relais publics de signalisation restent des dépendances externes.
+Architecture : monorepo pnpm, moteur TypeScript pur, React/Vite, scène Three.js avec modèles Blender/glTF et Trystero pour WebRTC. Le jeu reste statique, sans serveur de jeu à maintenir. Un annuaire HTTPS avec base D1 gère la découverte et la réservation des salons publics. Les réseaux restrictifs peuvent nécessiter un TURN facultatif ; les relais publics de signalisation restent des dépendances externes.
 
 Le commit-reveal rend les tirages acceptés vérifiables mais n'empêche pas un participant de refuser sa révélation. La recette sur quatre réseaux distincts dont un smartphone en 4G restera explicitement séparée des tests locaux et simulés.
 
@@ -52,15 +54,25 @@ Le workflow `Deploy Pages` vérifie format, types, lint, tests, couverture, buil
 
 ## Jouer en ligne
 
-Un lien d'invitation ouvre directement le formulaire « Votre nom → Rejoindre le salon ». L'écran de connexion reste affiché jusqu'à l'arrivée de l'hôte, avec une nouvelle tentative et une aide réseau. Le menu **Comment jouer** propose une partie guidée de 27 escales : commandes mises en lumière, vrais achats, constructions, enchères et duels simulés, navigation libre et aucune modification de la partie sauvegardée.
+Un lien d'invitation ouvre directement le formulaire « Votre nom → Rejoindre le salon ». L'écran de connexion reste affiché jusqu'à l'arrivée de l'hôte, avec une nouvelle tentative et une aide réseau.
 
 Les offres secrètes restent affichées pendant les synchronisations réseau. Les cartes tirées apparaissent sous forme de cartes animées ; après **J'ai lu · continuer**, elles s’envolent hors de l’écran. Le joueur qui tire une carte peut utiliser ce bouton également en ligne ; les autres écrans gardent leur lecture automatique. Le réglage de réduction des animations reste respecté. Le délai de décision en ligne commence après les animations partagées.
 
-Sur l’accueil, les modes sont présentés dans l’ordre **Entre amis**, **2v2**, **Solo & bots**, avec **Entre amis** sélectionné au départ. Dans Entre amis et 2v2, « Créer un salon en ligne » est le bouton principal jaune ; le jeu sur cet appareil reste disponible juste dessous. Dans Solo & bots, le jeu local est le bouton principal. L’hôte choisit la durée, les sièges et le mode 2v2 ; les places libres deviennent des bots.
+Sur l’accueil, les modes sont présentés dans l’ordre **Entre amis**, **En ligne**, **Solo & bots**, avec **Entre amis** sélectionné au départ. Dans Entre amis, « Créer un salon en ligne » est le bouton principal jaune ; l’hôte choisit les sièges et la durée dans le salon, et les places libres deviennent des bots. « Jouer sur cet appareil » ouvre une configuration locale des joueurs et de la durée. Dans Solo & bots, la configuration locale reste visible sur l’accueil et le jeu local est le bouton principal. Les nouvelles parties se jouent chacun pour soi ; les anciennes sauvegardes en équipes restent lisibles.
 
 Une fois le salon créé, utilisez « Copier le lien d’invitation » et envoyez ce lien à vos amis. Après la copie, « Partager le lien » apparaît sous l’URL lorsque le navigateur permet le partage natif : ce bouton ouvre le menu de partage de l’appareil et ses applications disponibles. Si le partage est indisponible, collez le lien copié dans votre messagerie. « Rejoindre un salon » permet de coller le lien complet ; ouvrir directement ce lien prépare aussi l’invitation. Le salon renouvelle sa présence pour permettre une arrivée tardive tant que la fenêtre de l’hôte reste ouverte. Après une coupure, le siège reste réservé pendant 90 secondes et le chrono des décisions attend la reconnexion. Un tirage interrompu réserve aussi ce délai au lieu de passer immédiatement le joueur en bot. Le délai habituel de 30 secondes pour une décision avec une connexion active reste applicable. Après fermeture accidentelle, rouvrez le jeu et cliquez sur « Reprendre ma partie en ligne », ou rouvrez le lien du salon : l’historique est vérifié et le contrôle humain est rétabli après synchronisation. « Reprendre mon siège » reste disponible pour une reprise manuelle.
 
 Le lien contient un secret aléatoire de 128 bits dans son fragment, non envoyé au serveur statique. Trystero 0.26.0 utilise Nostr pour la signalisation, WebRTC pour le jeu et un mot de passe dérivé pour le salon. Les données du jeu sont échangées entre pairs. La clé, l’identifiant du salon, l’historique signé et les choix secrets en cours sont conservés dans le stockage local du navigateur pendant 24 h ; le cache d’onglet des anciennes versions reste lisible. L’effacement du stockage ou un autre navigateur ne permet pas de reprendre automatiquement le même siège. Ne jouez pas simultanément le même siège dans plusieurs onglets. Le retour arrière et le bouton d’accueil en jeu ouvrent une confirmation ; fermer ou recharger l’onglet utilise aussi la protection native du navigateur lorsqu’il l’autorise. Sur mobile, pincez le plateau à deux doigts pour modifier son zoom, puis glissez avec un doigt pour explorer la vue agrandie. « Recentrer mon pion » rétablit le cadrage automatique. La page défile en dehors du plateau, ou sur la vue complète non agrandie.
+
+## Trouver une partie publique
+
+Dans **En ligne**, choisissez un pseudo puis **Trouver une partie**, ou ouvrez une table avec **Créer un salon public**. La recherche dure environ huit secondes : même protocole et mêmes règles obligatoires, salons en attente avant parties commencées, préférence pour la même langue élargie après quatre secondes, puis priorité aux tables contenant davantage de joueurs humains. Une partie commencée doit conserver au moins trois minutes et avoir consommé moins de 75 % de sa durée. Aucun niveau ou classement n’est supposé.
+
+Sans résultat, une nouvelle partie publique de quatre places et vingt minutes commence avec trois IA aux pseudos variés. L’annonce doit être acceptée par l’annuaire avant de lancer ce repli. Une panne affiche une erreur et permet de réessayer. Les informations du mode et les profils identifient les IA ; le tag répétitif « BOT » est retiré des cartes compactes des salons publics.
+
+Un nouvel arrivant peut reprendre un siège IA d’origine au prochain passage sûr entre deux tours, avec son argent, ses propriétés et sa progression. La réservation dure quarante-cinq secondes et la connexion peut demander jusqu’à quarante secondes. Les places humaines réservées à une reconnexion ne sont jamais cédées. Une partie accepte au maximum quatre identités cumulées : le départ d’un humain ne crée pas une nouvelle place pour un inconnu. L’hôte doit garder la partie ouverte ; le salon disparaît de la recherche après trente-cinq secondes sans présence. Après changement d’hôte, la republication attend la fin de l’ancien bail.
+
+L’annuaire est [hébergé séparément](https://money-tour-matchmaking.frostyshark128.chatgpt.site). Le client commun web/Capacitor utilise `VITE_MATCHMAKING_URL` si un autre service compatible est configuré. Le cœur du service et ses tests sont dans `services/matchmaking`, et les règles d’admission sont détaillées dans [le protocole public](docs/PUBLIC_NETWORK.md). `pnpm test:directory` vérifie les réservations concurrentes sur SQLite réel ; `pnpm qa:public` utilise l’annuaire et de vraies connexions WebRTC entre deux contextes Chromium. L’APK doit être reconstruite et testée séparément avec [les commandes Android](docs/ANDROID.md).
 
 ## Limites réseau et de confiance
 

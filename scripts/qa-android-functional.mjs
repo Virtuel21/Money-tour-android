@@ -216,23 +216,40 @@ async function homeAndSettings(page, name) {
   const modes = page.getByRole('group', { name: 'Mode de jeu', exact: true });
   assert.deepEqual(await modes.getByRole('button').allTextContents(), [
     'Entre amis',
-    '2v2',
+    'En ligne',
     'Solo & bots',
   ]);
-  for (const mode of ['2v2', 'Solo & bots', 'Entre amis']) {
+  for (const mode of ['En ligne', 'Solo & bots', 'Entre amis']) {
     await tap(modes.getByRole('button', { name: mode, exact: true }));
-    if (mode === '2v2')
-      assert.equal(await page.getByRole('combobox', { name: /^Voyageurs/ }).isDisabled(), true);
+    assert.equal(
+      await page.getByRole('combobox', { name: /^Voyageurs/ }).count(),
+      mode === 'Solo & bots' ? 1 : 0,
+    );
+    if (mode === 'En ligne') {
+      assert(await page.getByRole('button', { name: /Trouver une partie/ }).isVisible());
+      assert(
+        await page.getByRole('button', { name: 'Créer un salon public', exact: true }).isVisible(),
+      );
+    }
   }
-  await page.locator('.duration-picker select').selectOption('custom');
-  await page.getByLabel('Durée personnalisée en minutes').fill('0');
+  await tap(page.getByRole('button', { name: 'Jouer sur cet appareil', exact: true }));
+  const localSetup = page.getByRole('dialog', { name: 'Jouer sur cet appareil', exact: true });
+  await localSetup.waitFor();
+  assert(await localSetup.getByRole('combobox', { name: /^Voyageurs/ }).isVisible());
+  await localSetup.locator('.duration-picker select').selectOption('custom');
+  await localSetup.getByLabel('Durée personnalisée en minutes').fill('0');
   assert.equal(
-    await page.locator('.primary.launch').isDisabled(),
+    await localSetup.getByRole('button', { name: 'Lancer la partie', exact: true }).isDisabled(),
     true,
     'Invalid duration cannot start',
   );
-  await page.getByLabel('Durée personnalisée en minutes').fill('5');
-  assert.equal(await page.locator('.primary.launch').isDisabled(), false);
+  await localSetup.getByLabel('Durée personnalisée en minutes').fill('5');
+  assert.equal(
+    await localSetup.getByRole('button', { name: 'Lancer la partie', exact: true }).isDisabled(),
+    false,
+  );
+  await geometry(page);
+  await tap(localSetup.locator('.modal-heading button'));
   await tap(page.getByRole('button', { name: 'Réglages', exact: true }));
   const settings = page.getByRole('dialog', { name: 'Votre confort de voyage', exact: true });
   await settings.waitFor();
@@ -251,21 +268,48 @@ async function homeAndSettings(page, name) {
     'Comfort preferences survive restart',
   );
   await geometry(page);
-  return { modes: 3, durationValidation: true, settingsPersist: true };
+  return {
+    modes: 3,
+    publicActions: true,
+    localSetupDialog: true,
+    durationValidation: true,
+    settingsPersist: true,
+  };
 }
 async function newGame(page, name, mode = 'Solo & bots') {
   await open(page);
   await tap(page.getByRole('button', { name: mode, exact: true }));
-  if (mode !== '2v2') await page.getByRole('combobox', { name: /^Voyageurs/ }).selectOption('2');
+  if (mode === 'Entre amis')
+    await tap(page.getByRole('button', { name: 'Jouer sur cet appareil', exact: true }));
+  await page.getByRole('combobox', { name: /^Voyageurs/ }).selectOption('2');
   await page.getByLabel('Nom du joueur 1', { exact: true }).fill('Android QA');
-  await tap(page.getByRole('button', { name: /Jouer sur cet appareil/ }));
-  const adventure = page.getByRole('button', { name: 'Compris', exact: true });
-  if (await adventure.isVisible({ timeout: 3000 }).catch(() => false)) await tap(adventure);
+  await tap(
+    page.getByRole('button', {
+      name: mode === 'Entre amis' ? 'Lancer la partie' : 'Jouer sur cet appareil',
+      exact: true,
+    }),
+  );
+  const adventure = page.getByRole('button', { name: 'Démarrer l’aventure', exact: true });
+  await adventure.waitFor();
+  await tap(adventure);
   await ready(page);
-  if (await adventure.isVisible().catch(() => false)) await tap(adventure);
   const initial = await state(page);
-  assert.equal(initial.mode, mode === '2v2' ? 'teams' : 'free-for-all');
-  assert.equal(initial.players.length, mode === '2v2' ? 4 : 2);
+  assert.equal(initial.mode, 'free-for-all');
+  assert.equal(initial.players.length, 2);
+  assert.equal(
+    initial.players.filter((player) => player.bot).length,
+    mode === 'Solo & bots' ? 1 : 0,
+  );
+  return restartGame(page, name, initial, { newGame: true });
+}
+async function savedTeamGame(page, name) {
+  await open(page, createPlayerFixture('teams').save);
+  const initial = await state(page);
+  assert.equal(initial.mode, 'teams');
+  assert.equal(initial.players.length, 4);
+  return restartGame(page, name, initial, { existingTeamSave: true });
+}
+async function restartGame(page, name, initial, details) {
   await capture(page, name, 'started');
   await tap(page.getByRole('button', { name: 'Quitter la partie', exact: true }));
   await page
@@ -283,34 +327,11 @@ async function newGame(page, name, mode = 'Solo & bots') {
   assert.equal(resumed.mode, initial.mode);
   await capture(page, name, 'resumed');
   return {
-    newGame: true,
+    ...details,
     mode: initial.mode,
     players: initial.players.length,
     restartResume: true,
   };
-}
-async function tutorial(page, name) {
-  await open(page);
-  await tap(page.getByRole('button', { name: /Comment jouer/ }));
-  await tap(page.getByRole('button', { name: 'Démarrer le tutoriel interactif', exact: true }));
-  await page.getByRole('dialog', { name: 'Partie guidée', exact: true }).waitFor();
-  await geometry(page);
-  await tap(page.getByRole('button', { name: 'Toutes les leçons (27)', exact: true }));
-  const lessons = page.getByLabel('Choisir une leçon', { exact: true });
-  assert.equal(await lessons.locator('option').count(), 27);
-  await lessons.selectOption('1');
-  await tap(
-    page.locator('.guided-tutorial').getByRole('button', { name: 'Lancer les dés', exact: true }),
-  );
-  await page.locator('.tutorial-task').filter({ hasText: /^✓/ }).waitFor({ timeout: 15000 });
-  await capture(page, name, 'tutorial-roll');
-  await tap(page.getByRole('button', { name: 'Quitter le tutoriel', exact: true }));
-  assert.equal(
-    await page.evaluate(() => localStorage.getItem('money-tour.local.v17')),
-    null,
-    'Tutorial never changes a saved game',
-  );
-  return { lessons: 27, realRoll: true, noSaveMutation: true };
 }
 async function purchase(page, name, variant) {
   const fixture = createActionFixture('purchase');
@@ -723,8 +744,7 @@ const cases = [
   ['home-settings', homeAndSettings],
   ['solo', (page, name) => newGame(page, name)],
   ['hotseat', (page, name) => newGame(page, name, 'Entre amis')],
-  ['teams', (page, name) => newGame(page, name, '2v2')],
-  ['tutorial', tutorial],
+  ['teams', savedTeamGame],
   ['purchase', purchase],
   ['insufficient', (page, name) => purchase(page, name, 'insufficient')],
   ...['upgrade', 'buyout', 'fraud'].map((kind) => [
@@ -741,6 +761,12 @@ const cases = [
   ['invitation-validation', invitationValidation],
 ];
 try {
+  if (requested)
+    for (const selection of requested)
+      assert(
+        cases.some(([kind]) => kind === selection),
+        `Unknown Android QA case: ${selection}`,
+      );
   for (const [width, height] of screens) {
     for (const [kind, run] of cases) {
       if (requested && !requested.includes(kind)) continue;
@@ -788,6 +814,10 @@ try {
       }
     }
   }
+  assert(
+    report.checks.length > 0 || report.failures.length > 0,
+    'At least one Android functional check must execute',
+  );
   assert.deepEqual(report.failures, [], 'All Android browser functional cases pass');
   assert.deepEqual(report.pageErrors, [], 'No browser application exceptions');
 } finally {

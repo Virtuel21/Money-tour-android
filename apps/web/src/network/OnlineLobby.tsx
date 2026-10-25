@@ -1,9 +1,11 @@
 import { translate } from '../i18n/translate';
+import { getLanguage } from '../i18n/language';
 import { useEffect, useId, useRef, useState } from 'react';
 import { GameIcon } from '../game/GameIcon';
 import { restoreDialogFocus, trapDialogFocus } from '../game/dialogFocus';
 import { identity, secret, type Identity } from './crypto';
-import { Session, type SessionView } from './session';
+import { Session, type SessionOptions, type SessionView } from './session';
+import { PublicMatchmaker, type PublicMatch, type PublicRoomLease } from './matchmaking';
 import {
   forgetOnlineResume,
   loadOnlineIdentity,
@@ -42,6 +44,7 @@ export default function OnlineLobby({
   onView,
   onLeave,
   autoCreate = false,
+  publicMode,
   setupTurn = false,
   resume,
   defaults,
@@ -52,12 +55,12 @@ export default function OnlineLobby({
   onView: (view: SessionView) => void;
   onLeave: () => void;
   autoCreate?: boolean;
+  publicMode?: 'find' | 'create';
   setupTurn?: boolean;
   resume?: OnlineResume;
   defaults?: {
     name: string;
     count: number;
-    teams: boolean;
     minutes: number;
     pace?: 'normal' | 'fast';
   };
@@ -68,9 +71,17 @@ export default function OnlineLobby({
     () => new URLSearchParams(location.hash.slice(1)).get('room') ?? '',
   );
   const [name, setName] = useState(
-    resume?.name ?? (defaults?.name && defaults.name !== 'Vous' ? defaults.name : ''),
+    resume?.name ??
+      (defaults?.name && !['vous', 'you'].includes(defaults.name.trim().toLowerCase())
+        ? defaults.name
+        : ''),
   );
   const [view, setView] = useState<SessionView | null>(null);
+  const [publicPhase, setPublicPhase] = useState<'idle' | 'searching' | 'joining' | 'creating'>(
+    'idle',
+  );
+  const publicRoom = Boolean(publicMode || view?.publicGame);
+  const [joiningRunning, setJoiningRunning] = useState(false);
   const [initialTurn] = useState(() => {
     try {
       return {
@@ -92,7 +103,6 @@ export default function OnlineLobby({
   const [sharing, setSharing] = useState(false);
   const [shareError, setShareError] = useState('');
   const [count, setCount] = useState(defaults?.count ?? 4),
-    [teams, setTeams] = useState(defaults?.teams ?? false),
     [minutes, setMinutes] = useState(defaults?.minutes ?? 20);
   const [initialPreferences] = useState(loadTurnPreferences);
   const [turnUrl, setTurnUrl] = useState(initialPreferences?.url ?? ''),
@@ -118,6 +128,9 @@ export default function OnlineLobby({
   const joinedCode = useRef('');
   const connecting = useRef(false);
   const abort = useRef<AbortController | null>(null);
+  const directory = useRef<PublicMatchmaker | null>(null);
+  const publicLease = useRef<PublicRoomLease | null>(null);
+  const reservation = useRef<PublicMatch | null>(null);
   const callbacks = useRef({ onSession, onView, onLeave });
   callbacks.current = { onSession, onView, onLeave };
   useEffect(() => {
@@ -134,6 +147,8 @@ export default function OnlineLobby({
     () => () => {
       attempt.current++;
       abort.current?.abort();
+      publicLease.current?.close();
+      if (reservation.current) void directory.current?.release(reservation.current).catch(() => {});
       session.current?.close();
     },
     [],
@@ -265,22 +280,37 @@ export default function OnlineLobby({
       onTest={() => void testTurn()}
     />
   );
-  async function connect(create: boolean) {
+  function matchmaker() {
+    return (directory.current ??= new PublicMatchmaker());
+  }
+  async function connect(
+    create: boolean,
+    details?: {
+      code?: string;
+      publicGame?: boolean;
+      match?: PublicMatch;
+      controller?: AbortController;
+      quiet?: boolean;
+    },
+  ): Promise<Session | undefined> {
     if (connecting.current || testing) return;
     connecting.current = true;
     const request = ++attempt.current;
-    abort.current?.abort();
-    const controller = new AbortController();
+    const controller = details?.controller ?? new AbortController();
+    if (abort.current !== controller) abort.current?.abort();
     abort.current = controller;
     setWorking(true);
     setError('');
-    const roomCode = resume?.code ?? (create ? secret().slice(0, 32) : invitationCode(code));
+    const roomCode =
+      details?.code ?? resume?.code ?? (create ? secret().slice(0, 32) : invitationCode(code));
     if (!roomCode) {
       setError('Collez le lien d’invitation complet envoyé par votre ami.');
       setWorking(false);
       connecting.current = false;
       return;
     }
+    publicLease.current?.close();
+    publicLease.current = null;
     session.current?.close();
     session.current = null;
     setView(null);
@@ -296,19 +326,42 @@ export default function OnlineLobby({
       rememberTurn(settings, roomCode);
       const chosenName = name.trim().slice(0, 20);
       const publicName =
-        !chosenName || ['vous', 'voyageur'].includes(chosenName.toLowerCase())
+        !chosenName || ['vous', 'voyageur', 'you', 'traveller'].includes(chosenName.toLowerCase())
           ? `Voyageur ${user.id.slice(0, 4)}`
           : chosenName;
       setName(publicName);
-      const creator = resume?.creator ?? create;
-      const recovery = { code: roomCode, name: publicName, creator };
+      const creator = details ? create : (resume?.creator ?? create);
+      const isPublic = details?.publicGame === true || resume?.publicGame === true;
+      const recovery = {
+        code: roomCode,
+        name: publicName,
+        creator,
+        ...(isPublic ? { publicGame: true } : {}),
+      };
       joinedCode.current = roomCode;
       if (!rememberOnline(recovery, user))
         setError('Stockage désactivé : votre siège ne pourra pas être repris après fermeture.');
-      const next = new Session(transport, user, publicName, creator);
+      let lease: PublicRoomLease | null = null;
+      const publicOptions: SessionOptions = isPublic
+        ? {
+            publicGame: true,
+            authorizePublicJoin: (authorization) =>
+              lease?.authorizePublicJoin(authorization) ?? Promise.resolve(false),
+          }
+        : {};
+      const next = new Session(transport, user, publicName, creator, undefined, publicOptions);
+      let publicReady = !isPublic;
       next.onChange = (value) => {
         if (request !== attempt.current) return;
         setView(value);
+        if (!publicReady) return;
+        if (
+          isPublic &&
+          !creator &&
+          value.publicJoinStatus !== 'joined' &&
+          !value.members.some((member) => member.id === user!.id)
+        )
+          return;
         callbacks.current.onView(value);
       };
       next.onPersist = (value) => {
@@ -319,6 +372,13 @@ export default function OnlineLobby({
           );
       };
       session.current = next;
+      if (details?.match)
+        await next.requestPublicSeat({
+          seatId: details.match.seatId,
+          reservationId: details.match.reservationId,
+          reservationToken: details.match.reservationToken,
+          expectedHostId: details.match.hostId,
+        });
       setCode(roomCode);
       setCopied(false);
       history.replaceState(history.state, '', invitationLink(location.href, roomCode, settings));
@@ -327,23 +387,139 @@ export default function OnlineLobby({
         next.close();
         return;
       }
+      if (next.publicGame) {
+        lease = matchmaker().watch(next, { code: roomCode, language: getLanguage() });
+        publicLease.current = lease;
+        await lease.ready();
+        if (request !== attempt.current || controller.signal.aborted) {
+          lease.close();
+          next.close();
+          return;
+        }
+      }
       callbacks.current.onSession(next);
+      if (isPublic) {
+        publicReady = true;
+        const value = next.view;
+        if (
+          creator ||
+          value.publicJoinStatus === 'joined' ||
+          value.members.some((member) => member.id === user!.id)
+        )
+          callbacks.current.onView(value);
+      }
+      return next;
     } catch (e) {
       if (request !== attempt.current) return;
+      publicLease.current?.close();
+      publicLease.current = null;
       session.current?.close();
       session.current = null;
       setView(null);
-      setError(
-        controller.signal.aborted
-          ? 'Le relais met trop de temps à répondre. Réessayez.'
-          : e instanceof Error
-            ? e.message
-            : 'Connexion impossible.',
-      );
+      if (!details?.quiet || controller.signal.aborted)
+        setError(
+          controller.signal.aborted
+            ? 'Le relais met trop de temps à répondre. Réessayez.'
+            : e instanceof Error
+              ? e.message
+              : 'Connexion impossible.',
+        );
     } finally {
       if (request === attempt.current) {
         setWorking(false);
         connecting.current = false;
+      }
+    }
+  }
+  async function waitForPublicSeat(next: Session, signal: AbortSignal) {
+    const deadline = Date.now() + 40000;
+    while (!signal.aborted && session.current === next && Date.now() < deadline) {
+      if (next.view.publicJoinStatus === 'joined') return true;
+      if (next.view.publicJoinStatus === 'rejected') return false;
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+    return false;
+  }
+  async function connectPublic() {
+    if (!publicMode || !name.trim() || connecting.current || testing) return;
+    const controller = new AbortController();
+    abort.current?.abort();
+    abort.current = controller;
+    const request = ++attempt.current;
+    connecting.current = true;
+    setWorking(true);
+    setError('');
+    const excluded: string[] = [];
+    try {
+      if (publicMode === 'find') {
+        for (let retry = 0; retry < 2; retry++) {
+          setPublicPhase('searching');
+          const found = await matchmaker().find({
+            language: getLanguage(),
+            signal: controller.signal,
+            excludeRoomIds: excluded,
+          });
+          if (controller.signal.aborted || (retry === 0 && request !== attempt.current)) return;
+          if (!found) break;
+          reservation.current = found;
+          setJoiningRunning(found.phase === 'playing');
+          setPublicPhase('joining');
+          connecting.current = false;
+          const next = await connect(false, {
+            code: found.code,
+            publicGame: true,
+            match: found,
+            controller,
+            quiet: true,
+          });
+          if (next && !controller.signal.aborted) {
+            connecting.current = true;
+            setWorking(true);
+          }
+          if (next && (await waitForPublicSeat(next, controller.signal))) {
+            reservation.current = null;
+            return;
+          }
+          await matchmaker()
+            .release(found)
+            .catch(() => {});
+          if (found.phase === 'playing' || retry > 0) excluded.push(found.roomId);
+          reservation.current = null;
+          publicLease.current?.close();
+          publicLease.current = null;
+          next?.close();
+          session.current = null;
+          setView(null);
+          if (controller.signal.aborted) return;
+          connecting.current = true;
+          setWorking(true);
+        }
+      }
+      if (controller.signal.aborted) return;
+      setPublicPhase('creating');
+      setJoiningRunning(false);
+      connecting.current = false;
+      const next = await connect(true, { publicGame: true, controller });
+      if (!next || controller.signal.aborted || session.current !== next) return;
+      if (publicMode === 'find') await next.start(4, false, 20 * 60000, 'normal');
+    } catch (cause) {
+      if (!controller.signal.aborted) {
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : 'La recherche est momentanément indisponible. Réessayez.',
+        );
+        publicLease.current?.close();
+        publicLease.current = null;
+        session.current?.close();
+        session.current = null;
+        setView(null);
+      }
+    } finally {
+      if (abort.current === controller) {
+        connecting.current = false;
+        setWorking(false);
+        setPublicPhase('idle');
       }
     }
   }
@@ -360,6 +536,10 @@ export default function OnlineLobby({
       return;
     attempt.current++;
     abort.current?.abort();
+    publicLease.current?.close();
+    publicLease.current = null;
+    if (reservation.current) void directory.current?.release(reservation.current).catch(() => {});
+    reservation.current = null;
     connecting.current = false;
     setWorking(false);
     session.current?.close();
@@ -416,7 +596,13 @@ export default function OnlineLobby({
     >
       <div className="modal-heading">
         <h2 id={titleId}>
-          {translate(setupTurn ? 'Configurer le serveur TURN' : 'Le voyage entre amis')}
+          {translate(
+            setupTurn
+              ? 'Configurer le serveur TURN'
+              : publicRoom
+                ? 'Le voyage en ligne'
+                : 'Le voyage entre amis',
+          )}
         </h2>
         <button className="icon-button" aria-label={translate('Fermer le salon')} onClick={close}>
           <GameIcon name="close" />
@@ -427,17 +613,26 @@ export default function OnlineLobby({
           <form
             onSubmit={(event) => {
               event.preventDefault();
-              if (name.trim()) void connect(setupTurn);
+              if (name.trim()) {
+                if (publicMode) void connectPublic();
+                else void connect(setupTurn);
+              }
             }}
           >
             <p>
-              {invited
+              {publicMode
                 ? translate(
-                    'Vous êtes invité à une partie ! Choisissez votre nom pour rejoindre vos amis.',
+                    publicMode === 'find'
+                      ? 'Choisissez un pseudo : nous cherchons une table disponible pour vous.'
+                      : 'Ouvrez votre table à d’autres voyageurs. Vous choisissez la durée et le nombre de places.',
                   )
-                : translate(
-                    'Rejoignez vos amis avec leur lien d’invitation ou créez un salon. Jusqu’à quatre voyageurs, chacun sur son écran.',
-                  )}
+                : invited
+                  ? translate(
+                      'Vous êtes invité à une partie ! Choisissez votre nom pour rejoindre vos amis.',
+                    )
+                  : translate(
+                      'Rejoignez vos amis avec leur lien d’invitation ou créez un salon. Jusqu’à quatre voyageurs, chacun sur son écran.',
+                    )}
             </p>
             <label className="field">
               {translate('Votre nom')}
@@ -447,11 +642,55 @@ export default function OnlineLobby({
                 maxLength={20}
                 placeholder={translate('Votre prénom ou pseudo')}
                 value={name}
+                disabled={working}
                 onChange={(e) => setName(e.target.value)}
               />
             </label>
             {setupTurn && turnPanel}
-            {!invited && (
+            {publicMode && (
+              <>
+                <p className="public-disclosure">
+                  {translate(
+                    'Les places libres peuvent être complétées par des joueurs IA en attendant d’autres voyageurs.',
+                  )}
+                </p>
+                <button
+                  className="primary"
+                  type="submit"
+                  disabled={working || testing || !name.trim()}
+                >
+                  {translate(
+                    publicMode === 'find' ? 'Trouver une partie' : 'Créer un salon public',
+                  )}
+                </button>
+                {working && (
+                  <div className="public-match-status" role="status" aria-live="polite">
+                    <h3>
+                      {translate(
+                        publicPhase === 'searching'
+                          ? 'Recherche d’une table…'
+                          : publicPhase === 'creating'
+                            ? 'Votre table se prépare…'
+                            : 'Connexion à votre table…',
+                      )}
+                    </h3>
+                    <p>
+                      {translate(
+                        publicPhase === 'searching'
+                          ? 'Priorité aux salons de votre langue, en attente ou encore assez tôt dans la partie.'
+                          : publicPhase === 'creating'
+                            ? 'Aucune table n’a été trouvée. Un salon ouvert est préparé avec des joueurs IA.'
+                            : 'Nous réservons votre place et synchronisons le plateau.',
+                      )}
+                    </p>
+                    <button type="button" className="secondary" onClick={leave}>
+                      {translate('Annuler la recherche')}
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+            {!publicMode && !invited && (
               <>
                 <button
                   type="button"
@@ -481,7 +720,7 @@ export default function OnlineLobby({
                 )}
               </>
             )}
-            {!setupTurn && (
+            {!setupTurn && !publicMode && (
               <button
                 type="submit"
                 className="primary"
@@ -490,7 +729,10 @@ export default function OnlineLobby({
                 {working ? translate('Connexion…') : translate('Rejoindre le salon')}
               </button>
             )}
-            {!setupTurn && (!invited || error || requiredTurn) && turnPanel}
+            {!setupTurn &&
+              (!publicMode || error || requiredTurn) &&
+              (!invited || error || requiredTurn) &&
+              turnPanel}
           </form>
         ) : (
           <>
@@ -498,9 +740,18 @@ export default function OnlineLobby({
               <div className="connection-wait" role="status">
                 <h3>{translate('Connexion au salon…')}</h3>
                 <p>{translate(view.status)}</p>
+                {publicRoom && joiningRunning && (
+                  <p>
+                    {translate(
+                      'Cette partie a déjà commencé : vous reprenez une place disponible avec son argent et ses propriétés.',
+                    )}
+                  </p>
+                )}
                 <p>
                   {translate(
-                    'Gardez cette page ouverte, ainsi que le salon de votre ami. La connexion peut prendre quelques secondes.',
+                    publicRoom
+                      ? 'Votre place est réservée. Gardez cette page ouverte pendant la connexion.'
+                      : 'Gardez cette page ouverte, ainsi que le salon de votre ami. La connexion peut prendre quelques secondes.',
                   )}
                 </p>
                 <button className="primary" disabled={working} onClick={() => void connect(false)}>
@@ -511,6 +762,8 @@ export default function OnlineLobby({
                   onClick={() => {
                     attempt.current++;
                     abort.current?.abort();
+                    publicLease.current?.close();
+                    publicLease.current = null;
                     connecting.current = false;
                     setWorking(false);
                     session.current?.close();
@@ -528,7 +781,7 @@ export default function OnlineLobby({
             {view.host && (
               <>
                 <p className="eyebrow">
-                  {translate('SALON PRIVÉ · ')}
+                  {translate(publicRoom ? 'SALON PUBLIC · ' : 'SALON PRIVÉ · ')}
                   {view.members.length}
                   {translate('/4 VOYAGEURS')}
                 </p>
@@ -548,28 +801,36 @@ export default function OnlineLobby({
                     )}
                   </p>
                 )}
-                <div className="invite-code">
-                  <small>{translate('INVITEZ VOS AMIS')}</small>
-                  <p>
-                    {translate(
-                      'Partagez ce lien avec vos amis. Le salon reste ouvert tant que vous gardez cette fenêtre ouverte.',
-                    )}
+                {publicRoom ? (
+                  <p className="public-disclosure">
+                    {translate('Ce salon est ouvert aux voyageurs qui recherchent une partie.')}
                   </p>
-                  <button className="primary" onClick={() => void copy()}>
-                    {copied ? translate('Lien copié ✓') : translate('Copier le lien d’invitation')}
-                  </button>
-                  <input aria-label={translate('Lien d’invitation')} readOnly value={link} />
-                  {copied && canShare && (
-                    <button className="secondary" disabled={sharing} onClick={() => void share()}>
-                      {translate(sharing ? 'Ouverture du partage…' : 'Partager le lien')}
-                    </button>
-                  )}
-                  {shareError && (
-                    <p role="alert" className="network-error invite-share-error">
-                      {translate(shareError)}
+                ) : (
+                  <div className="invite-code">
+                    <small>{translate('INVITEZ VOS AMIS')}</small>
+                    <p>
+                      {translate(
+                        'Partagez ce lien avec vos amis. Le salon reste ouvert tant que vous gardez cette fenêtre ouverte.',
+                      )}
                     </p>
-                  )}
-                </div>
+                    <button className="primary" onClick={() => void copy()}>
+                      {copied
+                        ? translate('Lien copié ✓')
+                        : translate('Copier le lien d’invitation')}
+                    </button>
+                    <input aria-label={translate('Lien d’invitation')} readOnly value={link} />
+                    {copied && canShare && (
+                      <button className="secondary" disabled={sharing} onClick={() => void share()}>
+                        {translate(sharing ? 'Ouverture du partage…' : 'Partager le lien')}
+                      </button>
+                    )}
+                    {shareError && (
+                      <p role="alert" className="network-error invite-share-error">
+                        {translate(shareError)}
+                      </p>
+                    )}
+                  </div>
+                )}
                 {!view.state && (
                   <form
                     className="lobby-name"
@@ -597,7 +858,7 @@ export default function OnlineLobby({
                       <span className="seat-number">{i + 1}</span>
                       <strong>
                         {member.name}
-                        {member.id === view.self ? translate(' (vous)') : ''}
+                        {member.id === (view.selfIdentity ?? view.self) ? translate(' (vous)') : ''}
                       </strong>
                       <small>
                         {member.id === view.host
@@ -612,58 +873,55 @@ export default function OnlineLobby({
                 <p role="status" className="network-status">
                   {translate(view.status)}
                 </p>
-                {!view.state && view.host === view.self && (
-                  <>
-                    <div className="setup-options">
-                      <label>
-                        {translate('Sièges')}
-                        <select
-                          value={count}
-                          disabled={teams}
-                          onChange={(e) => setCount(Number(e.target.value))}
-                        >
-                          {[2, 3, 4].map((n) => (
-                            <option key={n}>{n}</option>
-                          ))}
-                        </select>
-                      </label>
-                      <DurationPicker value={minutes} onChange={setMinutes} />
-                      <label className="field">
-                        {translate('Rythme partagé')}
-                        <select
-                          value={pace}
-                          onChange={(e) => setPace(e.target.value === 'fast' ? 'fast' : 'normal')}
-                        >
-                          <option value="normal">{translate('Animations normales')}</option>
-                          <option value="fast">{translate('Animations rapides')}</option>
-                        </select>
-                      </label>
-                    </div>
-                    <label className="toggle">
-                      <input
-                        type="checkbox"
-                        checked={teams}
-                        onChange={(e) => {
-                          setTeams(e.target.checked);
-                          if (e.target.checked) setCount(4);
-                        }}
-                      />{' '}
-                      {translate('Équipes 2v2 · sièges 1 et 3 contre 2 et 4')}
-                    </label>
-                    <p>{translate('Les sièges libres seront occupés par des bots.')}</p>
-                    <button
-                      className="primary"
-                      disabled={view.busy || view.blocked || !validMinutes(minutes)}
-                      onClick={() =>
-                        void session.current?.start(count, teams, minutes * 60000, pace)
-                      }
-                    >
-                      {view.busy
-                        ? translate('Préparation du plateau…')
-                        : translate('Lancer la partie')}
-                    </button>
-                  </>
-                )}
+                {!view.state &&
+                  view.host === (view.selfIdentity ?? view.self) &&
+                  publicMode !== 'find' && (
+                    <>
+                      <div className="setup-options">
+                        <label>
+                          {translate('Sièges')}
+                          <select
+                            aria-label={translate('Sièges')}
+                            value={count}
+                            onChange={(e) => setCount(Number(e.target.value))}
+                          >
+                            {[2, 3, 4].map((n) => (
+                              <option key={n}>{n}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <DurationPicker value={minutes} onChange={setMinutes} />
+                        <label className="field">
+                          {translate('Rythme partagé')}
+                          <select
+                            value={pace}
+                            onChange={(e) => setPace(e.target.value === 'fast' ? 'fast' : 'normal')}
+                          >
+                            <option value="normal">{translate('Animations normales')}</option>
+                            <option value="fast">{translate('Animations rapides')}</option>
+                          </select>
+                        </label>
+                      </div>
+                      <p>
+                        {translate(
+                          publicRoom
+                            ? 'Les places libres peuvent être complétées par des joueurs IA en attendant d’autres voyageurs.'
+                            : 'Les sièges libres seront occupés par des bots.',
+                        )}
+                      </p>
+                      <button
+                        className="primary"
+                        disabled={working || view.busy || view.blocked || !validMinutes(minutes)}
+                        onClick={() =>
+                          void session.current?.start(count, false, minutes * 60000, pace)
+                        }
+                      >
+                        {view.busy
+                          ? translate('Préparation du plateau…')
+                          : translate('Lancer la partie')}
+                      </button>
+                    </>
+                  )}
                 {view.state && (
                   <button
                     className="primary"
@@ -703,7 +961,9 @@ export default function OnlineLobby({
         )}
         <p className="setup-note">
           {translate(
-            'Vous pouvez reprendre votre siège sur cet appareil pendant 24 h. Après une coupure, la partie attend jusqu’à 90 secondes avant de confier votre siège à un bot. Une coupure de l’hôte déclenche une relève après 15 secondes. Certains réseaux nécessitent un TURN. Partagez le lien uniquement avec vos invités.',
+            publicRoom
+              ? 'Vous pouvez reprendre votre place sur cet appareil après une coupure. Gardez le jeu au premier plan.'
+              : 'Vous pouvez reprendre votre siège sur cet appareil pendant 24 h. Après une coupure, la partie attend jusqu’à 90 secondes avant de confier votre siège à un bot. Une coupure de l’hôte déclenche une relève après 15 secondes. Certains réseaux nécessitent un TURN. Partagez le lien uniquement avec vos invités.',
           )}
         </p>
       </div>

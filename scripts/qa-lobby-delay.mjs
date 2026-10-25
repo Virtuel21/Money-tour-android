@@ -158,11 +158,12 @@ try {
   result.browser = browser.version();
   host = await makePage('host');
   await host.goto(app.url);
-  await host.getByLabel('Nom du joueur 1', { exact: true }).fill('HoteQA');
-  await host.locator('.setup-options select').first().selectOption('2');
   await host.getByRole('button', { name: /Créer un salon en ligne/ }).click();
   const invitation = host.getByLabel('Lien d’invitation', { exact: true });
   await invitation.waitFor();
+  await host.getByLabel('Votre nom dans le salon', { exact: true }).fill('HoteQA');
+  await host.getByRole('button', { name: 'Enregistrer mon nom', exact: true }).click();
+  await host.getByLabel('Sièges', { exact: true }).selectOption('2');
   const cancelledLink = await invitation.inputValue();
   assert.match(new URL(cancelledLink).hash, /^#room=[a-f\d]{32}$/);
   assert.equal(await host.getByRole('button', { name: 'Copier le code du salon' }).count(), 0);
@@ -193,6 +194,9 @@ try {
   await capture(host, 'host-dialog-closed');
   await host.getByRole('button', { name: 'Créer un salon en ligne', exact: true }).click();
   await invitation.waitFor();
+  await host.getByLabel('Votre nom dans le salon', { exact: true }).fill('HoteQA');
+  await host.getByRole('button', { name: 'Enregistrer mon nom', exact: true }).click();
+  await host.getByLabel('Sièges', { exact: true }).selectOption('2');
   const link = await invitation.inputValue();
   assert.match(new URL(link).hash, /^#room=[a-f\d]{32}$/);
   assert.notEqual(link, cancelledLink);

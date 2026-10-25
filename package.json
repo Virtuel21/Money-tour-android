@@ -18,7 +18,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "pnpm typecheck && pnpm lint && pnpm test:coverage && pnpm build",
+    "check": "pnpm typecheck && pnpm lint && pnpm test:coverage && pnpm test:directory && pnpm build",
     "qa:board:install": "playwright install chromium firefox webkit",
     "qa:board": "node scripts/qa-board.mjs",
     "qa:menus": "node scripts/qa-menus.mjs",
@@ -35,7 +35,9 @@
     "android:icons": "node scripts/android-icons.mjs",
     "qa:android:functional": "node scripts/qa-android-functional.mjs",
     "qa:android:device": "node scripts/qa-android-device.mjs",
-    "qa:android:visual": "node scripts/qa-android-visual.mjs"
+    "qa:android:visual": "node scripts/qa-android-visual.mjs",
+    "test:directory": "pnpm --filter @money-tour/directory test",
+    "qa:public": "node --import tsx scripts/qa-public-games.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",

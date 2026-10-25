@@ -173,27 +173,31 @@ try {
           assert.equal(await page.locator('html').getAttribute('lang'), 'fr');
           await page.getByRole('button', { name: 'English', exact: true }).last().click();
           await close(page);
-          await page.getByRole('button', { name: /How to play/ }).click();
-          await page.getByText('Read all the rules', { exact: true }).click();
-          await capture(page, prefix + '-rules');
-          await page
-            .getByRole('button', { name: 'Start the interactive tutorial', exact: true })
-            .click();
-          await page.getByRole('button', { name: 'Leave tutorial', exact: true }).waitFor();
-          await capture(page, prefix + '-tutorial');
-          if (width === 390) {
-            await page.getByRole('button', { name: 'All lessons (27)', exact: true }).click();
-            const select = page.getByLabel('Choose a lesson', { exact: true });
-            for (const index of [2, 4, 8, 9, 13, 17, 21, 26]) {
-              await select.selectOption(String(index));
-              await capture(page, prefix + '-lesson-' + index);
-            }
-          }
-          await page.getByRole('button', { name: 'Leave tutorial', exact: true }).click();
+          assert.equal(await page.getByRole('button', { name: /How to play/ }).count(), 0);
+          assert.deepEqual(await page.locator('.mode-tabs button').allTextContents(), [
+            'With friends',
+            'Online',
+            'Solo & bots',
+          ]);
+          await page.getByRole('button', { name: 'Play on this device', exact: true }).click();
+          await capture(page, prefix + '-local-setup');
           await close(page);
+          await page.getByRole('button', { name: 'Online', exact: true }).click();
+          await page.getByRole('button', { name: 'Find a game', exact: true }).click();
+          const publicForm = page.locator('.online-modal[open]');
+          assert.equal(await publicForm.getByLabel('Your name', { exact: true }).inputValue(), '');
+          assert.equal(
+            await publicForm.getByRole('button', { name: 'Find a game', exact: true }).isDisabled(),
+            true,
+          );
+          await capture(page, prefix + '-public-search-form');
+          await close(page);
+          await page.getByRole('button', { name: 'Solo & bots', exact: true }).click();
+          await capture(page, prefix + '-solo-setup');
+          await page.getByRole('button', { name: 'With friends', exact: true }).click();
           await page.getByRole('button', { name: 'Join a room', exact: true }).click();
           await page.getByLabel('Your name', { exact: true }).fill('Player Test');
-          await page.getByLabel('Room code', { exact: true }).fill('12');
+          await page.getByLabel('Invitation link', { exact: true }).fill('12');
           await page.getByRole('button', { name: 'Join room', exact: true }).click();
           await page.getByRole('alert').waitFor();
           await capture(page, prefix + '-room-error');
@@ -201,27 +205,26 @@ try {
           await page.goto(server.url + '/?scenario=menu-review');
           await page.locator('[data-label-kind="name"]').first().waitFor({ timeout: 45000 });
           await capture(page, prefix + '-game');
-          for (const label of [
-            'Game settings',
-            'My strategy',
-            'Action log',
-            'Explore spaces',
-            ...(width < 1000 ? ['My journal'] : []),
-          ]) {
-            const button = page.getByRole('button', {
-              name: label,
-              exact: label !== 'My strategy',
-            });
-            await button.click();
-            await capture(page, prefix + '-' + label.toLowerCase().replaceAll(' ', '-'));
-            if (label === 'Explore spaces') {
-              const search = page.getByRole('searchbox');
-              if (await search.count()) {
-                await search.fill('Edinburgh');
-                assert.equal(await page.locator('.mobile-tile-list button').count(), 1);
-              }
+          for (const panel of ['settings', 'player-profile', 'action-log', 'property-details']) {
+            if (panel === 'player-profile') {
+              await page.locator('.player-panel.is-active .player-panel-heading').first().click();
+              await page.locator('.player-details-dialog[open]').waitFor();
+            } else if (panel === 'action-log') {
+              const history = page.locator('.live-actions');
+              if ((await history.getAttribute('open')) === null)
+                await history.locator('summary').click();
+              await page.getByRole('button', { name: 'All actions ↗', exact: true }).click();
+            } else if (panel === 'property-details') {
+              await page
+                .locator('.board-hit-polygons')
+                .getByRole('button', { name: 'View Lisbon', exact: true })
+                .click();
+            } else {
+              await page.getByRole('button', { name: 'Game settings', exact: true }).click();
             }
-            if (label === 'Game settings') {
+            await page.locator('dialog[open]').last().waitFor();
+            await capture(page, prefix + '-' + panel);
+            if (panel === 'settings') {
               await page.getByRole('button', { name: 'Français', exact: true }).last().click();
               assert.equal(await page.locator('html').getAttribute('lang'), 'fr');
               await page.getByRole('button', { name: 'English', exact: true }).last().click();

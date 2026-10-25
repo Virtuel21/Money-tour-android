@@ -68,27 +68,36 @@ it('opens a free-for-all room from the default friends CTA without overwriting a
   persistLocal(previous);
   await mount();
   const tabs = [...document.querySelectorAll<HTMLButtonElement>('.mode-tabs button')];
-  expect(tabs.map((tab) => tab.textContent)).toEqual(['Entre amis', '2v2', 'Solo & bots']);
+  expect(tabs.map((tab) => tab.textContent)).toEqual(['Entre amis', 'En ligne', 'Solo & bots']);
   expect(tabs[0]!.getAttribute('aria-pressed')).toBe('true');
   expect(button('Créer un salon en ligne').classList.contains('primary')).toBe(true);
   await click('Créer un salon en ligne');
-  expect(lobby.props).toMatchObject({ autoCreate: true, defaults: { teams: false, count: 4 } });
+  expect(document.querySelector('.setup .seat-list')).toBeNull();
+  expect(document.querySelector('.setup .setup-options')).toBeNull();
+  expect(button('Comment jouer')).toBeUndefined();
+  expect(lobby.props).toMatchObject({ autoCreate: true, defaults: { count: 4 } });
   expect(loadLocal()?.seed).toBe(previous.seed);
 });
 
-it('creates an online team room from the main CTA and keeps local 2v2 available', async () => {
+it('configures a local friends game only after choosing to play on this device', async () => {
   await mount();
-  await click('2v2');
-  expect(button('Créer un salon en ligne').classList.contains('primary')).toBe(true);
   expect(button('Jouer sur cet appareil').classList.contains('secondary')).toBe(true);
-  await click('Créer un salon en ligne');
-  expect(lobby.props).toMatchObject({ defaults: { teams: true, count: 4 } });
-  await act(() => (lobby.props!.onClose as () => void)());
   await click('Jouer sur cet appareil');
+  expect(loadLocal()).toBeNull();
+  const dialog = document.querySelector<HTMLDialogElement>('dialog[open]')!;
+  expect(dialog.querySelector('h2')?.textContent).toBe('Jouer sur cet appareil');
+  expect(dialog.querySelectorAll('.seat')).toHaveLength(4);
+  const travellers = dialog.querySelector<HTMLSelectElement>('.setup-options select')!;
+  await act(() => {
+    travellers.value = '2';
+    travellers.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  expect(dialog.querySelectorAll('.seat')).toHaveLength(2);
+  await click('Lancer la partie');
   const game = loadLocal()!.state;
-  expect(game.mode).toBe('teams');
-  expect(game.players.map((player) => player.team)).toEqual([0, 1, 0, 1]);
-  expect(game.players.every((player) => !player.bot)).toBe(true);
+  expect(game.mode).toBe('free-for-all');
+  expect(game.players).toHaveLength(2);
+  expect(game.players.every((player) => !player.bot && player.team === undefined)).toBe(true);
 });
 
 it('makes local play primary only in solo and starts with the selected bots', async () => {
@@ -103,6 +112,26 @@ it('makes local play primary only in solo and starts with the selected bots', as
     true,
     true,
   ]);
+});
+
+it.each([
+  ['Trouver une partie', 'find'],
+  ['Créer un salon public', 'create'],
+] as const)('opens %s without changing the saved local game', async (label, publicMode) => {
+  const previous = newLocal({
+    players: [
+      { id: 'a', name: 'Alice' },
+      { id: 'b', name: 'Bob' },
+    ],
+  });
+  persistLocal(previous);
+  await mount();
+  await click('En ligne');
+  expect(document.querySelector('.setup .seat-list')).toBeNull();
+  expect(document.querySelector('.setup-note')?.textContent).toContain('joueurs IA');
+  await click(label);
+  expect(lobby.props).toMatchObject({ publicMode, autoCreate: false, open: true });
+  expect(loadLocal()?.seed).toBe(previous.seed);
 });
 
 it.each(['local', 'online'])(
@@ -143,6 +172,7 @@ it.each(['local', 'online'])(
     const label = target === 'online' ? 'Créer un salon en ligne' : 'Jouer sur cet appareil';
     expect(button(label).disabled).toBe(false);
     await click(label);
+    if (target === 'local') await click('Lancer la partie');
     expect(close).toHaveBeenCalledTimes(1);
     expect(location.hash).toBe('');
     if (target === 'online')
@@ -150,3 +180,55 @@ it.each(['local', 'online'])(
     else expect(loadLocal()?.state.players).toHaveLength(4);
   },
 );
+
+it('uses identity names and keeps the ready button for a public guest controlling a former AI seat', async () => {
+  await mount();
+  await click('Créer un salon en ligne');
+  const readyAdventure = vi.fn();
+  const state = newLocal({
+    players: [
+      { id: 'host', name: 'Alice' },
+      { id: 'bot-1', name: 'Nico' },
+    ],
+  }).state;
+  const view: SessionView = {
+    state,
+    publicGame: true,
+    publicJoinStatus: 'joined',
+    members: [
+      { id: 'host', name: 'Alice', key: {}, order: 0 },
+      { id: 'guest-key', name: 'Nico', key: {}, order: 1, seatId: 'bot-1' },
+    ],
+    startGate: {
+      id: 'rematch-gate',
+      deadline: Date.now() + 20000,
+      participants: ['host', 'guest-key'],
+      ready: ['host'],
+    },
+    host: 'host',
+    self: 'bot-1',
+    selfIdentity: 'guest-key',
+    connected: ['host', 'guest-key'],
+    busy: false,
+    status: 'Salon prêt',
+    incidents: [],
+    hash: '',
+    epoch: 0,
+    events: [],
+    blocked: false,
+  };
+  await act(() => {
+    (lobby.props!.onSession as (session: unknown) => void)({ close: vi.fn(), readyAdventure });
+    (lobby.props!.onView as (view: SessionView) => void)(view);
+  });
+  const introduction = document.querySelector<HTMLDialogElement>('.adventure-start[open]')!;
+  expect(
+    [...introduction.querySelectorAll('.adventure-start-players li > span:first-child')].map(
+      (element) => element.textContent,
+    ),
+  ).toEqual(['Alice', 'Nico']);
+  expect(introduction.textContent).not.toContain('guest-key');
+  expect(button('Démarrer l’aventure').disabled).toBe(false);
+  await click('Démarrer l’aventure');
+  expect(readyAdventure).toHaveBeenCalledTimes(1);
+});

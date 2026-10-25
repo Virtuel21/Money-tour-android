@@ -1,12 +1,20 @@
 # Recette réseau Android — 24 octobre 2026
 
 Le protocole de jeu et le moteur restent ceux du dépôt d’origine : Trystero 0.26.0,
-espace `virtuel21-money-tour-v21`, canal `game-v1`. Le wrapper Android utilise
+espace `virtuel21-money-tour-v21` lors de cette recette historique, canal `game-v1`. Le wrapper Android utilise
 `https://localhost` pour WebCrypto et WebRTC ; ses invitations utilisent
 `https://virtuel21.github.io/money-tour/#room=…`, jamais l’origine locale du WebView.
 Les liens Android `moneytour://room/<code>` et `moneytour://room/#room=…` sont
 normalisés en données d’invitation ; leur URL ne remplace jamais le contenu du WebView.
 Les liens web peuvent être collés dans « Rejoindre un salon » dans l’application.
+
+Depuis la synchronisation web du 25 octobre, le client utilise l’espace
+`virtuel21-money-tour-v22` et le protocole de session `4`, comme le jeu web.
+Les anciens clients actifs doivent être mis à jour pour rejoindre les nouveaux salons.
+Les salons publics passent aussi par l’annuaire HTTPS décrit dans
+[PUBLIC_NETWORK.md](PUBLIC_NETWORK.md). Les résultats historiques ci-dessous ne
+valident pas cette nouvelle recherche ni une connexion native avec un client web
+mis à jour ; voir [la validation de synchronisation](ANDROID_WEB_SYNC.md).
 
 ## Résultats observés
 

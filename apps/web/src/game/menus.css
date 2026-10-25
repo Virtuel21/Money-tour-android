@@ -169,6 +169,10 @@
   color: var(--menu-ink);
   background-color: #fffdf6;
 }
+.app .modal .seat {
+  display: grid;
+  grid-template-columns: 25px minmax(0, 1fr) 100px;
+}
 .app .modal :is(input[type='range']) {
   padding: 0;
   accent-color: #187c83;
@@ -540,6 +544,9 @@
   }
 }
 @media (max-width: 520px) {
+  .app .modal .seat {
+    grid-template-columns: 32px minmax(0, 1fr);
+  }
   .app .seat {
     grid-template-columns: 32px minmax(0, 1fr);
     gap: 8px 10px;

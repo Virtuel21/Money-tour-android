@@ -265,13 +265,14 @@ async function keyboard(page, name) {
 }
 async function homeModes(page, browser) {
   const modes = page.getByRole('group', { name: 'Mode de jeu', exact: true });
-  const travellers = page.getByLabel('Voyageurs', { exact: true });
-  const initialCount = await travellers.inputValue();
   assert.deepEqual(await modes.getByRole('button').allTextContents(), [
     'Entre amis',
-    '2v2',
+    'En ligne',
     'Solo & bots',
   ]);
+  assert.equal(await page.locator('.setup .seat-list').count(), 0);
+  assert.equal(await page.locator('.setup .setup-options').count(), 0);
+  assert.equal(await page.getByRole('button', { name: /Comment jouer/ }).count(), 0);
   assert.equal(
     await modes
       .getByRole('button', { name: 'Entre amis', exact: true })
@@ -279,23 +280,33 @@ async function homeModes(page, browser) {
     'true',
     `${browser}: Entre amis must be selected on a fresh home page`,
   );
-  for (const mode of ['Entre amis', '2v2', 'Solo & bots', 'Entre amis']) {
+  for (const mode of ['Entre amis', 'En ligne', 'Solo & bots', 'Entre amis']) {
     await modes.getByRole('button', { name: mode, exact: true }).click();
-    const actions = page.locator('.setup > button');
+    assert.equal(await page.locator('.setup .seat-list').count(), mode === 'Solo & bots' ? 1 : 0);
+    const actions = page.locator(
+      mode === 'En ligne' ? '.public-home-actions > button' : '.setup > button',
+    );
     assert.equal(await actions.first().getAttribute('class'), 'primary launch');
     assert.match(
       await actions.nth(0).innerText(),
-      mode === 'Solo & bots' ? /Jouer sur cet appareil/ : /Créer un salon en ligne/,
+      mode === 'Solo & bots'
+        ? /Jouer sur cet appareil/
+        : mode === 'En ligne'
+          ? /Trouver une partie/
+          : /Créer un salon en ligne/,
       `${browser}/${mode}: wrong primary action`,
     );
     assert.equal(await actions.nth(1).getAttribute('class'), 'secondary local-launch');
     assert.match(
       await actions.nth(1).innerText(),
-      mode === 'Solo & bots' ? /Créer un salon en ligne/ : /Jouer sur cet appareil/,
+      mode === 'Solo & bots'
+        ? /Créer un salon en ligne/
+        : mode === 'En ligne'
+          ? /Créer un salon public/
+          : /Jouer sur cet appareil/,
       `${browser}/${mode}: wrong secondary action`,
     );
   }
-  await travellers.selectOption(initialCount);
 }
 async function menus(browser, name, width, height, large = false) {
   const context = await browser.newContext({
@@ -315,10 +326,10 @@ async function menus(browser, name, width, height, large = false) {
     await capture(home, name, large ? 'accueil-200' : 'accueil', audit && !large);
     for (const [key, label] of [
       ['reglages', 'Réglages'],
-      ['regles', /Comment jouer/],
+      ['configuration-locale', 'Jouer sur cet appareil'],
       ['salon', 'Rejoindre un salon'],
     ]) {
-      if (large && key !== 'reglages') continue;
+      if (large && !['reglages', 'configuration-locale'].includes(key)) continue;
       const opener = await open(home, label);
       await capture(home, name, key + (large ? '-200' : ''), audit);
       if (key === 'reglages') {
@@ -327,6 +338,13 @@ async function menus(browser, name, width, height, large = false) {
           .evaluate((e) => (e.scrollTop = e.scrollHeight));
         await capture(home, name, key + '-bas' + (large ? '-200' : ''));
         await keyboard(home, name + '/settings');
+      }
+      if (key === 'configuration-locale') {
+        assert.equal(await home.locator('dialog[open] .seat').count(), 4);
+        await home.getByLabel('Voyageurs', { exact: true }).selectOption('2');
+        assert.equal(await home.locator('dialog[open] .seat').count(), 2);
+        await home.getByLabel('Voyageurs', { exact: true }).selectOption('4');
+        await keyboard(home, name + '/local-setup');
       }
       if (key === 'salon') {
         assert(
@@ -691,11 +709,13 @@ async function revisions(browser, name) {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(server.url + '/');
     await page.getByRole('button', { name: /Jouer sur cet appareil/ }).click();
+    await page.getByRole('button', { name: 'Lancer la partie', exact: true }).click();
     await ready(page);
     const key = 'money-tour.local.v17';
     const seed = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)).seed, key);
     await page.goto(server.url + '/');
     await page.getByRole('button', { name: /Nouvelle partie sur cet appareil/ }).click();
+    await page.getByRole('button', { name: 'Lancer la partie', exact: true }).click();
     await capture(page, name, 'nouvelle-partie', true);
     await page.getByRole('button', { name: 'Annuler', exact: true }).click();
     assert.equal(
@@ -703,6 +723,7 @@ async function revisions(browser, name) {
       seed,
     );
     await page.getByRole('button', { name: /Nouvelle partie sur cet appareil/ }).click();
+    await page.getByRole('button', { name: 'Lancer la partie', exact: true }).click();
     await page.getByRole('button', { name: 'Reprendre la partie conservée', exact: true }).click();
     await ready(page);
     assert.equal(
@@ -711,6 +732,7 @@ async function revisions(browser, name) {
     );
     await page.goto(server.url + '/');
     await page.getByRole('button', { name: /Nouvelle partie sur cet appareil/ }).click();
+    await page.getByRole('button', { name: 'Lancer la partie', exact: true }).click();
     await page.setViewportSize({ width: 844, height: 390 });
     await capture(page, name, 'nouvelle-partie', true);
     await page.getByRole('button', { name: 'Remplacer et commencer', exact: true }).click();

@@ -16,7 +16,7 @@ Les mises à jour avec la même signature conservent les sauvegardes. Désinstal
 
 ## Adaptations Android
 
-- Jeu, modèles, textures, effets et musiques embarqués ; partie locale et tutoriel disponibles hors connexion.
+- Jeu, modèles, textures, effets et musiques embarqués ; partie locale disponible hors connexion.
 - Bouton Retour : fermer la fenêtre courante, confirmer avant de quitter une partie, réduire l’application depuis l’accueil.
 - Arrière-plan : sauvegarde locale immédiate, arrêt du son et pause de la partie locale. Au retour, **Reprendre** relance le chrono et les bots.
 - Interface tactile adaptée au portrait et au paysage, zones tactiles agrandies, fenêtres défilantes et commandes protégées des barres système et du clavier.
@@ -24,6 +24,12 @@ Les mises à jour avec la même signature conservent les sauvegardes. Désinstal
 - Icône et écran de lancement assortis au jeu. Aucun compte supplémentaire, autorisation de caméra, de microphone ou d’accès aux fichiers personnels.
 
 En ligne, Android peut suspendre une application en arrière-plan. La partie des autres joueurs continue ; la reprise dépend des mécanismes de reconnexion du jeu. Certains réseaux mobiles nécessitent un serveur TURN : voir [Connexions mobiles](docs/NETWORK_MOBILE.md). Aucun service TURN n’est inclus dans l’APK.
+
+## Synchronisation avec le jeu web
+
+Le code intègre les mises à jour web du **25 octobre 2026**, jusqu’au commit `b8a1720` : accueil **Entre amis / En ligne / Solo & bots**, configuration des parties sur cet appareil dans une fenêtre, recherche de parties et création de salons publics. Un joueur peut rejoindre une partie publique en reprenant une place IA disponible ; les nouvelles parties sont chacun pour soi et les sauvegardes en équipes restent lisibles. Voir [le protocole public](docs/PUBLIC_NETWORK.md).
+
+Ces changements nécessitent une nouvelle compilation Android. Le lien de téléchargement en tête de page reste celui de la livraison du 24 octobre et ne contient pas cette synchronisation. Les contrôles et les limites du nouveau build sont consignés dans [la validation de synchronisation](docs/ANDROID_WEB_SYNC.md).
 
 ## Recette et preuves
 

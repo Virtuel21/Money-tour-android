@@ -9,10 +9,12 @@ const resumeSchema = z.object({
   code: z.string().regex(/^[a-f0-9]{32}$/i),
   name: z.string().min(1).max(20),
   creator: z.boolean(),
+  publicGame: z.boolean().optional(),
   at: z.number(),
 });
 export type OnlineResume = z.infer<typeof resumeSchema>;
 const savedSchema = z.object({
+  publicGame: z.boolean().optional(),
   room: z.string().length(64),
   host: z.string(),
   epoch: z.number().int().nonnegative(),

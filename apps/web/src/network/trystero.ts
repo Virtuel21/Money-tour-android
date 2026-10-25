@@ -23,7 +23,7 @@ export class TrysteroTransport implements Transport {
       {
         // Isolate cached versions with different shared presentation budgets.
         // Every peer in a room must use the same card reading schedule.
-        appId: 'virtuel21-money-tour-v21',
+        appId: 'virtuel21-money-tour-v22',
         password,
         ...(this.turn.length ? { turnConfig: this.turn } : {}),
         ...(this.relayOnly ? { rtcConfig: { iceTransportPolicy: 'relay' as const } } : {}),

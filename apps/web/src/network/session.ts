@@ -41,9 +41,10 @@ import type { Transport } from './transport';
 import { presentationMs } from '../game/presentation';
 import { DISCONNECT_GRACE_MS } from './policy';
 import { TAUNT_COOLDOWN, taunts, type Taunt, type TauntKind } from '../game/taunts';
+import { publicBotNames } from './publicNames';
 
 const ZERO = '0'.repeat(64);
-const SESSION_PROTOCOL = 3;
+const SESSION_PROTOCOL = 4;
 export const ADVENTURE_START_TIMEOUT_MS = 20000;
 class NeedsRandom extends Error {}
 export function execute(
@@ -74,10 +75,38 @@ export function execute(
       if (canonical(expected) !== canonical(command.options))
         throw new Error('Rematch settings changed');
     }
-    return { state: createGame({ ...command.options, config: rules }, rng), events: [] };
+    const next = createGame({ ...command.options, config: rules }, rng);
+    if ((command.type === 'start' && command.publicGame) || state?.publicGame)
+      next.publicGame = true;
+    if (command.type === 'rematch' && state?.publicSeats)
+      next.publicSeats = { ...state.publicSeats };
+    return { state: next, events: [] };
   }
   if (!state) throw new Error('Not started');
   if (command.type === 'adventure_release') return { state, events: [] };
+  if (command.type === 'join_seat') {
+    if (
+      !state.publicGame ||
+      state.winner ||
+      !state.players.some(
+        (player) => player.id === command.member.seatId && player.bot && !player.eliminated,
+      )
+    )
+      throw new Error('Public seat unavailable');
+    const result = reduceGame(
+      state,
+      { type: 'set_control', playerId: command.member.seatId, bot: false },
+      rng,
+    );
+    if (result.error) throw new Error(result.error);
+    result.state.players.find((player) => player.id === command.member.seatId)!.name =
+      command.member.name;
+    result.state.publicSeats = {
+      ...state.publicSeats,
+      [command.member.seatId]: command.member.id,
+    };
+    return result;
+  }
   const result = reduceGame(state, command.action, rng);
   if (result.error) throw new Error(result.error);
   return result;
@@ -92,6 +121,9 @@ export function needsRandom(state: GameState | null, command: Command): boolean 
   }
 }
 export interface SessionView {
+  publicGame?: boolean;
+  selfIdentity?: string;
+  publicJoinStatus?: 'waiting' | 'joined' | 'rejected';
   startGate?: AdventureStartGate | null;
   stats?: GameStats;
   taunts?: Taunt[];
@@ -130,12 +162,33 @@ interface Round {
   attestations: Record<string, string>;
 }
 export interface SavedSession {
+  publicGame?: boolean;
   room: string;
   members: Member[];
   host: string;
   epoch: number;
   frames: Frame[];
   adventureReady?: AdventureReady;
+}
+export interface PublicSeatRequest {
+  expectedHostId?: string;
+  seatId: string;
+  reservationId: string;
+  reservationToken: string;
+}
+export interface PublicJoinAuthorization extends PublicSeatRequest {
+  identityId: string;
+}
+export interface SessionOptions {
+  publicGame?: boolean;
+  authorizePublicJoin?: (request: PublicJoinAuthorization) => Promise<boolean>;
+}
+interface PendingPublicJoin {
+  at: number;
+  from: string;
+  peer: string;
+  member: Member;
+  request: Extract<Body, { type: 'public_join' }>;
 }
 
 /** All received messages are authenticated and processed in one serial queue. */
@@ -181,25 +234,65 @@ export class Session {
   private recovering = false;
   private recoveryUntil = 0;
   private scheduled: { from: string; body: Extract<Body, { type: 'contribution' }> }[] = [];
+  private publicRoom = false;
+  private publicRequest: PublicSeatRequest | null = null;
+  private expectedPublicHost: string | null = null;
+  private publicRequestSentAt = Number.NEGATIVE_INFINITY;
+  private publicRequestSentTo = '';
+  private publicRequestSentId = '';
+  private publicJoinStatus: SessionView['publicJoinStatus'];
+  private pendingPublic = new Map<string, PendingPublicJoin>();
   constructor(
     readonly transport: Transport,
     readonly user: Identity,
     public name: string,
     readonly creator = false,
     private now = () => Date.now(),
-  ) {}
+    private options: SessionOptions = {},
+  ) {
+    this.publicRoom = options.publicGame === true;
+  }
+  get publicGame(): boolean {
+    return this.state?.publicGame === true || (!this.state && this.publicRoom);
+  }
+  private seatFor(identityId: string): string {
+    return this.members.find((member) => member.id === identityId)?.seatId ?? identityId;
+  }
+  private identityFor(seatId: string): string {
+    return this.members.find((member) => (member.seatId ?? member.id) === seatId)?.id ?? seatId;
+  }
+  availablePublicSeats(): string[] {
+    if (!this.publicGame || this.blocked || this.state?.winner || this.members.length >= 4)
+      return [];
+    if (!this.state) return Array.from({ length: 4 - this.members.length }, () => 'lobby');
+    const original = this.frames.find((frame) => frame.command.type === 'start')?.command;
+    if (original?.type !== 'start') return [];
+    return this.state.players
+      .filter(
+        (player) =>
+          player.bot &&
+          !player.eliminated &&
+          original.options.players.some((initial) => initial.id === player.id && initial.bot) &&
+          !this.members.some((member) => (member.seatId ?? member.id) === player.id) &&
+          !this.state?.publicSeats?.[player.id],
+      )
+      .map((player) => player.id);
+  }
   get isHost(): boolean {
     return this.host === this.user.id;
   }
   get view(): SessionView {
     return {
+      publicGame: this.publicGame,
+      selfIdentity: this.user.id,
+      publicJoinStatus: this.publicJoinStatus,
       startGate: this.startGate,
       stats: this.stats,
       taunts: this.taunts,
       state: this.state,
       members: this.members,
       host: this.host,
-      self: this.user.id,
+      self: this.seatFor(this.user.id),
       connected: this.connected(),
       busy: this.busy || !!this.round,
       status: this.status,
@@ -247,10 +340,11 @@ export class Session {
       this.recovering = true;
       this.reclaimOnSync = true;
       this.recoveryUntil = this.now() + config.network.hostTimeoutMs;
-      this.members = saved.members;
-      this.host = saved.host;
+      this.publicRoom = saved.publicGame === true;
+      this.members = saved.members.filter((member) => !member.seatId);
+      this.host = this.expectedPublicHost ?? saved.host;
       this.epoch = saved.epoch;
-      for (const member of this.members) this.identities.set(member.id, member.key);
+      for (const member of saved.members) this.identities.set(member.id, member.key);
       for (const frame of saved.frames) await this.acceptFrame(frame, false);
       await this.acceptAdventureReady(saved.adventureReady);
     } else if (this.creator) {
@@ -264,6 +358,7 @@ export class Session {
     this.transport.onPeerLeave = (peer) => {
       const id = [...this.peers].find(([, p]) => p === peer)?.[0];
       if (id) {
+        this.pendingPublic.delete(id);
         this.peers.delete(id);
         this.seen.delete(id);
         if (!this.unavailableSince.has(id)) this.unavailableSince.set(id, this.now());
@@ -306,6 +401,132 @@ export class Session {
       peer,
     );
   }
+  private publicConsent(
+    request: Pick<PublicSeatRequest, 'reservationId' | 'seatId'>,
+    identityId: string,
+    name: string,
+  ) {
+    return {
+      domain: 'money-tour-public-seat-v1',
+      room: this.room,
+      reservationId: request.reservationId,
+      seatId: request.seatId,
+      identityId,
+      name,
+    };
+  }
+  async requestPublicSeat(request: PublicSeatRequest): Promise<void> {
+    this.publicRequest = {
+      seatId: request.seatId,
+      reservationId: request.reservationId,
+      reservationToken: request.reservationToken,
+    };
+    this.expectedPublicHost = request.expectedHostId ?? null;
+    if (this.expectedPublicHost) this.host = this.expectedPublicHost;
+    this.publicJoinStatus = 'waiting';
+    if (this.room) await this.sendPublicRequest();
+    this.emit();
+  }
+  private async sendPublicRequest(): Promise<void> {
+    const request = this.publicRequest;
+    if (!request || !this.room) return;
+    const hostPeer = this.peers.get(this.expectedPublicHost ?? this.host);
+    if (!hostPeer) return;
+    if (
+      this.publicRequestSentTo === hostPeer &&
+      this.publicRequestSentId === request.reservationId &&
+      this.now() - this.publicRequestSentAt < 1000
+    )
+      return;
+    this.publicRequestSentAt = this.now();
+    this.publicRequestSentTo = hostPeer;
+    this.publicRequestSentId = request.reservationId;
+    await this.send(
+      {
+        type: 'public_join',
+        seatId: request.seatId,
+        reservationId: request.reservationId,
+        reservationToken: request.reservationToken,
+        name: this.name,
+        consent: await sign(
+          this.user.privateKey,
+          this.publicConsent(request, this.user.id, this.name),
+        ),
+      },
+      hostPeer,
+    );
+  }
+  private async rejectPublic(join: PendingPublicJoin, reason: 'closed' | 'reservation' | 'full') {
+    await this.send(
+      { type: 'join_rejected', reservationId: join.request.reservationId, reason },
+      join.peer,
+    );
+  }
+  private async admitPublic(join: PendingPublicJoin): Promise<void> {
+    if (this.now() - join.at >= 45000) {
+      this.pendingPublic.delete(join.from);
+      await this.rejectPublic(join, 'reservation');
+      return;
+    }
+    if (!this.publicGame || this.state?.winner || this.members.length >= 4) {
+      this.pendingPublic.delete(join.from);
+      await this.rejectPublic(join, 'full');
+      return;
+    }
+    if (!this.state) {
+      if (join.request.seatId !== 'lobby' || this.round) return;
+      this.members.push({ ...join.member, order: this.members.length });
+      this.pendingPublic.delete(join.from);
+      this.persist();
+      await this.statusMessage();
+      this.emit();
+      return;
+    }
+    if (!this.availablePublicSeats().includes(join.request.seatId)) {
+      this.pendingPublic.delete(join.from);
+      await this.rejectPublic(join, 'full');
+      return;
+    }
+    if (
+      this.startGate ||
+      this.round ||
+      this.busy ||
+      this.state.phase !== 'roll' ||
+      this.now() < this.presentationUntil
+    )
+      return;
+    let stillAuthorized = false;
+    try {
+      stillAuthorized =
+        (await this.options.authorizePublicJoin?.({
+          identityId: join.from,
+          seatId: join.request.seatId,
+          reservationId: join.request.reservationId,
+          reservationToken: join.request.reservationToken,
+        })) === true;
+    } catch {
+      /* Recheck expiry at the safe transfer boundary, not only on connection. */
+    }
+    if (!stillAuthorized) {
+      this.pendingPublic.delete(join.from);
+      await this.rejectPublic(join, 'reservation');
+      return;
+    }
+    this.pendingPublic.delete(join.from);
+    await this.propose({
+      type: 'join_seat',
+      member: { ...join.member, order: this.members.length, seatId: join.request.seatId },
+      reservationId: join.request.reservationId,
+      consent: join.request.consent,
+    });
+    this.exclusions.add(join.from);
+    this.unavailableSince.set(join.from, this.now());
+    await this.statusMessage();
+    await this.send(
+      { type: 'snapshot', frames: this.frames, adventureReady: this.savedAdventureReady() },
+      join.peer,
+    );
+  }
   private acceptTaunt(
     playerId: string,
     kind: TauntKind,
@@ -336,7 +557,14 @@ export class Session {
   }
   async taunt(kind: TauntKind, targetId?: string): Promise<void> {
     this.enqueue(async () => {
-      if (this.acceptTaunt(this.user.id, kind, targetId, `${this.user.id}:${this.serial + 1}`))
+      if (
+        this.acceptTaunt(
+          this.seatFor(this.user.id),
+          kind,
+          targetId,
+          `${this.user.id}:${this.serial + 1}`,
+        )
+      )
         await this.send({ type: 'taunt', kind, targetId });
     });
     await this.idle();
@@ -356,6 +584,7 @@ export class Session {
   private async hello(): Promise<void> {
     await this.send({
       type: 'hello',
+      ...(this.publicRequest ? { publicJoin: true as const } : {}),
       protocol: SESSION_PROTOCOL,
       name: this.name,
       creator: this.creator,
@@ -365,6 +594,7 @@ export class Session {
       adventureReady: this.savedAdventureReady(),
     });
     if (this.isHost) await this.statusMessage();
+    else if (this.publicRequest) await this.sendPublicRequest();
   }
   private async statusMessage(): Promise<void> {
     await this.send({
@@ -380,6 +610,7 @@ export class Session {
   }
   private persist(): void {
     this.onPersist({
+      ...(this.publicGame ? { publicGame: true } : {}),
       room: this.room,
       members: this.members,
       host: this.host,
@@ -464,9 +695,10 @@ export class Session {
     this.recovering = false;
     if (!this.reclaimOnSync) return;
     this.reclaimOnSync = false;
-    const player = this.state?.players.find((p) => p.id === this.user.id);
+    const seatId = this.seatFor(this.user.id);
+    const player = this.state?.players.find((p) => p.id === seatId);
     if (player?.bot && !player.eliminated && !this.state?.winner)
-      void this.intent({ type: 'set_control', playerId: this.user.id, bot: false });
+      void this.intent({ type: 'set_control', playerId: seatId, bot: false });
   }
   private async receive(raw: unknown, peer: string): Promise<void> {
     if (JSON.stringify(raw).length > 8_000_000) return;
@@ -474,6 +706,7 @@ export class Session {
     if (!parsed.success) return;
     const { signature, ...message } = parsed.data;
     if (message.room !== this.room || message.peer !== peer) return;
+    if (this.expectedPublicHost && message.from !== this.expectedPublicHost) return;
     const stamp = `${peer}:${message.serial}`;
     if (this.dedup.has(stamp)) return;
     const known = this.identities.get(message.from);
@@ -487,6 +720,77 @@ export class Session {
     if (!this.exclusions.has(message.from)) this.unavailableSince.delete(message.from);
     const body = bodySchema.parse(message.body),
       from = message.from;
+    if (body.type === 'join_rejected' && from === this.host) {
+      if (this.publicRequest?.reservationId !== body.reservationId) return;
+      this.publicRequest = null;
+      this.publicJoinStatus = 'rejected';
+      this.incident(
+        body.reason === 'reservation'
+          ? 'La réservation de cette place a expiré. Relancez la recherche.'
+          : 'Cette partie ne dispose plus de place disponible. Relancez la recherche.',
+      );
+      return;
+    }
+    if (body.type === 'public_join' && this.isHost) {
+      await this.statusMessage();
+      if (!this.publicGame) {
+        await this.send(
+          { type: 'join_rejected', reservationId: body.reservationId, reason: 'closed' },
+          peer,
+        );
+        return;
+      }
+      if (this.members.some((member) => member.id === from)) {
+        await this.send(
+          { type: 'snapshot', frames: this.frames, adventureReady: this.savedAdventureReady() },
+          peer,
+        );
+        return;
+      }
+      const pending = this.pendingPublic.get(from);
+      if (pending?.request.reservationId === body.reservationId) {
+        pending.peer = peer;
+        return;
+      }
+      this.pendingPublic.delete(from);
+      const join: PendingPublicJoin = {
+        at: this.now(),
+        from,
+        peer,
+        request: body,
+        member: { id: from, key: message.key, name: body.name, order: this.members.length },
+      };
+      if (!this.publicGame || !this.options.authorizePublicJoin) {
+        await this.rejectPublic(join, 'closed');
+        return;
+      }
+      if (this.members.length >= 4 || this.pendingPublic.size >= 4) {
+        await this.rejectPublic(join, 'full');
+        return;
+      }
+      if (!(await verify(message.key, this.publicConsent(body, from, body.name), body.consent))) {
+        await this.rejectPublic(join, 'reservation');
+        return;
+      }
+      let authorized = false;
+      try {
+        authorized = await this.options.authorizePublicJoin({
+          identityId: from,
+          seatId: body.seatId,
+          reservationId: body.reservationId,
+          reservationToken: body.reservationToken,
+        });
+      } catch {
+        /* An unavailable directory must never grant a seat. */
+      }
+      if (!authorized) {
+        await this.rejectPublic(join, 'reservation');
+        return;
+      }
+      this.pendingPublic.set(from, join);
+      await this.admitPublic(join);
+      return;
+    }
     if (body.type === 'hello') {
       if (body.protocol !== SESSION_PROTOCOL) {
         this.incident('Version du jeu incompatible : actualisez la page sur tous les appareils.');
@@ -497,13 +801,20 @@ export class Session {
         this.unavailableSince.delete(from);
       }
       if (!this.host && body.creator) this.host = from;
+      if (!this.isHost && from === this.host && this.publicRequest) await this.sendPublicRequest();
       if (this.isHost) {
         const existing = this.members.find((m) => m.id === from);
         if (existing && !this.state && !this.round) {
           existing.name = body.name;
           this.persist();
         }
-        if (!this.members.some((m) => m.id === from) && !this.state && this.members.length < 4) {
+        if (
+          !this.publicGame &&
+          !body.publicJoin &&
+          !this.members.some((m) => m.id === from) &&
+          !this.state &&
+          this.members.length < 4
+        ) {
           this.members.push({
             id: from,
             name: body.name,
@@ -535,7 +846,7 @@ export class Session {
         this.recovering &&
         body.epoch > this.epoch &&
         body.host === from &&
-        this.members.some((m) => m.id === from)
+        (this.members.some((m) => m.id === from) || this.expectedPublicHost === from)
       ) {
         this.host = from;
         this.epoch = body.epoch;
@@ -554,7 +865,10 @@ export class Session {
         if ((await hash(member.key)) !== member.id) return;
         this.identities.set(member.id, member.key);
       }
-      if (this.state && canonical(body.members) !== canonical(this.members)) return;
+      if (this.state && canonical(body.members) !== canonical(this.members)) {
+        if (body.index > this.frames.length) await this.send({ type: 'sync' }, peer);
+        return;
+      }
       this.members = body.members;
       if (body.index === this.frames.length && body.head !== this.head) {
         this.blocked = true;
@@ -568,9 +882,21 @@ export class Session {
         if (this.state) this.status = 'Partie synchronisée.';
       }
       if (!this.members.some((m) => m.id === this.user.id))
-        this.status = 'Ce salon est complet ou la partie a déjà commencé.';
+        this.status = this.publicRequest
+          ? 'Votre place est réservée. Connexion à la partie…'
+          : 'Ce salon est complet ou la partie a déjà commencé.';
       else if (!this.state) this.status = 'Salon connecté. L’hôte peut lancer la partie.';
+      if (
+        this.members.some((m) => m.id === this.user.id) &&
+        this.publicJoinStatus === 'waiting' &&
+        (this.state || body.index === 0)
+      ) {
+        this.publicJoinStatus = 'joined';
+        this.publicRequest = null;
+        this.expectedPublicHost = null;
+      }
       this.persist();
+      if (this.publicRequest) await this.sendPublicRequest();
       this.emit();
       return;
     }
@@ -581,7 +907,7 @@ export class Session {
       return;
     }
     if (body.type === 'taunt') {
-      this.acceptTaunt(from, body.kind, body.targetId, stamp);
+      this.acceptTaunt(this.seatFor(from), body.kind, body.targetId, stamp);
       return;
     }
     if (body.type === 'attest' && this.round?.ceremony.context.nonce === body.nonce) {
@@ -604,12 +930,23 @@ export class Session {
           this.incident('La reprise contredit le dernier état validé.');
           return;
         }
+      if (!this.frames.length && !this.state)
+        this.members = this.members.filter((member) => !member.seatId);
       for (const frame of body.frames.slice(this.frames.length))
         await this.acceptFrame(frame, false);
+      if (
+        this.members.some((member) => member.id === this.user.id) &&
+        this.publicJoinStatus === 'waiting'
+      ) {
+        this.publicJoinStatus = 'joined';
+        this.publicRequest = null;
+        this.expectedPublicHost = null;
+      }
       await this.acceptAdventureReady(body.adventureReady);
       this.status = 'Partie synchronisée.';
       this.recovered();
       this.persist();
+      await this.hello();
       this.emit();
       return;
     }
@@ -682,10 +1019,11 @@ export class Session {
   }
   private async validIntent(intent: AuthIntent, from: string): Promise<boolean> {
     if (
+      !this.members.some((member) => member.id === from) ||
       intent.playerId !== from ||
       intent.parent !== this.head ||
       !('playerId' in intent.action) ||
-      intent.action.playerId !== from
+      intent.action.playerId !== this.seatFor(from)
     )
       return false;
     if (intent.action.type === 'set_control' && intent.action.bot) return false;
@@ -702,7 +1040,7 @@ export class Session {
     if (
       !actionSchema.safeParse(action).success ||
       !('playerId' in action) ||
-      action.playerId !== this.user.id
+      action.playerId !== this.seatFor(this.user.id)
     )
       return;
     const unsigned = { playerId: this.user.id, parent: this.head, action };
@@ -725,9 +1063,11 @@ export class Session {
     teams: boolean,
     durationMs: number,
     presentationPace: 'normal' | 'fast' = 'normal',
+    options: { publicGame?: boolean } = {},
   ): Promise<void> {
     this.enqueue(async () => {
       if (!this.isHost || this.state) return;
+      if (options.publicGame) this.publicRoom = true;
       if (teams) count = 4;
       const players = this.members.map((m, i) => ({
         id: m.id,
@@ -740,11 +1080,18 @@ export class Session {
         bot: false,
         ...(teams ? { team: i % 2 } : {}),
       }));
+      const aiNames = this.publicGame
+        ? publicBotNames(
+            this.room,
+            players.map((player) => player.name),
+            Math.max(0, count - players.length),
+          )
+        : [];
       while (players.length < Math.max(count, players.length)) {
         const i = players.length;
         players.push({
           id: `bot-${i}`,
-          name: ['Sacha', 'Lou', 'Noa', 'Alba'][i]!,
+          name: this.publicGame ? aiNames.shift()! : ['Sacha', 'Lou', 'Noa', 'Alba'][i]!,
           bot: true,
           ...(teams ? { team: i % 2 } : {}),
         });
@@ -754,6 +1101,7 @@ export class Session {
           type: 'start',
           rulesVersion: 18,
           adventureStart: true,
+          ...(this.publicGame ? { publicGame: true } : {}),
           options: {
             randomFirstPlayer: true,
             players,
@@ -771,8 +1119,8 @@ export class Session {
       const options = rematchOptions(this.state);
       options.players = options.players.map((player) => ({
         ...player,
-        bot: this.members.some((member) => member.id === player.id)
-          ? !this.connected().includes(player.id)
+        bot: this.members.some((member) => (member.seatId ?? member.id) === player.id)
+          ? !this.connected().includes(this.identityFor(player.id))
           : true,
       }));
       await this.propose(
@@ -786,12 +1134,39 @@ export class Session {
     });
   }
   private async permitted(command: Command): Promise<boolean> {
+    if (command.type === 'join_seat') {
+      const member = command.member;
+      return (
+        this.publicGame &&
+        !!this.state &&
+        !this.state.winner &&
+        !this.startGate &&
+        this.state.phase === 'roll' &&
+        this.members.length < 4 &&
+        member.order === this.members.length &&
+        !this.members.some((existing) => existing.id === member.id) &&
+        this.availablePublicSeats().includes(member.seatId) &&
+        (await hash(member.key)) === member.id &&
+        (await verify(
+          member.key,
+          this.publicConsent(
+            {
+              reservationId: command.reservationId,
+              seatId: member.seatId,
+            },
+            member.id,
+            member.name,
+          ),
+          command.consent,
+        ))
+      );
+    }
     if (command.type === 'rematch') {
       if (!this.state?.winner) return false;
       const previous = rematchOptions(this.state, command.options.randomFirstPlayer === true);
       previous.players = previous.players.map((player) => ({
         ...player,
-        bot: this.members.some((member) => member.id === player.id)
+        bot: this.members.some((member) => (member.seatId ?? member.id) === player.id)
           ? (command.options.players.find((p) => p.id === player.id)?.bot ?? true)
           : true,
       }));
@@ -1058,7 +1433,7 @@ export class Session {
     this.stats =
       frame.command.type === 'adventure_release'
         ? this.stats
-        : frame.command.type === 'action' && this.state
+        : (frame.command.type === 'action' || frame.command.type === 'join_seat') && this.state
           ? accumulateStats(this.stats, this.state, result.state, result.events)
           : newGameStats(result.state);
     if (frame.command.type === 'rematch') {
@@ -1070,6 +1445,16 @@ export class Session {
       this.lastTick = this.now();
     }
     this.state = result.state;
+    if (frame.command.type === 'join_seat') {
+      const member = frame.command.member;
+      this.members.push(member);
+      this.identities.set(member.id, member.key);
+      if (member.id === this.user.id) {
+        this.publicJoinStatus = 'joined';
+        this.publicRequest = null;
+        this.expectedPublicHost = null;
+      }
+    }
     if (frame.command.type === 'start' || frame.command.type === 'rematch') {
       this.adventureSignatures = {};
       this.startGate =
@@ -1080,7 +1465,7 @@ export class Session {
               deadline: frame.adventureDeadline,
               participants: result.state.players
                 .filter((player) => !player.bot)
-                .map((player) => player.id),
+                .map((player) => this.identityFor(player.id)),
               ready: [],
             };
     } else if (frame.command.type === 'adventure_release') {
@@ -1094,8 +1479,8 @@ export class Session {
       frame.command.action.type === 'set_control' &&
       !frame.command.action.bot
     ) {
-      this.exclusions.delete(frame.command.action.playerId);
-      this.unavailableSince.delete(frame.command.action.playerId);
+      this.exclusions.delete(this.identityFor(frame.command.action.playerId));
+      this.unavailableSince.delete(this.identityFor(frame.command.action.playerId));
     }
     this.events = result.events;
     if (live && result.events.length) {
@@ -1117,6 +1502,7 @@ export class Session {
   }
   async pulse(): Promise<void> {
     const now = this.now();
+    if (this.publicRequest) await this.sendPublicRequest();
     if (this.recovering && now < this.recoveryUntil) {
       await this.hello();
       return;
@@ -1196,6 +1582,12 @@ export class Session {
       await this.releaseAdventure();
       return;
     }
+    const pendingJoin = this.pendingPublic.values().next().value;
+    if (pendingJoin) {
+      const before = this.frames.length;
+      await this.admitPublic(pendingJoin);
+      if (this.frames.length !== before) return;
+    }
     // Give humans their entire decision window after the shared presentation,
     // just as local play already does. Heartbeats and recovery still run above.
     if (now < this.presentationUntil) {
@@ -1204,14 +1596,18 @@ export class Session {
     }
     const unavailable = this.state.players.filter(
       (p) =>
-        !p.bot && !p.eliminated && (!this.connected().includes(p.id) || this.exclusions.has(p.id)),
+        !p.bot &&
+        !p.eliminated &&
+        (!this.connected().includes(this.identityFor(p.id)) ||
+          this.exclusions.has(this.identityFor(p.id))),
     );
     for (const player of unavailable) {
-      if (!this.unavailableSince.has(player.id))
-        this.unavailableSince.set(player.id, this.seen.get(player.id) ?? now);
+      const controller = this.identityFor(player.id);
+      if (!this.unavailableSince.has(controller))
+        this.unavailableSince.set(controller, this.seen.get(controller) ?? now);
     }
     const absent = unavailable.find(
-      (p) => now - this.unavailableSince.get(p.id)! >= DISCONNECT_GRACE_MS,
+      (p) => now - this.unavailableSince.get(this.identityFor(p.id))! >= DISCONNECT_GRACE_MS,
     );
     if (absent) {
       await this.propose({
@@ -1224,7 +1620,10 @@ export class Session {
       this.lastTick = now;
       const remaining = Math.max(
         ...unavailable.map((p) =>
-          Math.ceil((DISCONNECT_GRACE_MS - (now - this.unavailableSince.get(p.id)!)) / 1000),
+          Math.ceil(
+            (DISCONNECT_GRACE_MS - (now - this.unavailableSince.get(this.identityFor(p.id))!)) /
+              1000,
+          ),
         ),
       );
       this.status = `Reconnexion de ${unavailable.map((p) => p.name).join(', ')}… Partie en attente · bot dans ${remaining} s.`;

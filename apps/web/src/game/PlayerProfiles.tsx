@@ -13,6 +13,7 @@ import './player-profiles.css';
 interface PlayerProfilesProps {
   state: GameState;
   self?: string;
+  publicGame?: boolean;
   mobile: boolean;
   inspectedOwner: string | null;
   onInspectOwner: (id: string | null) => void;
@@ -104,6 +105,7 @@ function TaxStatus({ player }: { player: Player }) {
 export function PlayerProfiles({
   state,
   self,
+  publicGame = false,
   mobile,
   inspectedOwner,
   onInspectOwner,
@@ -123,7 +125,7 @@ export function PlayerProfiles({
   const seatLabel = (player: Player, index: number) =>
     self === player.id
       ? translate('VOUS')
-      : player.bot
+      : player.bot && !publicGame
         ? translate('BOT')
         : state.mode === 'teams'
           ? formatText('ÉQ. {0}', player.team === 0 ? 'A' : 'B')
@@ -279,6 +281,7 @@ export function PlayerProfiles({
             index={selectedIndex}
             name={displayName(selectedPlayer, selectedIndex)}
             seat={seatLabel(selectedPlayer, selectedIndex)}
+            automated={publicGame && Boolean(selectedPlayer.bot)}
             active={selectedPlayer.id === activeId}
             self={self}
             showPrivateQuest={selectedPlayer.id === privatePlayerId}
@@ -301,6 +304,7 @@ function PlayerDetails({
   index,
   name,
   seat,
+  automated,
   active,
   self,
   showPrivateQuest,
@@ -316,6 +320,7 @@ function PlayerDetails({
   index: number;
   name: string;
   seat: string;
+  automated: boolean;
   active: boolean;
   self?: string;
   showPrivateQuest: boolean;
@@ -375,6 +380,7 @@ function PlayerDetails({
             <span className={`player-details-badge${active ? ' is-active' : ''}`}>
               {active ? translate('Joueur actif') : seat}
             </span>
+            {automated && <p className="public-player-kind">{translate('Joueur IA')}</p>}
             <PlayerBalance player={player} />
           </div>
         </header>

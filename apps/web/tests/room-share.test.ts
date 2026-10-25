@@ -70,7 +70,7 @@ async function lobby(
       createElement(OnlineLobby, {
         open: true,
         autoCreate: true,
-        defaults: { name: 'Camille', count: 2, teams: false, minutes: 20 },
+        defaults: { name: 'Camille', count: 2, minutes: 20 },
         onClose: vi.fn(),
         onSession: vi.fn(),
         onView: vi.fn(),

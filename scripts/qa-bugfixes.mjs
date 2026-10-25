@@ -122,6 +122,7 @@ try {
       assert.equal(await page.locator('.online-modal[open]').count(), 0);
       assert.equal(new URL(page.url()).hash, '');
       await local.click();
+      await page.getByRole('button', { name: 'Lancer la partie', exact: true }).click();
       await page.getByRole('button', { name: 'Démarrer l’aventure', exact: true }).click();
       await readyBoard(page);
       assert.equal(await page.locator('.play-scene').count(), 1);

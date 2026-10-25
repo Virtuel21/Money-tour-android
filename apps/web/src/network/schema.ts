@@ -1,6 +1,16 @@
 import { z } from 'zod';
 const id = z.string().min(1).max(80);
 const natural = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
+export const memberSchema = z
+  .object({
+    id,
+    name: z.string().min(1).max(20),
+    key: z.record(z.string(), z.unknown()),
+    order: z.number().int().min(0).max(3),
+    seatId: id.optional(),
+  })
+  .strict();
+export type Member = z.infer<typeof memberSchema>;
 export const actionSchema = z.union([
   z
     .object({
@@ -118,6 +128,7 @@ export const commandSchema = z.union([
       rulesVersion: z.literal(18).optional(),
       options: optionsSchema,
       adventureStart: z.literal(true).optional(),
+      publicGame: z.literal(true).optional(),
     })
     .strict(),
   z
@@ -134,6 +145,14 @@ export const commandSchema = z.union([
       gate: z.string().length(64),
       at: natural,
       ready: z.record(id, z.string().length(128)),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('join_seat'),
+      member: memberSchema.extend({ seatId: id }),
+      reservationId: z.string().min(1).max(128),
+      consent: z.string().length(128),
     })
     .strict(),
   z
@@ -177,20 +196,24 @@ export const frameSchema = z
   })
   .strict();
 export type Frame = z.infer<typeof frameSchema>;
-export const memberSchema = z
-  .object({
-    id,
-    name: z.string().min(1).max(20),
-    key: z.record(z.string(), z.unknown()),
-    order: z.number().int().min(0).max(3),
-  })
-  .strict();
-export type Member = z.infer<typeof memberSchema>;
 export const adventureReadySchema = z.object({
   gate: z.string().length(64),
   signatures: z.record(id, z.string().length(128)),
 });
 export const bodySchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('public_join'),
+    name: z.string().min(1).max(20),
+    seatId: id,
+    reservationId: z.string().min(1).max(128),
+    reservationToken: z.string().min(1).max(512),
+    consent: z.string().length(128),
+  }),
+  z.object({
+    type: z.literal('join_rejected'),
+    reservationId: z.string().min(1).max(128),
+    reason: z.enum(['closed', 'reservation', 'full']),
+  }),
   z.object({
     type: z.literal('adventure_ready'),
     gate: z.string().length(64),
@@ -210,6 +233,7 @@ export const bodySchema = z.discriminatedUnion('type', [
   }),
   z.object({
     type: z.literal('hello'),
+    publicJoin: z.literal(true).optional(),
     protocol: natural.optional(),
     name: z.string().min(1).max(20),
     creator: z.boolean(),
