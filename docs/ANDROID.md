@@ -27,6 +27,20 @@ apksigner verify --verbose --print-certs artifacts/android/Money-Tour-Android-0.
 adb install -r artifacts/android/Money-Tour-Android-0.1.0-debug.apk
 ```
 
+## Firebase Analytics
+
+Le module Android utilise le plugin Google Services 4.5.0 et Firebase Analytics avec la BoM 35.1.0. La configuration fournie est versionnée dans `android/app/google-services.json` : projet Firebase `money-tour-45c5d`, application `com.moneytour.android`. Le plugin est appliqué explicitement ; un fichier manquant ou incompatible doit faire échouer le build.
+
+Cette intégration suit la [configuration Android officielle Firebase](https://firebase.google.com/docs/android/setup). Elle ajoute le SDK natif et sa collecte automatique. Les événements des actions du jeu dans la WebView Capacitor ne sont pas encore transmis au SDK natif. Aucun conteneur Google Tag Manager n’est inclus à ce stade ; la liaison du projet Firebase à la propriété GA4 doit être vérifiée dans la console Firebase.
+
+Pour vérifier la réception dans DebugView avec un appareil ou émulateur connecté :
+
+```sh
+adb shell setprop debug.firebase.analytics.app com.moneytour.android
+```
+
+Relancer ensuite l’application et ouvrir Analytics → DebugView dans Firebase. Désactiver ce mode après le contrôle avec `adb shell setprop debug.firebase.analytics.app .none.`. Une compilation réussie ne prouve pas la réception des événements dans GA4.
+
 ## Signature et mises à jour
 
 Le build debug utilise la clé du poste (`~/.android/debug.keystore`). Le workflow peut restaurer la même clé via le secret `ANDROID_DEBUG_KEYSTORE_BASE64`, pour permettre les mises à jour sans désinstallation. Cette clé de test n’est pas destinée à Google Play. Les fichiers de clés sont exclus de Git.
