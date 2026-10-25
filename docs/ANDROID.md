@@ -31,7 +31,7 @@ adb install -r artifacts/android/Money-Tour-Android-0.1.0-debug.apk
 
 Le module Android utilise le plugin Google Services 4.5.0 et Firebase Analytics avec la BoM 35.1.0. La configuration fournie est versionnée dans `android/app/google-services.json` : projet Firebase `money-tour-45c5d`, application `com.moneytour.android`. Le plugin est appliqué explicitement ; un fichier manquant ou incompatible doit faire échouer le build.
 
-Cette intégration suit la [configuration Android officielle Firebase](https://firebase.google.com/docs/android/setup). Elle ajoute le SDK natif et sa collecte automatique. Les événements des actions du jeu dans la WebView Capacitor ne sont pas encore transmis au SDK natif. Aucun conteneur Google Tag Manager n’est inclus à ce stade ; la liaison du projet Firebase à la propriété GA4 doit être vérifiée dans la console Firebase.
+Cette intégration suit la [configuration Android officielle Firebase](https://firebase.google.com/docs/android/setup). Elle ajoute le SDK natif et sa collecte automatique. Les événements des actions du jeu dans la WebView Capacitor ne sont pas encore transmis au SDK natif. La liaison du projet Firebase à la propriété GA4 doit être vérifiée dans la console Firebase.
 
 Pour vérifier la réception dans DebugView avec un appareil ou émulateur connecté :
 
@@ -40,6 +40,33 @@ adb shell setprop debug.firebase.analytics.app com.moneytour.android
 ```
 
 Relancer ensuite l’application et ouvrir Analytics → DebugView dans Firebase. Désactiver ce mode après le contrôle avec `adb shell setprop debug.firebase.analytics.app .none.`. Une compilation réussie ne prouve pas la réception des événements dans GA4.
+
+## Google Tag Manager
+
+Le SDK natif Google Tag Manager 18.3.0 utilise le conteneur Android/Firebase `GTM-5V5MVGB2` (`Money Tour Android`). Le conteneur compilé est embarqué dans `android/app/src/main/assets/containers/GTM-5V5MVGB2.json`, conformément à la [procédure Android officielle](https://developers.google.com/tag-platform/tag-manager/android/v5).
+
+Le fichier fourni `GTM-5V5MVGB2_workspace2.json` est un export de l’espace de travail (`exportFormatVersion: 2`, version de brouillon `0`), destiné à une réimportation dans la console GTM. Il n’est pas utilisé comme ressource Android. La ressource compilée a été récupérée le 25 octobre 2026 depuis le [point de distribution Android de Google](https://www.google-analytics.com/gtm/android?id=GTM-5V5MVGB2&pv=-1&rv=5.0) : version `1`, empreinte GTM `MQ$0`, SHA-256 `559f16d80ab8c753435e03ea4f7e2e3bfcd6ce89eb90da1b125e784ee885035e`. Cette version ne contient aucune balise active ; la balise de brouillon `test` n’est pas publiée par ce changement.
+
+Les événements Firebase continuent d’être envoyés à Analytics par défaut. GTM permet de les modifier ou filtrer avec des balises et déclencheurs publiés dans sa console. Les événements personnalisés du jeu Capacitor restent à instrumenter dans le SDK Firebase natif.
+
+### Prévisualiser et vérifier
+
+Le manifeste de variante `debug` déclare `TagManagerPreviewActivity` avec le schéma `tagmanager.c.com.moneytour.android`. Cette route de prévisualisation n’est pas ajoutée à la variante `release`.
+
+1. Installer l’APK debug sur un appareil ou émulateur avec Google Play Services.
+2. Dans GTM, ouvrir **Versions → Actions → Prévisualiser**, saisir `com.moneytour.android`, puis générer le lien de début de prévisualisation.
+3. Ouvrir ce lien sur l’appareil et interagir avec l’application.
+4. Activer les journaux et DebugView si nécessaire :
+
+```sh
+adb shell setprop log.tag.GoogleTagManager VERBOSE
+adb shell setprop debug.firebase.analytics.app com.moneytour.android
+adb logcat -s GoogleTagManager FA FA-SVC
+```
+
+Après le contrôle, quitter la prévisualisation via le lien de fin généré dans GTM et désactiver DebugView avec `adb shell setprop debug.firebase.analytics.app .none.`. Vérifier le chargement du conteneur dans les journaux et la réception des événements dans Firebase/GA4 ; une compilation réussie ne suffit pas à confirmer ces deux points.
+
+Après validation des balises et déclencheurs, publier la version dans GTM. Les appareils téléchargent ensuite les versions publiées ; le fichier embarqué sert de configuration initiale. Pour le mettre à jour dans une future APK, utiliser **Versions → version choisie → Télécharger**, puis remplacer la ressource Android par le fichier compilé téléchargé.
 
 ## Signature et mises à jour
 
